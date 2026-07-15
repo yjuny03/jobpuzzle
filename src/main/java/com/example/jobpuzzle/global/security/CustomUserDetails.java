@@ -1,6 +1,7 @@
 package com.example.jobpuzzle.global.security;
 
 import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.entity.UserStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -55,9 +56,9 @@ public class CustomUserDetails implements UserDetails {
         return true;
     }
 
-    // 계정 활성화 여부
+    // 계정 활성화 여부 (status가 String -> UserStatus enum으로 바뀌어서 비교 방식 수정)
     @Override
     public boolean isEnabled() {
-        return "ACTIVE".equals(user.getStatus());
+        return user.getStatus() == UserStatus.ACTIVE;
     }
 }

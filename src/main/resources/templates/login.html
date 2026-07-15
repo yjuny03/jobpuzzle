@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 — JobPuzzle</title>
+  <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+  <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
+</head>
+
+<body>
+
+  <div th:replace="~{fragments/header :: landingHeader}"></div>
+
+  <main class="auth-shell">
+    <div class="auth-card">
+      <h1 class="auth-card__title">로그인</h1>
+      <p class="auth-card__subtitle">JobPuzzle과 함께 취업 준비를 시작해보세요</p>
+
+      <div class="auth-error" id="login-error"></div>
+
+      <form class="auth-form" id="login-form" novalidate>
+        <div class="auth-field">
+          <label class="field-label" for="loginId">아이디</label>
+          <input class="text-input" type="text" id="loginId" name="loginId" autocomplete="username" required>
+        </div>
+        <div class="auth-field">
+          <label class="field-label" for="password">비밀번호</label>
+          <input class="text-input" type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text-muted);">
+          <input type="checkbox" id="autoLogin">
+          자동로그인
+        </label>
+        <button class="btn btn--primary auth-submit" type="submit">로그인</button>
+      </form>
+
+      <div class="auth-divider">또는</div>
+
+      <a class="auth-kakao-btn" href="/oauth2/authorization/kakao">
+        카카오로 시작하기
+      </a>
+
+      <p class="auth-footer-link">
+        아직 회원이 아니신가요? <a href="/join" th:href="@{/join}">회원가입</a>
+      </p>
+    </div>
+  </main>
+
+  <script src="/js/login.js" th:src="@{/js/login.js}"></script>
+</body>
+
+</html>
