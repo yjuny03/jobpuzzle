@@ -26,8 +26,6 @@ public class JobGuideChunk {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
     private String contentSummary;
 
     private String embeddingRef;

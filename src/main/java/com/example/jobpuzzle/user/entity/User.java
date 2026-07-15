@@ -27,8 +27,7 @@ public class User {
 
     private String name;
 
-    // 권한 - "USER", "ADMIN" 등
-    private String role;
+    private UserRole role;
 
     private Long defaultJobCategoryId;
 
@@ -46,8 +45,7 @@ public class User {
 
     private LocalDateTime lockedAt;
 
-    // 회원 상태 - "ACTIVE"(정상), "WITHDRAWN"(탈퇴) 등
-    private String status;
+    private UserStatus status;
 
     private LocalDateTime withdrawnAt;
 
@@ -56,9 +54,9 @@ public class User {
     private LocalDateTime updatedAt;
 
     @Builder
-    private User(String loginId, String password, String email, String name, String role,
+    private User(String loginId, String password, String email, String name, UserRole role,
                   String socialProvider, String socialId, Integer loginFailCount,
-                  Boolean isLocked, String status) {
+                  Boolean isLocked, UserStatus status) {
         this.loginId = loginId;
         this.password = password;
         this.email = email;
@@ -78,12 +76,12 @@ public class User {
         return User.builder()
                 .email(email)
                 .name(name)
-                .role("USER")
+                .role(UserRole.USER)
                 .socialProvider(socialProvider)
                 .socialId(socialId)
                 .loginFailCount(0)
                 .isLocked(false)
-                .status("ACTIVE")
+                .status(UserStatus.ACTIVE)
                 .build();
     }
 
@@ -103,10 +101,10 @@ public class User {
                 .password(encodedPassword)
                 .email(email)
                 .name(name)
-                .role("USER")
+                .role(UserRole.USER)
                 .loginFailCount(0)
                 .isLocked(false)
-                .status("ACTIVE")
+                .status(UserStatus.ACTIVE)
                 .build();
     }
 

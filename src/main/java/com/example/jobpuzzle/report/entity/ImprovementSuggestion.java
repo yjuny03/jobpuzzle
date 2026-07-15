@@ -18,7 +18,7 @@ public class ImprovementSuggestion {
 
     private Long reportId;
 
-    private String targetType;
+    private ImprovementSuggestionTargetType targetType;
 
     @Lob
     @Column(columnDefinition = "TEXT")

@@ -20,13 +20,13 @@ public class JobGuideDocument {
 
     private String title;
 
-    private String sourceType;
+    private JobGuideDocumentSourceType sourceType;
 
     private String filePath;
 
-    private String status;
+    private JobGuideDocumentStatus status;
 
-    private Integer version;
+    private String version;
 
     private Long createdBy;
 

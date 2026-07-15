@@ -24,7 +24,7 @@ public class MatchAnalysisResult {
     @Column(columnDefinition = "TEXT")
     private String candidateEvidence;
 
-    private String matchLevel;
+    private MatchAnalysisResultMatchLevel matchLevel;
 
     @Lob
     @Column(columnDefinition = "TEXT")

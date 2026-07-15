@@ -18,7 +18,7 @@ public class FinalReport {
 
     private Long sessionId;
 
-    private Double overallScore;
+    private Integer overallScore;
 
     private String scoreLabel;
 

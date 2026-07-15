@@ -20,7 +20,7 @@ public class JobCategory {
 
     private String subCategory;
 
-    private String careerLevel;
+    private JobCategoryCareerLevel careerLevel;
 
     private LocalDateTime createdAt;
 
