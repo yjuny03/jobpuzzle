@@ -20,7 +20,7 @@ public class PromptTemplate {
 
     private String name;
 
-    private Integer version;
+    private String version;
 
     private String targetJson;
 

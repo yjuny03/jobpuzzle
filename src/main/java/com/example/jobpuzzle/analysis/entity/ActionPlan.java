@@ -22,7 +22,7 @@ public class ActionPlan {
 
     private String relatedRequirement;
 
-    private String matchLevel;
+    private ActionPlanMatchLevel matchLevel;
 
     @Lob
     @Column(columnDefinition = "TEXT")
@@ -34,7 +34,7 @@ public class ActionPlan {
 
     private LocalDateTime deadline;
 
-    private String status;
+    private ActionPlanStatus status;
 
     private LocalDateTime completedAt;
 

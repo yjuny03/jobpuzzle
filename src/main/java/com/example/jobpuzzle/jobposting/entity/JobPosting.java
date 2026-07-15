@@ -28,9 +28,9 @@ public class JobPosting {
 
     private String jobTitle;
 
-    private String careerLevel;
+    private JobPostingCareerLevel careerLevel;
 
-    private String postingStatus;
+    private JobPostingStatus postingStatus;
 
     private LocalDateTime createdAt;
 

@@ -20,7 +20,7 @@ public class WeaknessTagStatus {
 
     private String tag;
 
-    private String status;
+    private WeaknessTagResolveStatus status;
 
     private LocalDateTime firstOccurredAt;
 

@@ -22,7 +22,7 @@ public class FollowUpQuestion {
     @Column(columnDefinition = "TEXT")
     private String questionText;
 
-    private String followUpType;
+    private FollowUpQuestionType followUpType;
 
     private String targetWeakness;
 
