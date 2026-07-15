@@ -1,10 +1,30 @@
 package com.example.jobpuzzle.user.dto;
 
+import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.entity.UserRole;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
+// 내 정보 조회 응답 (/api/user/me)
 @Getter
-@NoArgsConstructor
+@AllArgsConstructor
 public class UserInfoResponse {
-    // TODO: 클래스 정의서 기준으로 필드 추가
+
+    private Long userId;
+    private String loginId;
+    private String email;
+    private String name;
+    private UserRole role;
+    private Long defaultJobCategoryId;
+
+    public static UserInfoResponse from(User user) {
+        return new UserInfoResponse(
+                user.getUserId(),
+                user.getLoginId(),
+                user.getEmail(),
+                user.getName(),
+                user.getRole(),
+                user.getDefaultJobCategoryId()
+        );
+    }
 }

@@ -1,0 +1,88 @@
+### 로그인/회원가입 API 테스트
+### IntelliJ에서 파일 열고 각 요청 왼쪽의 ▶ 버튼을 위에서부터 순서대로 눌러서 실행
+### (세션 쿠키는 같은 파일 안에서 자동으로 유지됨)
+
+@baseUrl = http://localhost:8080
+
+### 1. 회원가입 - 성공 기대
+POST {{baseUrl}}/api/user/join
+Content-Type: application/json
+
+{
+  "loginId": "testuser01",
+  "password": "test1234!",
+  "email": "testuser01@example.com",
+  "name": "테스트유저"
+}
+
+### 2. 같은 아이디로 재가입 시도 - 실패 기대 (USER_001 아이디 중복)
+POST {{baseUrl}}/api/user/join
+Content-Type: application/json
+
+{
+  "loginId": "testuser01",
+  "password": "test1234!",
+  "email": "다른이메일@example.com",
+  "name": "테스트유저2"
+}
+
+### 3. 아이디 중복 확인 - true(중복) 기대
+GET {{baseUrl}}/api/user/check-id?loginId=testuser01
+
+### 4. 이메일 중복 확인 - true(중복) 기대
+GET {{baseUrl}}/api/user/check-email?email=testuser01@example.com
+
+### 5. 비밀번호 틀리게 로그인 - 실패 기대 (USER_003 로그인 실패)
+POST {{baseUrl}}/api/user/login
+Content-Type: application/json
+
+{
+  "loginId": "testuser01",
+  "password": "wrongpassword"
+}
+
+### 6. 정상 로그인 - 성공 기대 (여기서 세션 쿠키 발급됨, autoLogin true면 자동로그인 쿠키도 발급)
+POST {{baseUrl}}/api/user/login
+Content-Type: application/json
+
+{
+  "loginId": "testuser01",
+  "password": "test1234!",
+  "autoLogin": true
+}
+
+### 7. 내 정보 조회 - 로그인된 상태라 성공 기대 (6번의 세션 쿠키 자동 사용)
+GET {{baseUrl}}/api/user/me
+
+### 8. 내 정보 수정 - 이름/이메일/관심직무 변경
+PUT {{baseUrl}}/api/user/me
+Content-Type: application/json
+
+{
+  "name": "테스트유저(수정)",
+  "email": "testuser01@example.com",
+  "defaultJobCategoryId": 1
+}
+
+### 9. 로그아웃 - 세션 + 자동로그인 쿠키/DB 토큰 정리
+POST {{baseUrl}}/api/user/logout
+
+### 10. 로그아웃 후 내 정보 조회 - 401(미인증)로 막혀야 정상
+GET {{baseUrl}}/api/user/me
+
+### 11. 회원가입 시 비밀번호 정책 위반 테스트 - 실패 기대 (USER_006)
+POST {{baseUrl}}/api/user/join
+Content-Type: application/json
+
+{
+  "loginId": "testuser02",
+  "password": "1234",
+  "email": "testuser02@example.com",
+  "name": "테스트유저2"
+}
+
+### 12. 로그인 5번 연속 실패시키기 - 계정 잠금 테스트용
+### (5,6번을 비밀번호 틀리게 5번 반복 실행한 뒤 정상 비밀번호로 로그인해보면 USER_004 계정 잠김이 떠야 정상)
+
+### 13. 회원 탈퇴 - 로그인된 상태에서 실행 (6번 다시 실행해서 로그인한 뒤 테스트)
+DELETE {{baseUrl}}/api/user/me

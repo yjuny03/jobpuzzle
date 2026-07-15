@@ -1,0 +1,128 @@
+/* auth.css — login / join page (shared) */
+
+.auth-shell {
+  min-height: calc(100vh - 68px);
+  background: var(--color-bg-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 32px 30px;
+}
+
+.auth-card__title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.auth-card__subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 26px;
+  text-align: center;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-field-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.auth-field-row .text-input {
+  flex: 1;
+}
+
+.field-hint {
+  font-size: 12px;
+  margin-top: 6px;
+}
+.field-hint--ok { color: #1E9161; }
+.field-hint--error { color: #B5433D; }
+
+.auth-error {
+  font-size: 12.5px;
+  color: #B5433D;
+  background: #FBEEEC;
+  border: 1px solid #F3D9D5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: none;
+}
+.auth-error.is-visible {
+  display: block;
+}
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 14.5px;
+  margin-top: 4px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.auth-kakao-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #FEE500;
+  color: #191600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+.auth-kakao-btn:hover {
+  background: #F5DC00;
+}
+
+.auth-footer-link {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 22px;
+}
+.auth-footer-link a {
+  font-weight: 600;
+  text-decoration: none;
+}
