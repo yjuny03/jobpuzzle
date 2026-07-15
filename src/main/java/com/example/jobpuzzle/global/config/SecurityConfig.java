@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.global.config;
 
+import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,8 @@ import javax.sql.DataSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    // 카카오 로그인 성공 시 회원 조회/생성을 처리하는 서비스
+    private final CustomOAuth2UserService customOAuth2UserService;
 
     // 정적 리소스 경로 - 인증 없이 접근 허용할 CSS/JS/이미지 경로
     private static final String[] STATIC_URLS = {
@@ -25,7 +28,9 @@ public class SecurityConfig {
 
     // 로그인 없이 볼 수 있는 화면(뷰) 경로
     private static final String[] PUBLIC_VIEW_URLS = {
-            "/"
+            "/",
+            "/login",
+            "/oauth2/**"
     };
 
     // 인증 없이 호출 가능한 공개 API 경로
@@ -45,6 +50,12 @@ public class SecurityConfig {
 
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()
+                )
+                // 카카오 로그인 설정 - 로그인 성공 시 customOAuth2UserService가 회원 조회/생성 처리
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
                 );
         return http.build();
 
