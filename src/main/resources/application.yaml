@@ -10,7 +10,7 @@ spring:
     oauth2:
       client:
         registration:
-          #카카오 API키 
+          #카카오 API KEY
           kakao:
             client-id: 7a00487f617c925b0842ac8cf71ac0a5
             client-secret: o10rOrDFVuuoxhs3gFK02RWnl4weNMOi

@@ -5,7 +5,7 @@ import lombok.Getter;
 
 import java.util.Map;
 
-// 카카오가 응답으로 주는 사용자 정보를 우리 서비스에서 쓰기 좋은 형태로 변환하는 클래스
+// 카카오가 응답
 @Getter
 public class OAuthAttributes {
 

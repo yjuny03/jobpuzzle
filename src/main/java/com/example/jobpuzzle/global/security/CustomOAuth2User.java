@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
-// 카카오 로그인 성공 후 스프링 시큐리티가 들고 다니는 로그인 사용자 정보
+// 카카오 로그인 성공
 public class CustomOAuth2User implements OAuth2User {
 
     private final User user;
