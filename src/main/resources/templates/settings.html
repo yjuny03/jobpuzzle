@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설정 — JobPuzzle</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/settings.css" th:href="@{/css/settings.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('settings')}"></div>
+
+<div class="app-shell">
+  <div class="app-container app-container--narrow">
+
+    <h1 class="page-title">설정</h1>
+    <p class="page-subtitle">계정과 희망 직무를 관리할 수 있어요</p>
+
+    <!-- profile -->
+    <div class="card card--pad-lg" style="margin-bottom:20px;">
+      <p class="settings-section-title">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        프로필 설정
+      </p>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div><label class="field-label">이름</label><input class="text-input" value="김지원"></div>
+        <div><label class="field-label">이메일</label><input class="text-input" value="honggildong@example.com"></div>
+      </div>
+      <button class="btn btn--primary mt-16">저장</button>
+    </div>
+
+    <!-- target role -->
+    <div class="card card--pad-lg" style="margin-bottom:20px;">
+      <p class="settings-section-title">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2"><path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+        희망 직무 설정
+      </p>
+      <p style="font-size:12.5px; color:#8A93A3; margin:0 0 16px;">메인 화면과 리포트 기본값에 활용됩니다.</p>
+      <div class="job-form-grid">
+        <div><label class="field-label">대분류</label>
+          <select class="select-input" id="job-major">
+            <option>IT·개발</option><option>경영·사무</option><option>디자인</option>
+          </select>
+        </div>
+        <div><label class="field-label">중분류</label>
+          <select class="select-input" id="job-minor"></select>
+        </div>
+        <div><label class="field-label">경력수준</label>
+          <select class="select-input">
+            <option>신입</option><option>경력 1~3년</option><option>경력 3년 이상</option>
+          </select>
+        </div>
+        <button class="btn btn--primary" style="white-space:nowrap;">저장하기</button>
+      </div>
+    </div>
+
+    <!-- danger zone -->
+    <div class="danger-card">
+      <p style="font-size:15px; font-weight:700; margin:0 0 8px; color:#B5433D;">회원 탈퇴</p>
+      <p style="font-size:13px; color:#8A6B67; line-height:1.6; margin:0 0 16px;">탈퇴 시 모든 자료와 훈련 기록이 삭제되며 복구할 수 없어요.</p>
+      <button class="btn-danger-outline">회원 탈퇴하기</button>
+    </div>
+
+  </div>
+</div>
+
+<div th:replace="~{fragments/footer :: siteFooter}"></div>
+
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/settings.js" th:src="@{/js/settings.js}"></script>
+</body>
+</html>
