@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>리포트 — JobPuzzle</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/reports.css" th:href="@{/css/reports.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('reports')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <p class="eyebrow-label">리포트</p>
+    <h1 class="page-title">리포트 · 직무별 리포트 · 추천</h1>
+    <p class="page-subtitle">완료한 모의면접 결과와 직무별 리포트, 추천 공고를 확인하세요</p>
+
+    <div class="tabbar" style="margin-bottom:24px;">
+      <button class="tabbar__btn is-active" data-tab="report">면접 리포트</button>
+      <button class="tabbar__btn" data-tab="guide">직무별 리포트</button>
+      <button class="tabbar__btn" data-tab="recs">추천 목록</button>
+    </div>
+
+    <!-- 1. interview report -->
+    <div class="tab-panel" data-panel="report">
+      <div class="report-layout">
+        <div id="report-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+        <div class="card card--pad-lg" id="report-detail"></div>
+      </div>
+    </div>
+
+    <!-- 2. job guide -->
+    <div class="tab-panel" data-panel="guide" hidden>
+      <div class="card card--pad-lg" id="guide-detail"></div>
+    </div>
+
+    <!-- 3. recommendations -->
+    <div class="tab-panel" data-panel="recs" hidden>
+      <div style="display:flex; flex-direction:column; gap:12px;" id="recs-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<div th:replace="~{fragments/footer :: siteFooter}"></div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/reports.js" th:src="@{/js/reports.js}"></script>
+</body>
+</html>

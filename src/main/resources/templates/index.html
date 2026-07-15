@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPuzzle — 당신의 취업, 우리가 퍼즐처럼 맞춰드립니다</title>
+  <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+  <link rel="stylesheet" href="/css/landing.css" th:href="@{/css/landing.css}">
+  <link rel="stylesheet" href="/css/loader.css" th:href="@{/css/loader.css}">
+</head>
+
+<body>
+
+  <!-- JobPuzzle entry loader (toggle in fragments/loader.html: data-enabled=true|false) -->
+  <div th:replace="~{fragments/loader :: jobPuzzleLoader}"></div>
+
+  <!-- demo state switcher (not part of real product chrome) -->
+  <div class="preview-bar" hidden>
+    <span class="preview-bar__label">미리보기 상태</span>
+    <button class="preview-bar__btn" id="btn-mode-guest" data-mode="guest">비로그인</button>
+    <button class="preview-bar__btn" id="btn-mode-noData" data-mode="noData">로그인·자료없음</button>
+    <button class="preview-bar__btn" id="btn-mode-ready" data-mode="ready">로그인·자료있음</button>
+  </div>
+
+  <!-- shared landing header -->
+  <div th:replace="~{fragments/header :: landingHeader}"></div>
+
+  <main>
+
+    <!-- hero -->
+    <section class="hero" id="intro">
+      <div class="hero__inner">
+        <div class="hero__copy">
+          <div class="badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            전문가 가이드 기반 신뢰도 있는 분석
+          </div>
+
+          <h1 class="hero__title">당신의 취업,<br>우리가 <span>퍼즐처럼</span> 맞춰드립니다</h1>
+
+          <p class="hero__desc">채용공고와 이력서를 분석해 나만의 면접 질문을 만들고,<br>부족한 점을 찾아 이력서까지 완성해드려요</p>
+
+          <button class="btn btn--primary btn--lg" id="hero-cta">
+            <span id="hero-cta-label">로그인하기</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
+
+          <p class="hero__hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <span id="hero-cta-hint">로그인이 필요해요 · 클릭하면 로그인 페이지로 이동해요</span>
+          </p>
+        </div>
+
+        <div class="hero__card-wrap">
+          <div class="hero__glow"></div>
+          <div class="score-card">
+            <div class="score-card__head">
+              <div class="score-card__title">
+                <span class="icon-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg></span>
+                <span>백엔드 개발자 · 신입</span>
+              </div>
+              <span class="pill">AI 매칭</span>
+            </div>
+
+            <div class="score-bar">
+              <div class="score-bar__label"><span>문제해결력</span><span>82%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:82%"></div>
+              </div>
+            </div>
+            <div class="score-bar">
+              <div class="score-bar__label"><span>협업 경험</span><span>64%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:64%"></div>
+              </div>
+            </div>
+            <div class="score-bar">
+              <div class="score-bar__label"><span>기술 이해도</span><span>90%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:90%"></div>
+              </div>
+            </div>
+
+            <div class="score-card__divider"></div>
+
+            <div class="score-card__note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>이 공고라면 이런 질문이 나올 수 있어요: “협업 중 갈등을 해결한 경험이 있나요?”</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- differentiators -->
+    <section class="section" id="how">
+      <p class="eyebrow">WHY JOBPUZZLE</p>
+      <h2 class="section__title">기존 면접 준비와 뭐가 다른가요</h2>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9" />
+              <circle cx="12" cy="12" r="5" />
+              <circle cx="12" cy="12" r="1" />
+            </svg></div>
+          <p class="feature-card__title">공고에 맞춘 정밀 진단</p>
+          <p class="feature-card__desc">채용공고와 이력서를 비교해 부족한 경험과 역량을 구체적으로 짚어드려요.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg></div>
+          <p class="feature-card__title">그 공고만의 면접 질문</p>
+          <p class="feature-card__desc">실제로 나올 법한 질문을 만들어 실전처럼 훈련할 수 있어요.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg></div>
+          <p class="feature-card__title">훈련할수록 정교해지는 분석</p>
+          <p class="feature-card__desc">답변을 분석해서 약점을 계속 업데이트하고 다음 질문에 반영해요.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+            </svg></div>
+          <p class="feature-card__title">이력서 보완까지 한 번에</p>
+          <p class="feature-card__desc">면접에서 드러난 약점을 이력서·자기소개서 수정 제안으로 이어드려요.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- job report -->
+    <section class="section section--tinted">
+      <div class="report-wrap">
+        <p class="eyebrow" style="text-align:center;">JOB REPORT</p>
+        <h2 class="section__title" style="text-align:center;">직무별 요구역량 리포트</h2>
+        <p class="section__subtitle">누적된 채용 데이터로 직무 트렌드와 내 위치를 확인해요</p>
+
+        <div class="report-card">
+          <div class="report-card__lock" id="report-lock">
+            <div class="report-card__lock-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg></div>
+            <p class="report-card__lock-title" id="lock-title">로그인하고 리포트 확인하기</p>
+            <p class="report-card__lock-desc" id="lock-desc">로그인하면 직무별 요구역량 리포트를 볼 수 있어요</p>
+            <button class="btn btn--primary" id="lock-btn">로그인</button>
+          </div>
+
+          <div class="report-card__body">
+            <div class="score-card__head">
+              <div class="score-card__title">
+                <span class="icon-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg></span>
+                <span>백엔드 개발자 · 신입</span>
+              </div>
+              <span class="pill">AI 매칭</span>
+            </div>
+
+            <div class="score-bar">
+              <div class="score-bar__label"><span>문제해결력</span><span>82%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:82%"></div>
+              </div>
+            </div>
+            <div class="score-bar">
+              <div class="score-bar__label"><span>협업 경험</span><span>64%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:64%"></div>
+              </div>
+            </div>
+            <div class="score-bar">
+              <div class="score-bar__label"><span>기술 이해도</span><span>90%</span></div>
+              <div class="score-bar__track">
+                <div class="score-bar__fill" style="width:90%"></div>
+              </div>
+            </div>
+
+            <div class="score-card__divider"></div>
+
+            <div class="score-card__note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>이 공고라면 이런 질문이 나올 수 있어요: “협업 중 갈등을 해결한 경험이 있나요?”</span>
+            </div>
+          </div>
+
+          <div class="report-card__unlocked" id="report-unlocked" hidden>
+            <div class="mascot-note">
+              <div class="mascot-note__icon"><img src="/images/puzzy-mascot.png" th:src="@{/images/puzzy-mascot.png}" alt="Puzzy"></div>
+              <p><span id="report-username">김지원</span>님은 “문제해결 경험” 서술이 특히 부족해요. 관련 질문으로 훈련해보세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- how it works -->
+    <section class="section">
+      <p class="eyebrow" style="text-align:center;">HOW IT WORKS</p>
+      <h2 class="section__title" style="text-align:center;">이렇게 준비해요</h2>
+
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step__num">1</div>
+          <p class="step__title">자료 등록</p>
+          <p class="step__desc">이력서·자소서·포트폴리오와 채용공고를 등록해요</p>
+        </div>
+        <div class="step">
+          <div class="step__num">2</div>
+          <p class="step__title">AI 분석</p>
+          <p class="step__desc">공고와 자료를 비교해 강점과 부족한 점을 찾아요</p>
+        </div>
+        <div class="step">
+          <div class="step__num">3</div>
+          <p class="step__title">모의면접</p>
+          <p class="step__desc">맞춤 질문으로 실전처럼 답변을 연습해요</p>
+        </div>
+        <div class="step">
+          <div class="step__num">4</div>
+          <p class="step__title">리포트 확인</p>
+          <p class="step__desc">평가 결과와 약점 보완 방향을 리포트로 받아요</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div th:replace="~{fragments/footer :: siteFooter}"></div>
+
+  <script src="/js/loader.js" th:src="@{/js/loader.js}"></script>
+  <script src="/js/landing.js" th:src="@{/js/landing.js}"></script>
+</body>
+
+</html>

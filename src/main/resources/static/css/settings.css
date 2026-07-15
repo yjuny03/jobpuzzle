@@ -1,0 +1,35 @@
+/* settings.css */
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.job-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 640px) {
+  .job-form-grid { grid-template-columns: 1fr; }
+}
+.danger-card {
+  background: #FBF6F5;
+  border: 1px solid #F0DCD9;
+  border-radius: 16px;
+  padding: 26px;
+}
+.btn-danger-outline {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 20px;
+  background: transparent;
+  color: #B5433D;
+  border: 1px solid #E3B7B0;
+  border-radius: 8px;
+  cursor: pointer;
+}

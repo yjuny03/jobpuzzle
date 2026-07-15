@@ -1,0 +1,134 @@
+/* reports.css */
+
+.report-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .report-layout { grid-template-columns: 1fr; }
+}
+.report-list-item {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.report-list-item.is-active {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary);
+}
+.report-list-item__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.report-list-item__date {
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+  margin: 0 0 8px;
+}
+.report-list-item__score {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.donut {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.donut__inner {
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.weakspot-box {
+  background: #FDF7EE;
+  border: 1px solid #F5E4C8;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+.req-row {
+  background: #F9FAFB;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.job-filter-bar {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--color-surface-tint);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 22px;
+}
+.job-filter-field label {
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 5px;
+}
+.job-filter-field select {
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.skill-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  padding: 7px 14px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.weak-tag-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FDF7EE;
+  border: 1px solid #F5E4C8;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.freq-question {
+  background: var(--color-surface-tint);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.tough-question {
+  background: #FBEEEC;
+  border: 1px solid #F3D9D5;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.rec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}

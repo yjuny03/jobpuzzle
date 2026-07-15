@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>면접 준비 — JobPuzzle</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/interview.css" th:href="@{/css/interview.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('interview')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <p class="eyebrow-label">면접 관리</p>
+    <h1 class="page-title">질문 생성 · 모의면접</h1>
+    <p class="page-subtitle">공고와 자료를 바탕으로 질문을 만들고 실전처럼 연습하세요</p>
+
+    <div class="tabbar" style="margin-bottom:24px;">
+      <span class="tabbar__btn is-active">질문 생성</span>
+      <a href="/interview-result.html" th:href="@{/interview-result.html}" class="tabbar__btn" style="text-decoration:none; display:inline-block;">답변 평가</a>
+    </div>
+
+    <div id="step-root"></div>
+
+  </div>
+</div>
+
+<!-- text entry modal (register material as text) -->
+<div class="modal-overlay" id="text-entry-modal" hidden>
+  <div class="modal-box modal-box--lg">
+    <div class="flex-row" style="justify-content:space-between; margin-bottom:16px;">
+      <p style="font-size:16px; font-weight:700; margin:0;" id="text-entry-title"></p>
+      <button class="modal-x" id="text-entry-close">&times;</button>
+    </div>
+    <div id="text-entry-fields"></div>
+    <div class="flex-row gap-10" style="justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="text-entry-cancel">취소</button>
+      <button class="btn btn--primary" id="text-entry-submit">등록하기</button>
+    </div>
+  </div>
+</div>
+
+<div th:replace="~{fragments/footer :: siteFooter}"></div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/interview.js" th:src="@{/js/interview.js}"></script>
+</body>
+</html>
