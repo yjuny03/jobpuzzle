@@ -18,7 +18,7 @@ public class ReadinessResult {
 
     private Long snapshotId;
 
-    private String status;
+    private ReadinessResultStatus status;
 
     @Lob
     @Column(columnDefinition = "TEXT")

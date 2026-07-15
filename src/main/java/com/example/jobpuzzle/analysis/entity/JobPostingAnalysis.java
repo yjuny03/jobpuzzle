@@ -20,6 +20,8 @@ public class JobPostingAnalysis {
 
     private Long jobCategoryId;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String mainTasks;
 
     @Lob

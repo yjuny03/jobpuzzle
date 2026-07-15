@@ -16,25 +16,25 @@ public class AiCallLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long aiCallLogId;
 
-    private String provider;
+    private Provider provider;
 
     private String model;
 
     private Long promptTemplateId;
 
-    private Integer promptVersion;
+    private String promptVersion;
 
     private Long guideId;
 
-    private Integer guideVersion;
+    private String guideVersion;
 
-    private String resultType;
+    private AiCallLogResultType resultType;
 
     private Long resultId;
 
     private LocalDateTime requestedAt;
 
-    private String status;
+    private AiCallLogStatus status;
 
     private LocalDateTime completedAt;
 
@@ -44,7 +44,7 @@ public class AiCallLog {
 
     private Boolean valid;
 
-    private String errorType;
+    private AiCallLogErrorType errorType;
 
     private Integer retryCount;
 

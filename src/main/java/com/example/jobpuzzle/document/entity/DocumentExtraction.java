@@ -18,7 +18,7 @@ public class DocumentExtraction {
 
     private Long documentId;
 
-    private String extractionStatus;
+    private DocumentExtractionStatus extractionStatus;
 
     @Lob
     @Column(columnDefinition = "TEXT")

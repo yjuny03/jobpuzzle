@@ -20,20 +20,26 @@ public class InterviewQuestion {
 
     private Long snapshotId;
 
-    private String questionType;
+    private InterviewQuestionType questionType;
 
     @Lob
     @Column(columnDefinition = "TEXT")
     private String questionText;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String intent;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String evaluationFocus;
 
     private String relatedRequirement;
 
-    private String reviewStatus;
+    private InterviewQuestionReviewStatus reviewStatus;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String reviewNote;
 
     private Integer displayOrder;
