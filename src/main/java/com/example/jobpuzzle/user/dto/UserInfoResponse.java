@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.user.dto;
 
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.entity.UserRole;
 import lombok.AllArgsConstructor;
@@ -24,7 +25,7 @@ public class UserInfoResponse {
                 user.getEmail(),
                 user.getName(),
                 user.getRole(),
-                user.getDefaultJobCategoryId()
+                user.getDefaultJobCategory().getJobCategoryId()
         );
     }
 }
