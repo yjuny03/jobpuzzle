@@ -1,6 +1,7 @@
 package com.example.jobpuzzle.user.entity;
 
 import com.example.jobpuzzle.global.common.BaseEntity;
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -39,8 +40,9 @@ public class User extends BaseEntity {
 
     // 기본 관심 직무 - 정의서상 NOT NULL이지만, 회원가입 화면에 직무 선택 UI가 아직 없어서
     // 당장은 nullable로 두고 직무 선택 기능이 만들어지면 NOT NULL로 전환하기로 함
-    @Column(name = "default_job_category_id")
-    private Long defaultJobCategoryId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_job_category_id")
+    private JobCategory defaultJobCategory;
 
     // 소셜 로그인 제공자 - "kakao", "google" 등 (일반 회원가입 회원은 null)
     @Column(length = 20)
@@ -69,14 +71,14 @@ public class User extends BaseEntity {
 
     @Builder
     private User(String loginId, String password, String email, String name, UserRole role,
-                  Long defaultJobCategoryId, String socialProvider, String socialId, Integer loginFailCount,
+                  JobCategory defaultJobCategory, String socialProvider, String socialId, Integer loginFailCount,
                   Boolean isLocked, UserStatus status) {
         this.loginId = loginId;
         this.password = password;
         this.email = email;
         this.name = name;
         this.role = role;
-        this.defaultJobCategoryId = defaultJobCategoryId;
+        this.defaultJobCategory = defaultJobCategory;
         this.socialProvider = socialProvider;
         this.socialId = socialId;
         this.loginFailCount = loginFailCount;
@@ -110,14 +112,14 @@ public class User extends BaseEntity {
 
     // 아이디/비밀번호로 처음 가입하는 회원 생성 (password는 암호화된 값이어야 함)
     public static User createLocalUser(String loginId, String encodedPassword, String email, String name,
-                                        Long defaultJobCategoryId) {
+                                        JobCategory defaultJobCategory) {
         return User.builder()
                 .loginId(loginId)
                 .password(encodedPassword)
                 .email(email)
                 .name(name)
                 .role(UserRole.USER)
-                .defaultJobCategoryId(defaultJobCategoryId)
+                .defaultJobCategory(defaultJobCategory)
                 .loginFailCount(0)
                 .isLocked(false)
                 .status(UserStatus.ACTIVE)
@@ -125,10 +127,10 @@ public class User extends BaseEntity {
     }
 
     // 내 정보 수정 - 이름/이메일/기본 관심 직무 변경
-    public void updateProfile(String name, String email, Long defaultJobCategoryId) {
+    public void updateProfile(String name, String email, JobCategory defaultJobCategory) {
         this.name = name;
         this.email = email;
-        this.defaultJobCategoryId = defaultJobCategoryId;
+        this.defaultJobCategory = defaultJobCategory;
     }
 
     // 회원 탈퇴 처리 - 상태만 WITHDRAWN으로 바꾸고 탈퇴 시각 기록 (실제 데이터 삭제는 안 함)
