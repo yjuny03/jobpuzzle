@@ -1,59 +1,109 @@
 package com.example.jobpuzzle.analysis.entity;
 
+import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult.*;
+import com.example.jobpuzzle.ai.log.AiCallLog;
+import com.example.jobpuzzle.document.entity.UserDocument;
+import com.example.jobpuzzle.global.common.BaseEntity;
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
+import com.example.jobpuzzle.user.entity.User;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Entity
 @NoArgsConstructor
 @Table(name = "candidate_material_analysis")
-public class CandidateMaterialAnalysis {
+public class CandidateMaterialAnalysis extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long analysisId;
 
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    private Long jobCategoryId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_category_id", nullable = false)
+    private JobCategory jobCategory;
 
-    private Long resumeDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resume_document_id")
+    private UserDocument resumeDocument;
 
-    private Long coverLetterDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cover_letter_document_id")
+    private UserDocument coverLetterDocument;
 
-    private Long portfolioDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_document_id")
+    private UserDocument portfolioDocument;
 
-    private Long experienceNoteDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "experience_note_document_id")
+    private UserDocument experienceNoteDocument;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
-    private String resumeAnalysis;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resume_analysis",columnDefinition = "json")
+    private Resume resumeAnalysis;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
-    private String coverLetterAnalysis;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "cover_letter_analysis",columnDefinition = "json")
+    private CoverLetter coverLetterAnalysis;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
-    private String portfolioAnalysis;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "portfolio_analysis",columnDefinition = "json")
+    private Portfolio portfolioAnalysis;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
-    private String experienceNoteAnalysis;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "experience_note_analysis",columnDefinition = "json")
+    private ExperienceNote experienceNoteAnalysis;
 
-    @Lob
-    @Column(columnDefinition = "TEXT")
-    private String missingEvidence;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "missing_evidence",columnDefinition = "json")
+    private List<String> missingEvidence;
 
-    private Boolean isEdited;
+    @Column(name= "is_edited",nullable = false)
+    private boolean isEdited = false;
 
-    private Long aiCallLogId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ai_call_log_id")
+    private AiCallLog aiCallLog;
 
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
+    @Builder
+    private CandidateMaterialAnalysis(
+            User user,
+            JobCategory jobCategory,
+            UserDocument resumeDocument,
+            UserDocument coverLetterDocument,
+            UserDocument portfolioDocument,
+            UserDocument experienceNoteDocument,
+            Resume resumeAnalysis,
+            CoverLetter coverLetterAnalysis,
+            Portfolio portfolioAnalysis,
+            ExperienceNote experienceNoteAnalysis,
+            List<String> missingEvidence,
+            AiCallLog aiCallLog
+    ){
+        this.user = user;
+        this.jobCategory = jobCategory;
+        this.resumeDocument = resumeDocument;
+        this.coverLetterDocument = coverLetterDocument;
+        this.portfolioDocument = portfolioDocument;
+        this.experienceNoteDocument = experienceNoteDocument;
+        this.resumeAnalysis = resumeAnalysis;
+        this.coverLetterAnalysis = coverLetterAnalysis;
+        this.portfolioAnalysis = portfolioAnalysis;
+        this.experienceNoteAnalysis = experienceNoteAnalysis;
+        this.missingEvidence = missingEvidence;
+        this.isEdited = false;
+        this.aiCallLog = aiCallLog;
+    }
 
 }

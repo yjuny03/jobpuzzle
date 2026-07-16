@@ -16,7 +16,7 @@ public class AiCallLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long aiCallLogId;
 
-    private Provider provider;
+    private AiProvider provider;
 
     private String model;
 
