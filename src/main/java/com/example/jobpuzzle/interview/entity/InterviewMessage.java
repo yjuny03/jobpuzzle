@@ -18,7 +18,7 @@ public class InterviewMessage {
 
     private Long questionId;
 
-    private String sender;
+    private InterviewMessageSender sender;
 
     @Lob
     @Column(columnDefinition = "TEXT")

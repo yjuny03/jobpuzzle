@@ -60,8 +60,9 @@
     if (els.previewBar) els.previewBar.hidden = !previewEnabled;
   }
 
-  function applyMode(mode) {
+  function applyMode(mode, userName) {
     var config = STATE_CONFIG[mode] || STATE_CONFIG.guest;
+    var name = userName || DUMMY_USER_NAME;
 
     // preview bar active state
     els.previewBtns.forEach(function (btn) {
@@ -72,8 +73,8 @@
     if (config.isLoggedIn) {
       els.authGuest.hidden = true;
       els.authUser.hidden = false;
-      els.userName.textContent = DUMMY_USER_NAME + '님';
-      els.userAvatar.textContent = DUMMY_USER_NAME.charAt(0);
+      els.userName.textContent = name + '님';
+      els.userAvatar.textContent = name.charAt(0);
     } else {
       els.authGuest.hidden = false;
       els.authUser.hidden = true;
@@ -94,7 +95,7 @@
     } else {
       els.reportLock.hidden = true;
       els.reportUnlocked.hidden = false;
-      els.reportUsername.textContent = DUMMY_USER_NAME;
+      els.reportUsername.textContent = name;
     }
   }
 
@@ -114,10 +115,50 @@
     });
   }
 
+  // 로그아웃 클릭 시 실제 로그아웃 API 호출 후 새로고침 (더미 상태 말고 실제 세션을 지워야 함)
+  function bindLogout() {
+    var logoutLink = document.getElementById('logout-link');
+    if (!logoutLink) return;
+
+    logoutLink.addEventListener('click', function (event) {
+      event.preventDefault();
+      fetch('/api/user/logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(function () {
+          window.location.href = '/index.html';
+        });
+    });
+  }
+
+  // 실제 로그인 여부를 서버에 물어봐서 헤더/CTA 상태를 결정
+  // (?preview=true로 들어온 경우엔 기존처럼 더미 상태 미리보기 툴바를 그대로 사용)
+  function applyRealAuthState() {
+    fetch('/api/user/me', { credentials: 'same-origin' })
+      .then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
+      .then(function (result) {
+        if (result.ok && result.body.success) {
+          var user = result.body.data;
+          // 로그인은 했지만 아직 등록한 자료가 있는지는 알 수 없어서, 안전하게 "자료 없음" 상태로 보여줌
+          applyMode('noData', user.name || user.loginId);
+        } else {
+          applyMode('guest');
+        }
+      })
+      .catch(function () {
+        applyMode('guest');
+      });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     cacheEls();
     configurePreviewToolbar();
     bindEvents();
-    applyMode('ready'); // default dummy state: logged in with data, matches previous default
+    bindLogout();
+
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('preview') === 'true') {
+      applyMode('ready'); // 미리보기 모드는 기존 더미 상태로 시작, 툴바로 자유롭게 전환
+    } else {
+      applyRealAuthState();
+    }
   });
 })();

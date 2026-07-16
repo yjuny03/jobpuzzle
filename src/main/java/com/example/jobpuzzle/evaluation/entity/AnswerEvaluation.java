@@ -18,7 +18,7 @@ public class AnswerEvaluation {
 
     private Long questionId;
 
-    private Double score;
+    private Integer score;
 
     private String scoreLabel;
 
@@ -30,6 +30,8 @@ public class AnswerEvaluation {
     @Column(columnDefinition = "TEXT")
     private String weaknessTags;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String summary;
 
     private Long aiCallLogId;

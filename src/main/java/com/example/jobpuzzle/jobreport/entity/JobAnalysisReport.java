@@ -20,8 +20,10 @@ public class JobAnalysisReport {
 
     private Integer dataCount;
 
-    private String reliabilityLevel;
+    private JobAnalysisReportReliabilityLevel reliabilityLevel;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String keywordSummary;
 
     private Boolean isPublished;

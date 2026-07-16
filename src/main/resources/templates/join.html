@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>회원가입 — JobPuzzle</title>
+  <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+  <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
+</head>
+
+<body>
+
+  <div th:replace="~{fragments/header :: landingHeader}"></div>
+
+  <main class="auth-shell">
+    <div class="auth-card">
+      <h1 class="auth-card__title">회원가입</h1>
+      <p class="auth-card__subtitle">몇 가지 정보만 입력하면 바로 시작할 수 있어요</p>
+
+      <div class="auth-error" id="join-error"></div>
+
+      <form class="auth-form" id="join-form" novalidate>
+        <div class="auth-field">
+          <label class="field-label" for="loginId">아이디</label>
+          <div class="auth-field-row">
+            <input class="text-input" type="text" id="loginId" name="loginId" autocomplete="username" required>
+            <button class="btn-sm" type="button" id="check-id-btn">중복확인</button>
+          </div>
+          <span class="field-hint" id="loginId-hint"></span>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="password">비밀번호</label>
+          <input class="text-input" type="password" id="password" name="password" autocomplete="new-password" required>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="passwordCheck">비밀번호 확인</label>
+          <input class="text-input" type="password" id="passwordCheck" autocomplete="new-password" required>
+          <span class="field-hint" id="passwordCheck-hint"></span>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="email">이메일</label>
+          <div class="auth-field-row">
+            <input class="text-input" type="email" id="email" name="email" autocomplete="email" required>
+            <button class="btn-sm" type="button" id="check-email-btn">중복확인</button>
+          </div>
+          <span class="field-hint" id="email-hint"></span>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="name">이름</label>
+          <input class="text-input" type="text" id="name" name="name" autocomplete="name" required>
+        </div>
+
+        <button class="btn btn--primary auth-submit" type="submit">회원가입</button>
+      </form>
+
+      <p class="auth-footer-link">
+        이미 계정이 있으신가요? <a href="/login" th:href="@{/login}">로그인</a>
+      </p>
+    </div>
+  </main>
+
+  <script src="/js/join.js" th:src="@{/js/join.js}"></script>
+</body>
+
+</html>

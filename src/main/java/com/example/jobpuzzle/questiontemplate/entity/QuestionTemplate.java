@@ -18,13 +18,13 @@ public class QuestionTemplate {
 
     private Long jobCategoryId;
 
-    private String questionType;
+    private QuestionType questionType;
 
     @Lob
     @Column(columnDefinition = "TEXT")
     private String questionText;
 
-    private Integer difficulty;
+    private QuestionTemplateDifficulty difficulty;
 
     private Integer displayOrder;
 

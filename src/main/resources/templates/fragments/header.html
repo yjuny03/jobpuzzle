@@ -23,8 +23,8 @@
 
       <div class="site-header__actions">
         <div class="auth-guest" id="auth-guest">
-          <button class="btn btn--ghost" type="button">로그인</button>
-          <button class="btn btn--primary" type="button">회원가입</button>
+          <a class="btn btn--ghost" href="/login" th:href="@{/login}">로그인</a>
+          <a class="btn btn--primary" href="/join" th:href="@{/join}">회원가입</a>
         </div>
         <div class="auth-user" id="auth-user" hidden>
           <div class="user-chip" id="user-chip">
@@ -52,6 +52,7 @@
             <a
               href="/index.html"
               th:href="@{/index.html}"
+              id="logout-link"
               class="user-menu__item user-menu__item--danger"
               >로그아웃</a
             >
@@ -60,7 +61,7 @@
       </div>
     </header>
 
-    <!-- Logged-in application header. Dummy user values stay hardcoded until backend owners bind them. -->
+    <!-- Logged-in application header. header.js가 /api/user/me로 실제 로그인 사용자 정보를 채워넣음 -->
     <header th:fragment="appHeader(activePage)" class="site-header">
       <a href="/index.html" th:href="@{/index.html}" class="site-header__brand">
         <img
@@ -108,8 +109,8 @@
       <div class="site-header__actions">
         <div class="auth-user">
           <div class="user-chip" id="app-user-chip">
-            <span class="user-chip__avatar">김</span>
-            <span class="user-chip__name">김지원님</span>
+            <span class="user-chip__avatar" id="app-user-avatar">김</span>
+            <span class="user-chip__name" id="app-user-name">김지원님</span>
             <svg
               width="14"
               height="14"
@@ -132,6 +133,7 @@
             <a
               href="/index.html"
               th:href="@{/index.html}"
+              id="app-logout-link"
               class="user-menu__item user-menu__item--danger"
               >로그아웃</a
             >

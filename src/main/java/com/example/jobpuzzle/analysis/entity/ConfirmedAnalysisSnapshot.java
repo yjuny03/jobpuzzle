@@ -24,7 +24,7 @@ public class ConfirmedAnalysisSnapshot {
 
     private LocalDateTime confirmedAt;
 
-    private String status;
+    private ConfirmedAnalysisSnapshotStatus status;
 
     private LocalDateTime canceledAt;
 

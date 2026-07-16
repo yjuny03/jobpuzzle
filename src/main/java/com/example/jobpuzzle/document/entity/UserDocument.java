@@ -18,9 +18,9 @@ public class UserDocument {
 
     private Long userId;
 
-    private String documentType;
+    private UserDocumentType documentType;
 
-    private String sourceType;
+    private UserDocumentSourceType sourceType;
 
     private String filePath;
 

@@ -22,7 +22,7 @@ public class RecommendationLog {
 
     private Long jobPostingId;
 
-    private String recommendationType;
+    private RecommendationType recommendationType;
 
     private Double similarityScore;
 

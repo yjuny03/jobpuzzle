@@ -20,15 +20,15 @@ public class InterviewSession {
 
     private Long snapshotId;
 
-    private String mode;
+    private InterviewSessionMode mode;
 
     private Long guideId;
 
-    private Integer guideVersion;
+    private String guideVersion;
 
-    private Integer promptVersion;
+    private String promptVersion;
 
-    private String status;
+    private InterviewSessionStatus status;
 
     private LocalDateTime startedAt;
 
