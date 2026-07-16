@@ -34,8 +34,8 @@
         })
         .then(function (result) {
           if (result.ok && result.body.success) {
-            // 로그인 성공 - 대시보드로 이동
-            window.location.href = '/dashboard.html';
+            // 로그인 성공 - 메인으로 이동
+            window.location.href = '/index.html';
           } else {
             showError(errorEl, result.body.message || '로그인에 실패했습니다.');
           }
