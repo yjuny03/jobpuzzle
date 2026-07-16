@@ -3,6 +3,8 @@ package com.example.jobpuzzle.user.service;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
+import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
@@ -34,6 +36,7 @@ import java.util.regex.Pattern;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final JobCategoryRepository jobCategoryRepository;
 
     // 비밀번호 암호화/검증에 쓰는 인코더 (SecurityConfig에 등록된 빈)
     private final PasswordEncoder passwordEncoder;
@@ -66,8 +69,13 @@ public class UserService {
 
         // 비밀번호는 평문 그대로 저장하면 안 되므로 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
+
+        JobCategory jobCategory = jobCategoryRepository
+                .findById(request.getDefaultJobCategoryId())
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+
         User user = User.createLocalUser(request.getLoginId(), encodedPassword, request.getEmail(),
-                request.getName(), request.getDefaultJobCategoryId());
+                request.getName(), jobCategory);
         userRepository.save(user);
     }
 
@@ -172,13 +180,17 @@ public class UserService {
         User user = userRepository.findById(userDetails.getUser().getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        JobCategory jobCategory = jobCategoryRepository
+                .findById(request.getDefaultJobCategoryId())
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+
         // 이메일을 바꾸는 경우에만 중복 체크 (본인 이메일은 중복으로 안 침)
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())
                 && userRepository.existsByEmailAndUserIdNot(request.getEmail(), user.getUserId())) {
             throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
         }
 
-        user.updateProfile(request.getName(), request.getEmail(), request.getDefaultJobCategoryId());
+        user.updateProfile(request.getName(), request.getEmail(), jobCategory);
     }
 
     // 회원 탈퇴 - 상태 변경 후 로그인 상태도 함께 정리 (updateMyInfo와 같은 이유로 다시 조회해서 수정)
