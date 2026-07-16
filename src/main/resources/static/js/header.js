@@ -28,6 +28,8 @@
       .then(function (result) {
         if (result.ok && result.body.success) {
           var user = result.body.data;
+          // 사용자 정보를 app-user-loaded 로 저장해서 다른 곳에서도 가져다 쓸 수 있게 만듦
+          document.dispatchEvent(new CustomEvent('app-user-loaded', {detail: user}));
           var displayName = (user.name || user.loginId) + '님';
           nameEl.textContent = displayName;
           avatarEl.textContent = (user.name || user.loginId).charAt(0);

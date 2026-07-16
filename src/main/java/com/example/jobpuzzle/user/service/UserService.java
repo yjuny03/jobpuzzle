@@ -89,6 +89,7 @@ public class UserService {
     }
 
     // 아이디/비밀번호 로그인
+    @Transactional(noRollbackFor = CustomException.class)
     public void login(LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         // 회원 존재 여부 확인
         User user = userRepository.findByLoginId(request.getLoginId())
@@ -124,7 +125,8 @@ public class UserService {
         } catch (AuthenticationException e) {
             // 비밀번호가 틀린 경우 - 실패 횟수를 올리고(일정 횟수 넘으면 자동 잠금) 에러를 던짐
             user.increaseLoginFailCount();
-            throw new CustomException(ErrorCode.USER_LOGIN_FAILED);
+            String message = "로그인 실패 : " + user.getLoginFailCount() + "\n(로그인 실패 5번 초과시 계정이 잠깁니다.)";
+            throw new CustomException(ErrorCode.USER_LOGIN_FAILED, message);
         }
     }
 

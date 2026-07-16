@@ -68,6 +68,7 @@
   border-radius: 8px;
   padding: 10px 12px;
   display: none;
+  white-space: pre-line;
 }
 .auth-error.is-visible {
   display: block;

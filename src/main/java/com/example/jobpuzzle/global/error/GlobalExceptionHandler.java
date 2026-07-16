@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ApiResponse.fail(errorCode));
+                .body(ApiResponse.fail(errorCode, e.getMessage()));
     }
 
     // @Valid 검증 실패 (JoinRequest/LoginRequest/MyInfoUpdateRequest 등의 @NotBlank, @Email 등) - 첫 번째 오류 메시지를 그대로 보여줌
