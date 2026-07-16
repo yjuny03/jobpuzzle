@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.user.entity;
 
+import com.example.jobpuzzle.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @NoArgsConstructor
 @Table(name = "user")
-public class User {
+public class User extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,12 +67,6 @@ public class User {
 
     private LocalDateTime withdrawnAt;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
     @Builder
     private User(String loginId, String password, String email, String name, UserRole role,
                   Long defaultJobCategoryId, String socialProvider, String socialId, Integer loginFailCount,
@@ -87,8 +82,6 @@ public class User {
         this.loginFailCount = loginFailCount;
         this.isLocked = isLocked;
         this.status = status;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 카카오 로그인으로 처음 가입하는 회원 생성
@@ -111,7 +104,6 @@ public class User {
     public void updateSocialProfile(String email, String name) {
         this.email = email;
         this.name = name;
-        this.updatedAt = LocalDateTime.now();
     }
 
     private static final int MAX_LOGIN_FAIL_COUNT = 5;
@@ -137,7 +129,6 @@ public class User {
         this.name = name;
         this.email = email;
         this.defaultJobCategoryId = defaultJobCategoryId;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 회원 탈퇴 처리 - 상태만 WITHDRAWN으로 바꾸고 탈퇴 시각 기록 (실제 데이터 삭제는 안 함)
