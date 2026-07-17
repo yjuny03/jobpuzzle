@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: local
   application:
     name: jobpuzzle
   datasource:
@@ -35,3 +37,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
+app:
+  data-initializer:
+    enabled: true

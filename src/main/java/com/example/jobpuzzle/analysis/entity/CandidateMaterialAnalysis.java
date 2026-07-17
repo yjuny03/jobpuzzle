@@ -23,6 +23,7 @@ public class CandidateMaterialAnalysis extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "analysis_id")
     private Long analysisId;
 
     @ManyToOne(fetch = FetchType.LAZY)

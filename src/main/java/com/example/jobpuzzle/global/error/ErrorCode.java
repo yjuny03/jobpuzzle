@@ -26,8 +26,14 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_005", "존재하지 않는 회원입니다."),
     USER_INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "USER_006", "비밀번호는 영문/숫자를 포함해 8~20자로 입력해주세요."),
 
+    //document extraction
+    DOCUMENT_EXTRACTION_NOT_EDITABLE(
+            HttpStatus.BAD_REQUEST,"DOCUMENT_EXTRACTION_001",
+            "수정할 수 없는 추출 결과입니다."
+    ),
+
     //job category
-    JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_01","존재하지 않는 직업 분류 입니다.");
+    JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다.");
 
     private final HttpStatus status;
     private final String code;
