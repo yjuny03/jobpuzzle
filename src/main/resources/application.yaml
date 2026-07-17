@@ -39,4 +39,4 @@ spring:
         format_sql: true
 app:
   data-initializer:
-    enabled: true
+    enabled: false
