@@ -28,6 +28,7 @@ public enum ErrorCode {
     USER_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_007", "등록되지 않은 이메일입니다."),
     EMAIL_CODE_INCORRECT(HttpStatus.BAD_REQUEST, "USER_008", "올바르지 않은 인증 코드입니다."),
     USER_LOGIN_ID_EMAIL_MISMATCH(HttpStatus.NOT_FOUND, "USER_009", "아이디 또는 이메일을 확인해주세요."),
+    USER_ACCOUNT_NOT_LOCKED(HttpStatus.BAD_REQUEST, "USER_010", "잠기지 않은 계정입니다."),
 
     //document extraction
     DOCUMENT_EXTRACTION_NOT_EDITABLE(

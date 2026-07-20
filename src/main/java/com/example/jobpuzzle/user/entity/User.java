@@ -157,4 +157,11 @@ public class User extends BaseEntity {
     public void resetLoginFailCount() {
         this.loginFailCount = 0;
     }
+
+    // 이메일 인증을 통한 계정 잠금 해제 - 실패 횟수/잠금 상태/잠긴 시각을 모두 초기화
+    public void unlock() {
+        this.loginFailCount = 0;
+        this.isLocked = false;
+        this.lockedAt = null;
+    }
 }

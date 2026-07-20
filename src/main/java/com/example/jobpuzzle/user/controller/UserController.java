@@ -2,6 +2,8 @@ package com.example.jobpuzzle.user.controller;
 
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.dto.AccountUnlockSendRequest;
+import com.example.jobpuzzle.user.dto.AccountUnlockVerifyRequest;
 import com.example.jobpuzzle.user.dto.EmailSendRequest;
 import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
@@ -139,6 +141,22 @@ public class UserController {
     @PostMapping("/passwd-reset/reset")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
         userService.resetPassword(request.getLoginId(), request.getEmail(), request.getCode(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 발송
+    // POST /api/user/unlock/send-code { loginId, email }
+    @PostMapping("/unlock/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendUnlockCode(@Valid @RequestBody AccountUnlockSendRequest request) {
+        userService.sendUnlockCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 검증 (검증 성공 시 그 자리에서 잠금 해제까지 처리됨)
+    // POST /api/user/unlock/verify { loginId, email, code }
+    @PostMapping("/unlock/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyAndUnlock(@Valid @RequestBody AccountUnlockVerifyRequest request) {
+        userService.verifyAndUnlock(request.getLoginId(), request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }
