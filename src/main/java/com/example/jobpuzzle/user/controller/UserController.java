@@ -6,6 +6,8 @@ import com.example.jobpuzzle.user.dto.AccountUnlockSendRequest;
 import com.example.jobpuzzle.user.dto.AccountUnlockVerifyRequest;
 import com.example.jobpuzzle.user.dto.EmailSendRequest;
 import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailSendRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
@@ -41,6 +43,22 @@ public class UserController {
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<Void>> join(@Valid @RequestBody JoinRequest request) {
         userService.join(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 발송
+    // POST /api/user/join/send-code { email }
+    @PostMapping("/join/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendJoinEmailCode(@Valid @RequestBody JoinEmailSendRequest request) {
+        userService.sendJoinEmailCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
+    // POST /api/user/join/verify { email, code }
+    @PostMapping("/join/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyJoinEmailCode(@Valid @RequestBody JoinEmailVerifyRequest request) {
+        userService.verifyJoinEmailCode(request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 

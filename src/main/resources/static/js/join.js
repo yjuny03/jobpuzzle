@@ -1,4 +1,4 @@
-// join.js — /join 페이지: 회원가입 폼 + 아이디/이메일 실시간 중복확인
+// join.js — /join 페이지: 회원가입 폼 + 아이디 중복확인 + 이메일 인증 코드 발송/검증
 (function () {
   'use strict';
 
@@ -22,6 +22,14 @@
     EXPERIENCED: '경력',
     ANY: '경력무관'
   };
+
+  var CODE_VALID_SECONDS = 180;
+
+  function formatMMSS(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return m + ':' + (s < 10 ? '0' + s : s);
+  }
 
   document.addEventListener('DOMContentLoaded', function () {
     var form = document.getElementById('join-form');
@@ -139,10 +147,131 @@
       loginIdHint.textContent = '';
     });
 
-    var emailChecked = false;
+    var emailCodeInput = document.getElementById('emailCode');
+    var emailCodeStep = document.getElementById('email-code-step');
+    var emailCodeHint = document.getElementById('email-code-hint');
+    var emailCodeCountdownEl = document.getElementById('email-code-countdown');
+    var sendEmailCodeBtn = document.getElementById('send-email-code-btn');
+    var verifyEmailCodeBtn = document.getElementById('verify-email-code-btn');
+
+    var emailVerified = false;
+    var emailCodeTimerId = null;
+
+    function stopEmailCodeCountdown() {
+      if (emailCodeTimerId) {
+        clearInterval(emailCodeTimerId);
+        emailCodeTimerId = null;
+      }
+    }
+
+    function startEmailCodeCountdown() {
+      stopEmailCodeCountdown();
+      var remaining = CODE_VALID_SECONDS;
+      emailCodeCountdownEl.textContent = formatMMSS(remaining);
+      emailCodeHint.classList.remove('field-hint--error');
+      verifyEmailCodeBtn.disabled = false;
+
+      emailCodeTimerId = setInterval(function () {
+        remaining -= 1;
+        if (remaining <= 0) {
+          stopEmailCodeCountdown();
+          emailCodeHint.textContent = '인증 시간이 만료되었습니다. 인증코드를 다시 발송해주세요.';
+          emailCodeHint.classList.add('field-hint--error');
+          verifyEmailCodeBtn.disabled = true;
+          return;
+        }
+        emailCodeCountdownEl.textContent = formatMMSS(remaining);
+      }, 1000);
+    }
+
+    // 이메일을 바꾸면 이전 인증 결과는 무효이므로 초기화
     emailInput.addEventListener('input', function () {
-      emailChecked = false;
+      emailVerified = false;
       emailHint.textContent = '';
+      stopEmailCodeCountdown();
+      emailCodeStep.hidden = true;
+      emailCodeInput.value = '';
+      emailCodeInput.disabled = false;
+    });
+
+    sendEmailCodeBtn.addEventListener('click', function () {
+      var email = emailInput.value.trim();
+      if (!email) {
+        setHint(emailHint, '이메일을 입력해주세요.', false);
+        return;
+      }
+
+      emailVerified = false;
+      emailCodeInput.value = '';
+      emailCodeInput.disabled = false;
+      sendEmailCodeBtn.disabled = true;
+      var sendBtnOriginalText = sendEmailCodeBtn.textContent;
+      sendEmailCodeBtn.textContent = '전송 중...';
+      fetch('/api/user/join/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: email })
+      })
+        .then(function (res) {
+          return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+        })
+        .then(function (result) {
+          if (result.ok && result.body.success) {
+            setHint(emailHint, '인증 코드를 보냈습니다. 이메일을 확인해주세요.', true);
+            emailCodeStep.hidden = false;
+            startEmailCodeCountdown();
+          } else {
+            setHint(emailHint, result.body.message || '인증 코드 발송에 실패했습니다.', false);
+          }
+        })
+        .catch(function () {
+          setHint(emailHint, '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', false);
+        })
+        .then(function () {
+          sendEmailCodeBtn.disabled = false;
+          sendEmailCodeBtn.textContent = sendBtnOriginalText;
+        });
+    });
+
+    verifyEmailCodeBtn.addEventListener('click', function () {
+      var email = emailInput.value.trim();
+      var code = emailCodeInput.value.trim();
+      if (!code) {
+        emailCodeHint.textContent = '인증 코드를 입력해주세요.';
+        emailCodeHint.classList.add('field-hint--error');
+        return;
+      }
+
+      verifyEmailCodeBtn.disabled = true;
+      fetch('/api/user/join/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: email, code: Number(code) })
+      })
+        .then(function (res) {
+          return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+        })
+        .then(function (result) {
+          if (result.ok && result.body.success) {
+            emailVerified = true;
+            stopEmailCodeCountdown();
+            emailCodeHint.textContent = '이메일 인증이 완료되었습니다.';
+            emailCodeHint.classList.remove('field-hint--error');
+            emailCodeInput.disabled = true;
+          } else {
+            emailVerified = false;
+            emailCodeHint.textContent = result.body.message || '인증 코드가 올바르지 않습니다.';
+            emailCodeHint.classList.add('field-hint--error');
+            verifyEmailCodeBtn.disabled = false;
+          }
+        })
+        .catch(function () {
+          emailCodeHint.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          emailCodeHint.classList.add('field-hint--error');
+          verifyEmailCodeBtn.disabled = false;
+        });
     });
 
     document.getElementById('check-id-btn').addEventListener('click', function () {
@@ -163,24 +292,6 @@
         });
     });
 
-    document.getElementById('check-email-btn').addEventListener('click', function () {
-      var email = emailInput.value.trim();
-      if (!email) {
-        setHint(emailHint, '이메일을 입력해주세요.', false);
-        return;
-      }
-      fetch('/api/user/check-email?email=' + encodeURIComponent(email))
-        .then(function (res) { return res.json(); })
-        .then(function (body) {
-          var duplicate = body.data;
-          emailChecked = !duplicate;
-          setHint(emailHint, duplicate ? '이미 사용 중인 이메일입니다.' : '사용 가능한 이메일입니다.', !duplicate);
-        })
-        .catch(function () {
-          setHint(emailHint, '중복확인 중 오류가 발생했습니다.', false);
-        });
-    });
-
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       hideError(errorEl);
@@ -195,8 +306,8 @@
         showError(errorEl, '아이디 중복확인을 먼저 진행해주세요.');
         return;
       }
-      if (!emailChecked) {
-        showError(errorEl, '이메일 중복확인을 먼저 진행해주세요.');
+      if (!emailVerified) {
+        showError(errorEl, '이메일 인증을 먼저 완료해주세요.');
         return;
       }
       if (!selectedJobCategoryId) {
@@ -209,7 +320,8 @@
         password: passwordInput.value,
         email: emailInput.value.trim(),
         name: document.getElementById('name').value.trim(),
-        defaultJobCategoryId: Number(selectedJobCategoryId)
+        defaultJobCategoryId: Number(selectedJobCategoryId),
+        code: Number(emailCodeInput.value.trim())
       };
 
       fetch('/api/user/join', {
