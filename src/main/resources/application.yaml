@@ -39,4 +39,18 @@ spring:
         format_sql: true
 app:
   data-initializer:
-    enabled: true
+    enabled: false
+
+  mail:
+    host: smtp.naver.com
+    port: 465
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+        starttls:
+          enable: false
