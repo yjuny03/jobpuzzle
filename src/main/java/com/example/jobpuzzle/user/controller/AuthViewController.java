@@ -18,4 +18,10 @@ public class AuthViewController {
     public String joinPage() {
         return "join";
     }
+
+    // GET /find-id -> templates/find-id.html
+    @GetMapping("/find-id")
+    public String findIdPage() {
+        return "find-id";
+    }
 }

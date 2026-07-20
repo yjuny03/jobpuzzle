@@ -10,6 +10,7 @@ import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
 import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.repository.EmailVerificationStore;
 import com.example.jobpuzzle.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -50,6 +51,10 @@ public class UserService {
 
     // 자동로그인 토큰 DB 삭제용 - rememberMeServices.logout()은 쿠키만 지우고 DB 토큰은 안 지워서 별도로 호출
     private final PersistentTokenRepository persistentTokenRepository;
+
+    // 인증 코드 메일 발송 서비스
+    private final MailService mailService;
+    private final EmailVerificationStore emailVerificationStore;
 
     // 비밀번호 정책 - 영문/숫자 각각 1자 이상 포함, 8~20자
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,20}$");
@@ -160,8 +165,21 @@ public class UserService {
         SecurityContextHolder.clearContext();
     }
 
-    public void findLoginId() {
-        // TODO: 이메일 인증 인프라 준비되면 구현 (현재 메일 발송 설정 없음)
+    // 인증 코드 검증 및 이메일로 로그인 아이디 반환
+    public String verifyCodeAndFindLoginId(String email, int inputCode) {
+        if(!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+        return userRepository.findLoginIdByEmail(email);
+    }
+
+    // User에 존재하는 이메일로 인증 코드 발송
+    public void sendVerificationCode(String email) {
+        if(userRepository.existsByEmail(email)) {
+            mailService.sendMail(email);
+        } else {
+            throw new CustomException(ErrorCode.USER_EMAIL_NOT_FOUND);
+        }
     }
 
     public void resetPassword() {

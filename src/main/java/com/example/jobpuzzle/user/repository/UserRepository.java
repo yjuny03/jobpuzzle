@@ -2,6 +2,8 @@ package com.example.jobpuzzle.user.repository;
 
 import com.example.jobpuzzle.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -21,4 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 내 정보 수정 시 이메일 중복 확인용 - 본인 이메일은 중복으로 치지 않음
     boolean existsByEmailAndUserIdNot(String email, Long userId);
+
+    // 이메일로 로그인 아이디 찾기
+    @Query("SELECT u.loginId FROM User u WHERE u.email = :email")
+    String findLoginIdByEmail(@Param("email") String email);
 }

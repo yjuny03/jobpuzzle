@@ -2,6 +2,8 @@ package com.example.jobpuzzle.user.controller;
 
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.dto.EmailSendRequest;
+import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
@@ -95,5 +97,21 @@ public class UserController {
                                                         HttpServletResponse httpResponse) {
         userService.withdraw(userDetails, httpRequest, httpResponse);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 발송
+    // POST /api/user/find-id/send-code { email }
+    @PostMapping("/find-id/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@Valid @RequestBody EmailSendRequest request) {
+        userService.sendVerificationCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 검증 후 로그인 아이디 반환
+    // POST /api/user/find-id/verify { email, code }
+    @PostMapping("/find-id/verify")
+    public ResponseEntity<ApiResponse<String>> verifyVerificationCode(@Valid @RequestBody EmailVerifyRequest request) {
+        String loginId = userService.verifyCodeAndFindLoginId(request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(loginId));
     }
 }

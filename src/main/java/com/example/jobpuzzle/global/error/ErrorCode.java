@@ -25,6 +25,8 @@ public enum ErrorCode {
     USER_ACCOUNT_LOCKED(HttpStatus.LOCKED, "USER_004", "로그인 실패 횟수 초과로 잠긴 계정입니다. \n이메일 인증으로 잠금 해제할 수 있습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_005", "존재하지 않는 회원입니다."),
     USER_INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "USER_006", "비밀번호는 영문/숫자를 포함해 8~20자로 입력해주세요."),
+    USER_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_007", "등록되지 않은 이메일입니다."),
+    EMAIL_CODE_INCORRECT(HttpStatus.BAD_REQUEST, "USER_008", "올바르지 않은 인증 코드입니다."),
 
     //document extraction
     DOCUMENT_EXTRACTION_NOT_EDITABLE(
