@@ -49,6 +49,9 @@ public class SecurityConfig {
             "/index.html",
             "/login",
             "/join",
+            "/find-id",
+            "/passwd-reset",
+            "/unlock",
             "/oauth2/**"
     };
 
@@ -57,7 +60,11 @@ public class SecurityConfig {
             "/api/user/join",
             "/api/user/login",
             "/api/user/check-id",
-            "/api/user/check-email"
+            "/api/user/check-email",
+            "/api/user/find-id/**",
+            "/api/user/passwd-reset/**",
+            "/api/user/unlock/**",
+            "/api/job-category"
     };
 
     // 비밀번호 암호화에 쓰는 인코더
