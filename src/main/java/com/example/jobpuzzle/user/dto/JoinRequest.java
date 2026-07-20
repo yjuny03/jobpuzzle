@@ -2,6 +2,7 @@ package com.example.jobpuzzle.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,6 +32,7 @@ public class JoinRequest {
     @Size(max = 50, message = "이름은 50자 이내로 입력해주세요.")
     private String name;
 
-    // 기본 관심 직무 - 정의서상 필수지만 선택 UI가 아직 없어서 당장은 선택 입력으로 둠 (User 엔티티 주석 참고)
+    // 기본 관심 직무 - 회원가입 화면에 대분류/중분류/경력 드롭다운 추가되면서 필수로 전환
+    @NotNull(message = "관심 직무를 선택해주세요.")
     private Long defaultJobCategoryId;
 }
