@@ -32,6 +32,8 @@
       }
 
       sendBtn.disabled = true;
+      var sendBtnOriginalText = sendBtn.textContent;
+      sendBtn.textContent = '전송 중...';
       fetch('/api/user/find-id/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,6 +57,7 @@
         })
         .then(function () {
           sendBtn.disabled = false;
+          sendBtn.textContent = sendBtnOriginalText;
         });
     });
 

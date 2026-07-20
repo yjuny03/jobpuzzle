@@ -17,7 +17,7 @@ public class MailService {
     }
 
     public void sendMail(String to) {
-        int code = (int) ( Math.random()*999999 ) + 100000;
+        int code = (int) ( Math.random()*900000 ) + 100000;
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
         message.setFrom("jobpuzzle@naver.com");
