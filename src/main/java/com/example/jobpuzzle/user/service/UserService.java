@@ -2,7 +2,6 @@ package com.example.jobpuzzle.user.service;
 
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.user.dto.JoinRequest;
@@ -70,9 +69,12 @@ public class UserService {
         // 비밀번호는 평문 그대로 저장하면 안 되므로 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
-        JobCategory jobCategory = jobCategoryRepository
-                .findById(request.getDefaultJobCategoryId())
-                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+        // 직무 선택 UI가 아직 없어서 안 보내는 경우가 많음 - null이면 조회 안 하고 그대로 null로 저장
+        JobCategory jobCategory = null;
+        if (request.getDefaultJobCategoryId() != null) {
+            jobCategory = jobCategoryRepository.findById(request.getDefaultJobCategoryId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+        }
 
         User user = User.createLocalUser(request.getLoginId(), encodedPassword, request.getEmail(),
                 request.getName(), jobCategory);
@@ -169,20 +171,22 @@ public class UserService {
     }
 
     // 내 정보 조회 - 로그인된 회원 기준
-    public UserInfoResponse getMyInfo(CustomUserDetails userDetails) {
-        return UserInfoResponse.from(userDetails.getUser());
+    public UserInfoResponse getMyInfo(User user) {
+        return UserInfoResponse.from(user);
     }
 
     // 내 정보 수정 - 이름/이메일/기본 관심 직무
-    // userDetails가 들고 있는 User는 인증 시점에 조회된 엔티티라 현재 트랜잭션에서 영속 상태가 아닐 수 있어서,
+    // 컨트롤러에서 넘어온 User는 인증 시점에 조회된 엔티티라 현재 트랜잭션에서 영속 상태가 아닐 수 있어서,
     // userId로 다시 조회한 영속 엔티티를 수정해야 변경 감지(dirty checking)로 실제 반영됨
-    public void updateMyInfo(MyInfoUpdateRequest request, CustomUserDetails userDetails) {
-        User user = userRepository.findById(userDetails.getUser().getUserId())
+    public void updateMyInfo(MyInfoUpdateRequest request, User principal) {
+        User user = userRepository.findById(principal.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        JobCategory jobCategory = jobCategoryRepository
-                .findById(request.getDefaultJobCategoryId())
-                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+        JobCategory jobCategory = null;
+        if (request.getDefaultJobCategoryId() != null) {
+            jobCategory = jobCategoryRepository.findById(request.getDefaultJobCategoryId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
+        }
 
         // 이메일을 바꾸는 경우에만 중복 체크 (본인 이메일은 중복으로 안 침)
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())
@@ -194,8 +198,8 @@ public class UserService {
     }
 
     // 회원 탈퇴 - 상태 변경 후 로그인 상태도 함께 정리 (updateMyInfo와 같은 이유로 다시 조회해서 수정)
-    public void withdraw(CustomUserDetails userDetails, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        User user = userRepository.findById(userDetails.getUser().getUserId())
+    public void withdraw(User principal, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        User user = userRepository.findById(principal.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         user.withdraw();
         logout(httpRequest, httpResponse);

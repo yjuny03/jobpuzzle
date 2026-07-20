@@ -102,13 +102,15 @@ public class SecurityConfig {
                 .rememberMe(rememberMe -> rememberMe
                         .rememberMeServices(rememberMeServices())
                 )
-                // 카카오 로그인 설정 - 로그인 성공 시 customOAuth2UserService가 회원 조회/생성 처리
+                // 카카오/구글 로그인 설정 - 로그인 성공 시 customOAuth2UserService가 회원 조회/생성 처리
                 .oauth2Login(oauth2 -> oauth2
                         // 커스텀 로그인 페이지 지정 - 안 하면 스프링이 /login을 가로채서 자체 기본 로그인 화면을 띄워버림
                         .loginPage("/login")
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
+                        // 로그인 성공 후 이동할 화면 - "/"는 매핑된 화면이 없어서 기본값 그대로 두면 404로 떨어짐
+                        .defaultSuccessUrl("/index.html", true)
                 );
         return http.build();
 

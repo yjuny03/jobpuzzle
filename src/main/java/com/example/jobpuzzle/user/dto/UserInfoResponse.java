@@ -5,6 +5,7 @@ import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.entity.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 // 내 정보 조회 응답 (/api/user/me)
 @Getter
@@ -19,13 +20,17 @@ public class UserInfoResponse {
     private Long defaultJobCategoryId;
 
     public static UserInfoResponse from(User user) {
+        // 카카오/구글로 가입한 회원은 기본 관심 직무를 아직 선택한 적이 없어서 null일 수 있음
+        Long jobCategoryId = user.getDefaultJobCategory() != null
+                ? user.getDefaultJobCategory().getJobCategoryId()
+                : null;
         return new UserInfoResponse(
                 user.getUserId(),
                 user.getLoginId(),
                 user.getEmail(),
                 user.getName(),
                 user.getRole(),
-                user.getDefaultJobCategory().getJobCategoryId()
+                jobCategoryId
         );
     }
 }
