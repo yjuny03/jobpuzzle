@@ -249,7 +249,11 @@ public class UserService {
     }
 
     // 내 정보 조회 - 로그인된 회원 기준
-    public UserInfoResponse getMyInfo(User user) {
+    // principal은 로그인(세션) 시점에 조회된 스냅샷이라 그 이후 변경사항(예: 직무 설정)이 반영 안 될 수 있어서,
+    // updateMyInfo/withdraw와 동일하게 매번 DB에서 최신 상태로 다시 조회함
+    public UserInfoResponse getMyInfo(User principal) {
+        User user = userRepository.findById(principal.getUserId())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return UserInfoResponse.from(user);
     }
 

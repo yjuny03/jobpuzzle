@@ -40,15 +40,11 @@ spring:
     properties:
       hibernate:
         format_sql: true
-app:
-  data-initializer:
-    enabled: false
-
   mail:
     host: smtp.naver.com
     port: 465
-    username:
-    password:
+    username: jobpuzzle@naver.com
+    password: PL77TK8D9BSR
     properties:
       mail:
         smtp:
@@ -57,3 +53,6 @@ app:
             enable: true
         starttls:
           enable: false
+app:
+  data-initializer:
+    enabled: false
