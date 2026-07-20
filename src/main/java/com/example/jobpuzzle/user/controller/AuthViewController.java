@@ -30,4 +30,10 @@ public class AuthViewController {
     public String passwordResetPage() {
         return "passwd-reset";
     }
+
+    // GET /unlock -> templates/unlock.html
+    @GetMapping("/unlock")
+    public String unlockPage() {
+        return "unlock";
+    }
 }

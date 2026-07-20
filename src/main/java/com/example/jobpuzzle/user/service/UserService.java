@@ -215,6 +215,37 @@ public class UserService {
         emailVerificationStore.invalidate(email);
     }
 
+    // 계정 잠금 해제 - 아이디+이메일이 같은 계정인지, 실제로 잠긴 계정인지 확인 후 인증 코드 발송
+    public void sendUnlockCode(String loginId, String email) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!Boolean.TRUE.equals(user.getIsLocked())) {
+            throw new CustomException(ErrorCode.USER_ACCOUNT_NOT_LOCKED);
+        }
+
+        mailService.sendMail(email);
+    }
+
+    // 계정 잠금 해제 - 인증 코드 검증 성공 시 그 자리에서 잠금 해제 처리, 완료 시점에 인증 코드 무효화
+    public void verifyAndUnlock(String loginId, String email, int inputCode) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!Boolean.TRUE.equals(user.getIsLocked())) {
+            throw new CustomException(ErrorCode.USER_ACCOUNT_NOT_LOCKED);
+        }
+
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+
+        user.unlock();
+        emailVerificationStore.invalidate(email);
+    }
+
     // 내 정보 조회 - 로그인된 회원 기준
     public UserInfoResponse getMyInfo(CustomUserDetails userDetails) {
         return UserInfoResponse.from(userDetails.getUser());
