@@ -17,6 +17,12 @@
     el.classList.remove('is-visible');
   }
 
+  var CAREER_LEVEL_LABEL = {
+    NEW: '신입',
+    EXPERIENCED: '경력',
+    ANY: '경력무관'
+  };
+
   document.addEventListener('DOMContentLoaded', function () {
     var form = document.getElementById('join-form');
     var errorEl = document.getElementById('join-error');
@@ -28,6 +34,103 @@
     var passwordInput = document.getElementById('password');
     var passwordCheckInput = document.getElementById('passwordCheck');
     var passwordCheckHint = document.getElementById('passwordCheck-hint');
+
+    var mainCategorySelect = document.getElementById('mainCategory');
+    var subCategorySelect = document.getElementById('subCategory');
+    var careerLevelSelect = document.getElementById('careerLevel');
+    var jobCategoryHint = document.getElementById('jobCategory-hint');
+
+    var jobCategories = [];
+    var selectedJobCategoryId = null;
+
+    function uniqueInOrder(values) {
+      var seen = {};
+      var result = [];
+      values.forEach(function (value) {
+        if (!seen[value]) {
+          seen[value] = true;
+          result.push(value);
+        }
+      });
+      return result;
+    }
+
+    function fillOptions(select, options, placeholder) {
+      select.innerHTML = '';
+      var placeholderOption = document.createElement('option');
+      placeholderOption.value = '';
+      placeholderOption.textContent = placeholder;
+      select.appendChild(placeholderOption);
+      options.forEach(function (option) {
+        var el = document.createElement('option');
+        el.value = option.value;
+        el.textContent = option.label;
+        select.appendChild(el);
+      });
+    }
+
+    fetch('/api/job-category')
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        jobCategories = body.data || [];
+        var mainCategories = uniqueInOrder(jobCategories.map(function (c) { return c.mainCategory; }));
+        fillOptions(mainCategorySelect, mainCategories.map(function (m) {
+          return { value: m, label: m };
+        }), '선택해주세요');
+      })
+      .catch(function () {
+        jobCategoryHint.textContent = '직무 목록을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.';
+        jobCategoryHint.classList.add('field-hint--error');
+      });
+
+    mainCategorySelect.addEventListener('change', function () {
+      selectedJobCategoryId = null;
+      var mainCategory = mainCategorySelect.value;
+
+      if (!mainCategory) {
+        subCategorySelect.disabled = true;
+        careerLevelSelect.disabled = true;
+        fillOptions(subCategorySelect, [], '대분류를 먼저 선택해주세요');
+        fillOptions(careerLevelSelect, [], '중분류를 먼저 선택해주세요');
+        return;
+      }
+
+      var subCategories = uniqueInOrder(
+        jobCategories.filter(function (c) { return c.mainCategory === mainCategory; })
+          .map(function (c) { return c.subCategory; })
+      );
+      fillOptions(subCategorySelect, subCategories.map(function (s) {
+        return { value: s, label: s };
+      }), '선택해주세요');
+      subCategorySelect.disabled = false;
+
+      careerLevelSelect.disabled = true;
+      fillOptions(careerLevelSelect, [], '중분류를 먼저 선택해주세요');
+    });
+
+    subCategorySelect.addEventListener('change', function () {
+      selectedJobCategoryId = null;
+      var mainCategory = mainCategorySelect.value;
+      var subCategory = subCategorySelect.value;
+
+      if (!subCategory) {
+        careerLevelSelect.disabled = true;
+        fillOptions(careerLevelSelect, [], '중분류를 먼저 선택해주세요');
+        return;
+      }
+
+      var matches = jobCategories.filter(function (c) {
+        return c.mainCategory === mainCategory && c.subCategory === subCategory;
+      });
+      fillOptions(careerLevelSelect, matches.map(function (c) {
+        return { value: c.jobCategoryId, label: CAREER_LEVEL_LABEL[c.careerLevel] || c.careerLevel };
+      }), '선택해주세요');
+      careerLevelSelect.disabled = false;
+    });
+
+    careerLevelSelect.addEventListener('change', function () {
+      selectedJobCategoryId = careerLevelSelect.value || null;
+    });
 
     // 아이디를 바꾸면 중복확인 결과는 다시 확인해야 하므로 초기화
     var loginIdChecked = false;
@@ -96,12 +199,17 @@
         showError(errorEl, '이메일 중복확인을 먼저 진행해주세요.');
         return;
       }
+      if (!selectedJobCategoryId) {
+        showError(errorEl, '관심 직무를 선택해주세요.');
+        return;
+      }
 
       var payload = {
         loginId: loginIdInput.value.trim(),
         password: passwordInput.value,
         email: emailInput.value.trim(),
-        name: document.getElementById('name').value.trim()
+        name: document.getElementById('name').value.trim(),
+        defaultJobCategoryId: Number(selectedJobCategoryId)
       };
 
       fetch('/api/user/join', {

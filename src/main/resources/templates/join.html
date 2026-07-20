@@ -56,6 +56,28 @@
           <span class="field-hint" id="passwordCheck-hint"></span>
         </div>
 
+        <div class="auth-field">
+          <label class="field-label" for="mainCategory">관심 직무 - 대분류</label>
+          <select class="select-input" id="mainCategory" name="mainCategory" required>
+            <option value="">선택해주세요</option>
+          </select>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="subCategory">관심 직무 - 중분류</label>
+          <select class="select-input" id="subCategory" name="subCategory" required disabled>
+            <option value="">대분류를 먼저 선택해주세요</option>
+          </select>
+        </div>
+
+        <div class="auth-field">
+          <label class="field-label" for="careerLevel">경력</label>
+          <select class="select-input" id="careerLevel" name="careerLevel" required disabled>
+            <option value="">중분류를 먼저 선택해주세요</option>
+          </select>
+          <span class="field-hint" id="jobCategory-hint"></span>
+        </div>
+
         <button class="btn btn--primary auth-submit" type="submit">회원가입</button>
       </form>
 

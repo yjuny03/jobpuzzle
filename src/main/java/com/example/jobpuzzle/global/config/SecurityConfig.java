@@ -63,7 +63,8 @@ public class SecurityConfig {
             "/api/user/check-email",
             "/api/user/find-id/**",
             "/api/user/passwd-reset/**",
-            "/api/user/unlock/**"
+            "/api/user/unlock/**",
+            "/api/job-category"
     };
 
     // 비밀번호 암호화에 쓰는 인코더
