@@ -35,4 +35,8 @@ public class JoinRequest {
     // 기본 관심 직무 - 회원가입 화면에 대분류/중분류/경력 드롭다운 추가되면서 필수로 전환
     @NotNull(message = "관심 직무를 선택해주세요.")
     private Long defaultJobCategoryId;
+
+    // 이메일 인증 코드 - /join/verify로 미리 검증했더라도 가입 처리 시점에 재검증됨
+    @NotNull(message = "이메일 인증을 먼저 완료해주세요.")
+    private Integer code;
 }
