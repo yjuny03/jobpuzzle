@@ -7,6 +7,9 @@ import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetSendRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetVerifyRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
 import com.example.jobpuzzle.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -113,5 +116,29 @@ public class UserController {
     public ResponseEntity<ApiResponse<String>> verifyVerificationCode(@Valid @RequestBody EmailVerifyRequest request) {
         String loginId = userService.verifyCodeAndFindLoginId(request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(loginId));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 발송
+    // POST /api/user/passwd-reset/send-code { loginId, email }
+    @PostMapping("/passwd-reset/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendPasswordResetCode(@Valid @RequestBody PasswordResetSendRequest request) {
+        userService.sendPasswordResetCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 유효시간 내에 재설정 완료해야 함)
+    // POST /api/user/passwd-reset/verify { loginId, email, code }
+    @PostMapping("/passwd-reset/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyPasswordResetCode(@Valid @RequestBody PasswordResetVerifyRequest request) {
+        userService.verifyPasswordResetCode(request.getLoginId(), request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 재확인 후 새 비밀번호로 변경
+    // POST /api/user/passwd-reset/reset { loginId, email, code, newPassword }
+    @PostMapping("/passwd-reset/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        userService.resetPassword(request.getLoginId(), request.getEmail(), request.getCode(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

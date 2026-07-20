@@ -17,7 +17,7 @@ public class EmailVerificationStore {
         store.put(email, verificationCode);
     }
 
-    // 이메일 인증 코드 검증
+    // 이메일 인증 코드 검증 - 성공해도 삭제하지 않고 유효시간 만료로만 무효화됨 (검증 후 별도 단계에서 재확인이 필요한 흐름 지원용)
     public boolean verify(String email, int inputCode) {
         VerificationCode verificationCode = store.get(email);
         // 발송 이력이 없는 이메일
@@ -28,10 +28,11 @@ public class EmailVerificationStore {
         if (verificationCode.expireAt().isBefore(LocalDateTime.now())) {
             return false;
         }
-        boolean match = verificationCode.code() == inputCode;
-        if (match) {
-            store.remove(email);
-        }
-        return match;
+        return verificationCode.code() == inputCode;
+    }
+
+    // 인증 코드를 즉시 무효화 - 인증 코드를 활용한 민감한 작업(비밀번호 변경 등)이 완료된 시점에 호출
+    public void invalidate(String email) {
+        store.remove(email);
     }
 }

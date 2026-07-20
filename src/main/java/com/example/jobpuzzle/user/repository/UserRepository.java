@@ -27,4 +27,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 이메일로 로그인 아이디 찾기
     @Query("SELECT u.loginId FROM User u WHERE u.email = :email")
     String findLoginIdByEmail(@Param("email") String email);
+
+    // 비밀번호 재설정 시 아이디와 이메일이 같은 계정 소유인지 확인
+    boolean existsByLoginIdAndEmail(String loginId, String email);
 }

@@ -133,6 +133,11 @@ public class User extends BaseEntity {
         this.defaultJobCategory = defaultJobCategory;
     }
 
+    // 비밀번호 재설정 - encodedPassword는 암호화된 값이어야 함
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     // 회원 탈퇴 처리 - 상태만 WITHDRAWN으로 바꾸고 탈퇴 시각 기록 (실제 데이터 삭제는 안 함)
     public void withdraw() {
         this.status = UserStatus.WITHDRAWN;

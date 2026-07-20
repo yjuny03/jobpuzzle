@@ -182,8 +182,37 @@ public class UserService {
         }
     }
 
-    public void resetPassword() {
-        // TODO: 이메일 인증 인프라 준비되면 구현 (현재 메일 발송 설정 없음)
+    // 비밀번호 재설정 - 아이디+이메일이 같은 계정인지 확인 후 인증 코드 발송
+    public void sendPasswordResetCode(String loginId, String email) {
+        if (!userRepository.existsByLoginIdAndEmail(loginId, email)) {
+            throw new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH);
+        }
+        mailService.sendMail(email);
+    }
+
+    // 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음)
+    public void verifyPasswordResetCode(String loginId, String email, int inputCode) {
+        if (!userRepository.existsByLoginIdAndEmail(loginId, email)) {
+            throw new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH);
+        }
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+    }
+
+    // 비밀번호 재설정 - 인증 코드 재확인 후 비밀번호 변경, 완료 시점에 인증 코드 무효화
+    public void resetPassword(String loginId, String email, int inputCode, String newPassword) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+
+        validatePassword(newPassword);
+        user.changePassword(passwordEncoder.encode(newPassword));
+        emailVerificationStore.invalidate(email);
     }
 
     // 내 정보 조회 - 로그인된 회원 기준

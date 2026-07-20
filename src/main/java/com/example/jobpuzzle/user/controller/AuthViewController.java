@@ -24,4 +24,10 @@ public class AuthViewController {
     public String findIdPage() {
         return "find-id";
     }
+
+    // GET /passwd-reset -> templates/passwd-reset.html
+    @GetMapping("/passwd-reset")
+    public String passwordResetPage() {
+        return "passwd-reset";
+    }
 }
