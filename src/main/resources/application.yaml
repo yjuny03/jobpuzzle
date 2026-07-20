@@ -40,3 +40,4 @@ spring:
 app:
   data-initializer:
     enabled: false
+
