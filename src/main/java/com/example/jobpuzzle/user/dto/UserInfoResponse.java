@@ -18,6 +18,7 @@ public class UserInfoResponse {
     private String name;
     private UserRole role;
     private Long defaultJobCategoryId;
+    private String socialProvider;
 
     public static UserInfoResponse from(User user) {
         // 카카오/구글로 가입한 회원은 기본 관심 직무를 아직 선택한 적이 없어서 null일 수 있음
@@ -30,7 +31,8 @@ public class UserInfoResponse {
                 user.getEmail(),
                 user.getName(),
                 user.getRole(),
-                jobCategoryId
+                jobCategoryId,
+                user.getSocialProvider()
         );
     }
 }

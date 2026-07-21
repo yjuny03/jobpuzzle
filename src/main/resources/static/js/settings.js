@@ -49,7 +49,17 @@
     var emailInput = document.getElementById('settings-email');
     var nameInput = document.getElementById('settings-name');
     var profileError = document.getElementById('profile-error');
+    var editProfileBtn = document.getElementById('edit-profile-btn');
     var saveProfileBtn = document.getElementById('save-profile-btn');
+    var saveSuccessModal = document.getElementById('save-success-modal');
+    var saveSuccessConfirm = document.getElementById('save-success-confirm');
+
+    function setProfileEditMode(editing) {
+      emailInput.disabled = !editing;
+      nameInput.disabled = !editing;
+      editProfileBtn.hidden = editing;
+      saveProfileBtn.hidden = !editing;
+    }
 
     var majorSelect = document.getElementById('job-major');
     var minorSelect = document.getElementById('job-minor');
@@ -107,6 +117,10 @@
       idInput.value = user.loginId || '';
       emailInput.value = user.email || '';
       nameInput.value = user.name || '';
+
+      // 소셜 로그인 계정은 아이디를 직접 로그인에 쓰지 않으므로 아이디 항목을 숨김
+      var idRow = document.getElementById('settings-id-row');
+      idRow.style.display = user.socialProvider ? 'none' : '';
     }
 
     // header.js가 헤더 표시를 위해 이미 /api/user/me를 불러오므로, 중복 호출 없이 그 결과를 그대로 재사용함
@@ -178,6 +192,11 @@
         });
     }
 
+    editProfileBtn.addEventListener('click', function () {
+      hideError(profileError);
+      setProfileEditMode(true);
+    });
+
     saveProfileBtn.addEventListener('click', function () {
       hideError(profileError);
       if (!currentUser) return;
@@ -188,13 +207,30 @@
         return;
       }
 
+      var email = emailInput.value.trim();
+      if (!email) {
+        showError(profileError, '이메일을 입력해주세요.');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError(profileError, '올바른 이메일 형식이 아닙니다.');
+        return;
+      }
+
       saveMyInfo({
         name: name,
-        email: currentUser.email,
+        email: email,
         defaultJobCategoryId: currentUser.defaultJobCategoryId
       }, profileError, function () {
         currentUser.name = name;
+        currentUser.email = email;
+        setProfileEditMode(false);
+        saveSuccessModal.hidden = false;
       });
+    });
+
+    saveSuccessConfirm.addEventListener('click', function () {
+      saveSuccessModal.hidden = true;
     });
 
     saveJobCategoryBtn.addEventListener('click', function () {
