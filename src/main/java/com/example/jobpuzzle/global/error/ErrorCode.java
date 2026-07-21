@@ -30,12 +30,6 @@ public enum ErrorCode {
     USER_LOGIN_ID_EMAIL_MISMATCH(HttpStatus.NOT_FOUND, "USER_009", "아이디 또는 이메일을 확인해주세요."),
     USER_ACCOUNT_NOT_LOCKED(HttpStatus.BAD_REQUEST, "USER_010", "잠기지 않은 계정입니다."),
 
-    //document extraction
-    DOCUMENT_EXTRACTION_NOT_EDITABLE(
-            HttpStatus.BAD_REQUEST,"DOCUMENT_EXTRACTION_001",
-            "수정할 수 없는 추출 결과입니다."
-    ),
-
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다.");
 

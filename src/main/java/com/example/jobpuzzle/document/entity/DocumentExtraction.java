@@ -1,12 +1,12 @@
 package com.example.jobpuzzle.document.entity;
 
 import com.example.jobpuzzle.global.common.BaseTimeEntity;
-import com.example.jobpuzzle.global.error.CustomException;
-import com.example.jobpuzzle.global.error.ErrorCode;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -23,17 +23,24 @@ public class DocumentExtraction extends BaseTimeEntity {
     @JoinColumn(name = "document_id", nullable = false)
     private UserDocument document;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "base_extraction_id")
+    private DocumentExtraction baseExtraction;
+
+    @Column(name = "version")
+    private Integer version;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "extraction_status", nullable = false, length = 20)
     private DocumentExtractionStatus extractionStatus;
 
-    @Lob
-    @Column(name = "extracted_text", columnDefinition = "LONGTEXT")
-    private String extractedText;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "version_status", length = 20)
+    private DocumentVersionStatus versionStatus;
 
     @Lob
-    @Column(name = "edited_text", columnDefinition = "LONGTEXT")
-    private String editedText;
+    @Column(name = "content", columnDefinition = "LONGTEXT")
+    private String content;
 
     @Column(name = "page_count")
     private Integer pageCount;
@@ -41,40 +48,41 @@ public class DocumentExtraction extends BaseTimeEntity {
     @Column(name = "ocr_applied", nullable = false)
     private boolean ocrApplied = false;
 
-    @Column(name = "editable", nullable = false)
-    private boolean editable = true;
-
-    @Column(name = "failure_reason", length = 255)
+    @Column(name = "failure_reason", length = 500)
     private String failureReason;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
 
     @Builder
     private DocumentExtraction(
             UserDocument document,
+            DocumentExtraction baseExtraction,
+            Integer version,
             DocumentExtractionStatus extractionStatus,
-            String extractedText,
-            String editedText,
+            DocumentVersionStatus versionStatus,
+            String content,
             Integer pageCount,
             boolean ocrApplied,
-            boolean editable,
             String failureReason
     ) {
         this.document = document;
+        this.baseExtraction = baseExtraction;
+        this.version = version;
         this.extractionStatus = extractionStatus;
-        this.extractedText = extractedText;
-        this.editedText = editedText;
+        this.versionStatus = versionStatus;
+        this.content = content;
         this.pageCount = pageCount;
         this.ocrApplied = ocrApplied;
-        this.editable = editable;
         this.failureReason = failureReason;
     }
 
-    public void updateEditedText(String editedText) {
-        if (!editable) {
-            throw new CustomException(
-                    ErrorCode.DOCUMENT_EXTRACTION_NOT_EDITABLE
-            );
-        }
+    public void confirm() {
+        this.versionStatus = DocumentVersionStatus.CONFIRMED;
+        this.confirmedAt = LocalDateTime.now();
+    }
 
-        this.editedText = editedText;
+    public void supersede() {
+        this.versionStatus = DocumentVersionStatus.SUPERSEDED;
     }
 }
