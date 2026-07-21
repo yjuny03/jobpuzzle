@@ -41,3 +41,9 @@ application-local.yaml
 
 ### 로컬 파일 저장소 ###
 /storage/
+
+### 외부 서비스 인증키 ###
+/credentials/
+
+### 관련 자료 ###
+/docs/

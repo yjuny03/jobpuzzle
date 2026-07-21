@@ -50,6 +50,10 @@ app:
     local:
       base-dir: ./storage/documents
 
+  ocr:
+    google-vision:
+      credentials-path: ./credentials/google-vision-service-account.json
+
   mail:
     host: smtp.naver.com
     port: 465
