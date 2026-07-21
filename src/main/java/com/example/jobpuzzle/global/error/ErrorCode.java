@@ -17,6 +17,13 @@ public enum ErrorCode {
 
     //analysis
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
+    ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
+    ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),
+    ANALYSIS_CASE_SOURCE_DUPLICATE(HttpStatus.BAD_REQUEST, "ANALYSIS_004", "이미 연결된 자료입니다."),
+    ANALYSIS_CASE_JOB_POSTING_ALREADY_SELECTED(HttpStatus.BAD_REQUEST, "ANALYSIS_005", "채용공고는 1건만 선택할 수 있습니다. 기존 자료를 먼저 제거해주세요."),
+    ANALYSIS_CASE_SOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_006", "연결된 자료를 찾을 수 없습니다."),
+    ANALYSIS_CASE_JOB_POSTING_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_007", "채용공고를 정확히 1건 선택해야 합니다."),
+    ANALYSIS_CASE_USER_MATERIAL_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_008", "이력서·자기소개서·포트폴리오·경험정리 중 최소 1건을 선택해야 합니다."),
 
     //user - 회원가입/로그인
     USER_LOGIN_ID_DUPLICATE(HttpStatus.CONFLICT, "USER_001", "이미 사용 중인 아이디입니다."),

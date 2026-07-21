@@ -1,15 +1,14 @@
-// mydata.js — 지원 자료 페이지: 실제 백엔드 API(JSON-00) 연동
+// mydata.js — 지원 자료 페이지: 실제 백엔드 API(JSON-00) 연동. 등록/추출/페이지별 보기·수정/확정 로직은 document-flow.js 공용 모듈을 사용한다.
 (function () {
   'use strict';
 
-  var API_BASE = '/api';
-
-  var CATEGORY_LABEL = {
-    JOB_POSTING: '채용공고', COMPANY_INFO: '회사정보', RESUME: '이력서',
-    COVER_LETTER: '자기소개서', PORTFOLIO: '포트폴리오', EXPERIENCE_NOTE: '경험 자료'
-  };
+  var DF = window.DocumentFlow;
+  var api = DF.api;
+  var CATEGORY_LABEL = DF.CATEGORY_LABEL;
   var CATEGORIES = Object.keys(CATEGORY_LABEL).map(function (id) { return { id: id, label: CATEGORY_LABEL[id] }; });
-  var DIRECT_INPUT_ALLOWED = ['JOB_POSTING', 'COMPANY_INFO', 'EXPERIENCE_NOTE'];
+  var DIRECT_INPUT_ALLOWED = DF.DIRECT_INPUT_ALLOWED;
+  var versionLabel = DF.versionLabel;
+  var statusLabel = DF.statusLabel;
 
   var state = {
     tab: 'docs',
@@ -17,13 +16,6 @@
     docsPage: 0,
     docsPageData: null,
     selectedDocumentId: null,
-    documentMeta: null,
-    versions: [],
-    selectedExtractionId: null,
-    editMode: false,
-    pageIndex: 0,
-    editingPages: null,
-    editingHasMarkers: false,
     registerCategory: null,
     registerMethod: 'file',
     scaleAction: null,
@@ -31,69 +23,10 @@
     deleteDocId: null
   };
 
-  // ---- fetch helper: ApiResponse<T> 래퍼를 벗겨서 data만 반환, 실패하면 message로 reject ----
-  function api(path, opts) {
-    opts = opts || {};
-    var headers = opts.headers || {};
-    var fetchOpts = { method: opts.method || 'GET', credentials: 'same-origin', headers: headers };
-    if (opts.json !== undefined) {
-      headers['Content-Type'] = 'application/json; charset=UTF-8';
-      fetchOpts.body = JSON.stringify(opts.json);
-    } else if (opts.formData) {
-      fetchOpts.body = opts.formData;
-    }
-    return fetch(API_BASE + path, fetchOpts).then(function (res) {
-      if (res.status === 204) {
-        if (!res.ok) throw new Error('요청에 실패했습니다.');
-        return null;
-      }
-      return res.json().then(function (body) {
-        if (!res.ok || !body.success) {
-          throw new Error((body && body.message) || '요청에 실패했습니다.');
-        }
-        return body.data;
-      });
-    });
-  }
-
-  function versionLabel(major, minor) {
-    return major == null ? '미확정' : ('v' + major + '.' + minor);
-  }
-
-  function statusLabel(extractionStatus, versionStatus) {
-    if (extractionStatus === 'FAILED') return { text: '추출 실패', color: '#B5433D' };
-    if (versionStatus === 'CONFIRMED') return { text: '확정됨', color: '#1E8E5A' };
-    if (versionStatus === 'SUPERSEDED') return { text: '이전 버전', color: '#8A93A3' };
-    if (extractionStatus === 'PARTIAL') return { text: '일부만 추출됨', color: '#8A5A22' };
-    return { text: '검토 필요', color: '#8A5A22' };
-  }
-
-  // [N페이지] 마커를 기준으로 원문을 페이지 단위로 쪼갠다 (백엔드 DocumentExtractionAsyncRunner 참고)
-  function splitPages(content) {
-    if (!content) return [''];
-    var regex = /\[(\d+)페이지\]\n/g;
-    var matches = [];
-    var m;
-    while ((m = regex.exec(content)) !== null) matches.push(m);
-    if (matches.length === 0) return [content];
-    var pages = [];
-    for (var i = 0; i < matches.length; i++) {
-      var start = matches[i].index + matches[i][0].length;
-      var end = (i + 1 < matches.length) ? matches[i + 1].index : content.length;
-      pages.push(content.slice(start, end).trim());
-    }
-    return pages;
-  }
-
-  function hasPageMarkers(content) {
-    return /^\[\d+페이지\]\n/.test(content || '');
-  }
-
-  // splitPages로 나눈 페이지들을 저장용 content 문자열 하나로 다시 합치기 (원래 페이지 마커가 있던 문서만 마커를 다시 붙임)
-  function joinPages(pages, withMarkers) {
-    if (!withMarkers) return pages[0] || '';
-    return pages.map(function (text, idx) { return '[' + (idx + 1) + '페이지]\n' + text; }).join('\n\n');
-  }
+  var extractPanel = DF.createExtractPanel(document.getElementById('extract-detail'), {
+    onConfirmed: function () { loadDocuments(); },
+    openScaleModal: openScale
+  });
 
   // ---- tabs & chips ----
   function renderTabs() {
@@ -218,25 +151,9 @@
   // ---- extract nav + detail ----
   function selectDocument(documentId) {
     state.selectedDocumentId = documentId;
-    state.editMode = false;
-    state.editingPages = null;
-    state.pageIndex = 0;
     switchToExtractTab();
-    Promise.all([
-      api('/documents/' + documentId).then(function (detail) { state.documentMeta = detail.document; }),
-      loadVersions(documentId)
-    ]).then(function () {
-      renderExtractNav();
-      renderExtractDetail();
-    }).catch(function (e) { alert(e.message); });
-  }
-
-  function loadVersions(documentId) {
-    return api('/documents/' + documentId + '/extractions').then(function (versions) {
-      state.versions = versions;
-      state.selectedExtractionId = versions.length ? versions[0].extractionId : null;
-      renderExtractDetail();
-    });
+    renderExtractNav();
+    extractPanel.load(documentId).catch(function (e) { alert(e.message); });
   }
 
   function renderExtractNav() {
@@ -251,221 +168,6 @@
     }).join('');
     document.getElementById('extract-nav').innerHTML = html;
     document.querySelectorAll('[data-select-doc]').forEach(function (b) { b.addEventListener('click', function () { selectDocument(parseInt(b.dataset.selectDoc, 10)); }); });
-    syncDetailContentHeight();
-  }
-
-  function latestVersionedExtraction() {
-    for (var i = 0; i < state.versions.length; i++) {
-      if (state.versions[i].majorVersion != null) return state.versions[i];
-    }
-    return null;
-  }
-
-  // 페이지가 1장뿐이라 이전/다음이 필요 없을 때도 같은 높이를 차지하는 빈 슬롯을 반환 (본문 높이를 항상 동일하게 유지하기 위함)
-  function renderPageNav(pageCount, label) {
-    if (pageCount <= 1) return '<div class="extract-page-nav"></div>';
-    var isFirst = state.pageIndex === 0;
-    var isLast = state.pageIndex === pageCount - 1;
-    return '<div class="extract-page-nav">' +
-      '<button class="btn-sm" id="page-first-btn"' + (isFirst ? ' disabled' : '') + '>처음</button>' +
-      '<button class="btn-sm" id="page-prev-btn"' + (isFirst ? ' disabled' : '') + '>이전</button>' +
-      '<span style="font-size:12.5px; color:#8A93A3; display:inline-flex; align-items:center; gap:5px;">' +
-        '<input type="number" class="text-input" id="page-jump-input" min="1" max="' + pageCount + '" value="' + (state.pageIndex + 1) + '" style="width:44px; padding:4px 6px; font-size:12.5px; text-align:center;">' +
-        ' / ' + pageCount + label +
-      '</span>' +
-      '<button class="btn-sm" id="page-next-btn"' + (isLast ? ' disabled' : '') + '>다음</button>' +
-      '<button class="btn-sm" id="page-last-btn"' + (isLast ? ' disabled' : '') + '>마지막</button>' +
-      '</div>';
-  }
-
-  function renderExtractDetail() {
-    var container = document.getElementById('extract-detail');
-    if (!state.selectedDocumentId || !state.documentMeta) { container.innerHTML = '<p class="text-faint">왼쪽에서 자료를 선택해주세요</p>'; return; }
-
-    var doc = state.documentMeta;
-    var versions = state.versions;
-    var extraction = versions.filter(function (v) { return v.extractionId === state.selectedExtractionId; })[0];
-    if (!extraction) { container.innerHTML = '<p class="text-faint">아직 추출된 내용이 없어요. 잠시 후 다시 확인해주세요.</p>'; return; }
-
-    var isFailed = extraction.extractionStatus === 'FAILED';
-    var isLatest = versions.length > 0 && versions[0].extractionId === extraction.extractionId;
-    var hasAnyVersion = versions.some(function (v) { return v.majorVersion != null; });
-    var canConfirm = extraction.versionStatus === 'DRAFT' && isLatest;
-    var canEdit = !isFailed;
-    var status = statusLabel(extraction.extractionStatus, extraction.versionStatus);
-
-    var html = '<div class="flex-row" style="justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:8px;">' +
-      '<div><p style="font-size:16px; font-weight:700; margin:0 0 4px;">' + esc(doc.displayName) + '</p>' +
-      '<p style="font-size:12px; color:#8A93A3; margin:0;">' + CATEGORY_LABEL[doc.documentType] + ' · ' + doc.sourceType + '</p></div>' +
-      '<div class="flex-row gap-8" style="flex-wrap:wrap;">' +
-        '<span class="badge-pill" style="background:#F5F1FF; color:' + status.color + ';">' + status.text + '</span>' +
-        '<select class="select-input" style="width:auto; padding:6px 10px; font-size:12.5px;" id="version-select">' +
-          versions.map(function (v) {
-            var s = statusLabel(v.extractionStatus, v.versionStatus);
-            return '<option value="' + v.extractionId + '"' + (v.extractionId === extraction.extractionId ? ' selected' : '') + '>' +
-              versionLabel(v.majorVersion, v.minorVersion) + ' · ' + s.text + '</option>';
-          }).join('') +
-        '</select>' +
-      '</div></div>';
-
-    if (isFailed) {
-      html += '<div class="extract-fail"><p style="font-size:14px; font-weight:600; margin:0;">텍스트를 추출할 수 없습니다</p>' +
-        '<p style="font-size:12.5px; color:#8A93A3; margin:0;">' + esc(extraction.failureReason || '파일을 다시 확인해주세요.') + '</p>' +
-        (isLatest ? '<button class="btn btn--primary" id="retry-extract-btn">다시 추출 시도</button>' : '') +
-        '</div>';
-    } else if (state.editMode) {
-      var editPages = state.editingPages;
-      if (state.pageIndex >= editPages.length) state.pageIndex = 0;
-      html += '<div class="extract-body"><div class="extract-body__content">' +
-        '<textarea class="textarea-input page-viewer" id="content-editor" style="font-family:inherit;">' + esc(editPages[state.pageIndex]) + '</textarea>' +
-        renderPageNav(editPages.length, '페이지 수정 중') +
-        '</div><div class="extract-body__actions">' +
-        '<button class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="edit-cancel-btn">취소</button>' +
-        '<button class="btn btn--primary" id="edit-save-btn">저장</button>' +
-        '</div></div>';
-    } else {
-      var pages = splitPages(extraction.content);
-      if (state.pageIndex >= pages.length) state.pageIndex = 0;
-      html += '<div class="extract-body"><div class="extract-body__content">' +
-        '<div class="page-viewer">' + esc(pages[state.pageIndex]).replace(/\n/g, '<br>') + '</div>' +
-        renderPageNav(pages.length, '페이지') +
-        '</div><div class="extract-body__actions">' +
-        (canEdit ? '<button class="btn-sm btn-sm--primary-tint" id="enter-edit-btn">수정</button>' : '') +
-        (canConfirm ? '<button class="btn btn--primary" id="confirm-btn">확정하기</button>' : '') +
-        '</div></div>';
-    }
-
-    container.innerHTML = html;
-    bindExtractDetailEvents(extraction, hasAnyVersion);
-    syncDetailContentHeight();
-  }
-
-  // 왼쪽 자료 목록 카드의 실제 높이만큼 오른쪽 본문 박스 높이를 맞춘다
-  function syncDetailContentHeight() {
-    var nav = document.getElementById('extract-nav');
-    var content = document.querySelector('#extract-detail .page-viewer');
-    if (!nav || !content) return;
-    content.style.height = Math.max(nav.offsetHeight, 200) + 'px';
-  }
-
-  function bindExtractDetailEvents(extraction, hasAnyVersion) {
-    var versionSelect = document.getElementById('version-select');
-    if (versionSelect) versionSelect.addEventListener('change', function () {
-      state.selectedExtractionId = parseInt(versionSelect.value, 10);
-      state.editMode = false;
-      state.editingPages = null;
-      state.pageIndex = 0;
-      renderExtractDetail();
-    });
-
-    var pageCount = state.editMode ? state.editingPages.length : splitPages(extraction.content).length;
-
-    var firstBtn = document.getElementById('page-first-btn');
-    if (firstBtn) firstBtn.addEventListener('click', function () {
-      captureCurrentEditingPage();
-      state.pageIndex = 0;
-      renderExtractDetail();
-    });
-    var prevBtn = document.getElementById('page-prev-btn');
-    if (prevBtn) prevBtn.addEventListener('click', function () {
-      captureCurrentEditingPage();
-      state.pageIndex--;
-      renderExtractDetail();
-    });
-    var nextBtn = document.getElementById('page-next-btn');
-    if (nextBtn) nextBtn.addEventListener('click', function () {
-      captureCurrentEditingPage();
-      state.pageIndex++;
-      renderExtractDetail();
-    });
-    var lastBtn = document.getElementById('page-last-btn');
-    if (lastBtn) lastBtn.addEventListener('click', function () {
-      captureCurrentEditingPage();
-      state.pageIndex = pageCount - 1;
-      renderExtractDetail();
-    });
-    var jumpInput = document.getElementById('page-jump-input');
-    if (jumpInput) jumpInput.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter') return;
-      var target = parseInt(jumpInput.value, 10);
-      if (!target || target < 1 || target > pageCount) { alert('1~' + pageCount + ' 사이의 페이지 번호를 입력해주세요.'); return; }
-      captureCurrentEditingPage();
-      state.pageIndex = target - 1;
-      renderExtractDetail();
-    });
-
-    var retryBtn = document.getElementById('retry-extract-btn');
-    if (retryBtn) retryBtn.addEventListener('click', function () {
-      api('/documents/' + state.selectedDocumentId + '/extractions', { method: 'POST' })
-        .then(function () { pollExtraction(state.selectedDocumentId); })
-        .catch(function (e) { alert(e.message); });
-    });
-
-    var enterEdit = document.getElementById('enter-edit-btn');
-    if (enterEdit) enterEdit.addEventListener('click', function () {
-      state.editingPages = splitPages(extraction.content);
-      state.editingHasMarkers = hasPageMarkers(extraction.content);
-      state.editMode = true;
-      renderExtractDetail();
-    });
-    var editCancel = document.getElementById('edit-cancel-btn');
-    if (editCancel) editCancel.addEventListener('click', function () {
-      state.editMode = false;
-      state.editingPages = null;
-      state.pageIndex = 0;
-      renderExtractDetail();
-    });
-    var editSave = document.getElementById('edit-save-btn');
-    if (editSave) editSave.addEventListener('click', function () {
-      captureCurrentEditingPage();
-      var content = joinPages(state.editingPages, state.editingHasMarkers).trim();
-      if (!content) { alert('내용을 입력해주세요.'); return; }
-      if (hasAnyVersion) {
-        openScale(function (changeType) { submitEdit(extraction.extractionId, content, changeType); });
-      } else {
-        submitEdit(extraction.extractionId, content, null);
-      }
-    });
-
-    var confirmBtn = document.getElementById('confirm-btn');
-    if (confirmBtn) confirmBtn.addEventListener('click', function () {
-      api('/document-extractions/' + extraction.extractionId + '/confirm', { method: 'POST' })
-        .then(function () { loadDocuments(); loadVersions(state.selectedDocumentId); })
-        .catch(function (e) { alert(e.message); });
-    });
-  }
-
-  // 수정 중인 페이지 textarea의 현재 내용을 state.editingPages에 반영 (페이지 이동/저장 직전에 호출)
-  function captureCurrentEditingPage() {
-    var editor = document.getElementById('content-editor');
-    if (editor && state.editingPages) state.editingPages[state.pageIndex] = editor.value;
-  }
-
-  function submitEdit(baseExtractionId, content, changeType) {
-    var payload = { content: content };
-    if (changeType) payload.changeType = changeType;
-    api('/document-extractions/' + baseExtractionId + '/versions', { method: 'POST', json: payload })
-      .then(function () {
-        state.editMode = false;
-        state.editingPages = null;
-        state.pageIndex = 0;
-        loadDocuments();
-        loadVersions(state.selectedDocumentId);
-      }).catch(function (e) { alert(e.message); });
-  }
-
-  // 업로드 직후 비동기 추출이 끝날 때까지 짧게 폴링
-  function pollExtraction(documentId, attempt) {
-    attempt = attempt || 0;
-    if (attempt > 20) return;
-    api('/documents/' + documentId + '/extractions').then(function (versions) {
-      if (versions.length > 0) {
-        loadDocuments();
-        if (state.selectedDocumentId === documentId) loadVersions(documentId);
-      } else {
-        setTimeout(function () { pollExtraction(documentId, attempt + 1); }, 1000);
-      }
-    });
   }
 
   // ---- register modal ----
@@ -532,29 +234,25 @@
         var file = document.getElementById('register-file').files[0];
         if (!file) { alert('파일을 선택해주세요.'); return; }
         var keepOriginal = document.getElementById('register-keep-original').checked;
-        var fd = new FormData();
-        fd.append('file', file);
-        fd.append('documentType', category);
-        fd.append('displayName', name);
-        fd.append('keepOriginal', keepOriginal);
-        api('/documents', { method: 'POST', formData: fd }).then(function (doc) {
-          document.getElementById('register-modal').hidden = true;
-          state.docsPage = 0;
-          loadDocuments();
-          return api('/documents/' + doc.documentId + '/extractions', { method: 'POST' }).then(function () {
-            selectDocument(doc.documentId);
-            pollExtraction(doc.documentId);
-          });
-        }).catch(function (e) { alert(e.message); });
-      } else {
-        if (DIRECT_INPUT_ALLOWED.indexOf(category) === -1) { alert('이 자료 유형은 직접 입력을 지원하지 않아요.'); return; }
-        var content = document.getElementById('register-content').value.trim();
-        if (!content) { alert('내용을 입력해주세요.'); return; }
-        api('/documents/text', { method: 'POST', json: { documentType: category, content: content, displayName: name } })
-          .then(function (extraction) {
+        DF.registerDocument({ method: 'file', category: category, name: name, file: file, keepOriginal: keepOriginal })
+          .then(function (doc) {
             document.getElementById('register-modal').hidden = true;
             state.docsPage = 0;
-            loadDocuments().then(function () { selectDocument(extraction.documentId); });
+            loadDocuments();
+            selectDocument(doc.documentId);
+            DF.pollExtraction(doc.documentId, function () {
+              loadDocuments();
+              if (state.selectedDocumentId === doc.documentId) extractPanel.reload();
+            });
+          }).catch(function (e) { alert(e.message); });
+      } else {
+        var content = document.getElementById('register-content').value.trim();
+        if (!content) { alert('내용을 입력해주세요.'); return; }
+        DF.registerDocument({ method: 'text', category: category, name: name, content: content })
+          .then(function (doc) {
+            document.getElementById('register-modal').hidden = true;
+            state.docsPage = 0;
+            loadDocuments().then(function () { selectDocument(doc.documentId); });
           }).catch(function (e) { alert(e.message); });
       }
     });
@@ -562,16 +260,18 @@
 
   // ---- scale modal ----
   function openScale(action) {
-    var latest = latestVersionedExtraction();
-    var major = latest ? latest.majorVersion : 1;
-    var minor = latest ? latest.minorVersion : 0;
-    state.scaleAction = action;
-    state.scaleScale = 'minor';
-    document.getElementById('scale-current-version').textContent = 'v' + major + '.' + minor;
-    document.getElementById('scale-minor-preview').textContent = major + '.' + (minor + 1);
-    document.getElementById('scale-major-preview').textContent = (major + 1) + '.0';
-    document.querySelectorAll('.scale-option').forEach(function (o) { o.classList.toggle('is-active', o.dataset.scale === 'minor'); });
-    document.getElementById('scale-modal').hidden = false;
+    api('/documents/' + state.selectedDocumentId + '/extractions').then(function (versions) {
+      var latest = versions.filter(function (v) { return v.majorVersion != null; })[0] || null;
+      var major = latest ? latest.majorVersion : 1;
+      var minor = latest ? latest.minorVersion : 0;
+      state.scaleAction = action;
+      state.scaleScale = 'minor';
+      document.getElementById('scale-current-version').textContent = 'v' + major + '.' + minor;
+      document.getElementById('scale-minor-preview').textContent = major + '.' + (minor + 1);
+      document.getElementById('scale-major-preview').textContent = (major + 1) + '.0';
+      document.querySelectorAll('.scale-option').forEach(function (o) { o.classList.toggle('is-active', o.dataset.scale === 'minor'); });
+      document.getElementById('scale-modal').hidden = false;
+    });
   }
 
   function bindScaleModal() {
@@ -600,7 +300,7 @@
       var id = state.deleteDocId;
       api('/documents/' + id, { method: 'DELETE' }).then(function () {
         document.getElementById('delete-modal').hidden = true;
-        if (state.selectedDocumentId === id) { state.selectedDocumentId = null; state.documentMeta = null; state.versions = []; }
+        if (state.selectedDocumentId === id) { state.selectedDocumentId = null; extractPanel.clear(); }
         loadDocuments();
       }).catch(function (e) { alert(e.message); document.getElementById('delete-modal').hidden = true; });
     });
