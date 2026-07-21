@@ -1,5 +1,14 @@
 /* mydata.css — shared by my-data.html and job-analysis.html */
 
+.page-jump-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+}
+
 .modal-x {
   border: none;
   background: transparent;
@@ -91,6 +100,7 @@
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: 16px;
+  align-items: start;
 }
 @media (max-width: 800px) {
   .extract-layout { grid-template-columns: 1fr; }
@@ -151,6 +161,46 @@
   border: 1px solid var(--color-border);
   border-radius: 7px;
   cursor: pointer;
+}
+
+/* 보기/수정 모드, 한 페이지/여러 페이지 상관없이 본문 높이와 버튼 위치가 항상 똑같도록 전부 고정 높이로 맞춘다 */
+.extract-body {
+  display: flex;
+  flex-direction: column;
+}
+.extract-body__content {
+  display: flex;
+  flex-direction: column;
+}
+.extract-body__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  border-top: 1px solid #F0F2F5;
+  padding-top: 16px;
+}
+
+.extract-page-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  height: 44px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.page-viewer {
+  white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--color-text);
+  background: #F9FAFB;
+  border-radius: 12px;
+  padding: 20px;
+  height: 420px;
+  overflow-y: auto;
 }
 
 .version-note {

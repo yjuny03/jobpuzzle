@@ -18,6 +18,7 @@ import com.example.jobpuzzle.analysis.repository.ConfirmedAnalysisSnapshotReposi
 import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.DocumentExtractionStatus;
+import com.example.jobpuzzle.document.entity.DocumentVersionStatus;
 import com.example.jobpuzzle.document.entity.UserDocument;
 import com.example.jobpuzzle.document.entity.UserDocumentSourceType;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
@@ -126,32 +127,38 @@ public class DataInitializer implements ApplicationRunner {
 
         UserDocument jobPostingDocument = createTextDocument(
                 user,
-                UserDocumentType.JOB_POSTING
+                UserDocumentType.JOB_POSTING,
+                "테스트 채용공고"
         );
 
         UserDocument companyInfoDocument = createTextDocument(
                 user,
-                UserDocumentType.COMPANY_INFO
+                UserDocumentType.COMPANY_INFO,
+                "테스트 회사정보"
         );
 
         UserDocument resumeDocument = createTextDocument(
                 user,
-                UserDocumentType.RESUME
+                UserDocumentType.RESUME,
+                "테스트 이력서"
         );
 
         UserDocument coverLetterDocument = createTextDocument(
                 user,
-                UserDocumentType.COVER_LETTER
+                UserDocumentType.COVER_LETTER,
+                "테스트 자기소개서"
         );
 
         UserDocument portfolioDocument = createTextDocument(
                 user,
-                UserDocumentType.PORTFOLIO
+                UserDocumentType.PORTFOLIO,
+                "테스트 포트폴리오"
         );
 
         UserDocument experienceNoteDocument = createTextDocument(
                 user,
-                UserDocumentType.EXPERIENCE_NOTE
+                UserDocumentType.EXPERIENCE_NOTE,
+                "테스트 경험정리"
         );
 
         userDocumentRepository.saveAll(List.of(
@@ -519,34 +526,37 @@ public class DataInitializer implements ApplicationRunner {
     // TEXT 입력 방식의 사용자 문서 생성
     private UserDocument createTextDocument(
             User user,
-            UserDocumentType documentType
+            UserDocumentType documentType,
+            String displayName
     ) {
         return UserDocument.builder()
                 .user(user)
                 .documentType(documentType)
                 .sourceType(UserDocumentSourceType.TEXT)
+                .displayName(displayName)
                 .filePath(null)
                 .fileName(null)
                 .keepOriginal(false)
-                .version(1)
                 .build();
     }
 
-    // 사용자 문서에서 정상 추출된 테스트 텍스트 생성
+    // 사용자 문서에서 정상 추출되어 확정 완료된 테스트 버전 생성
     private DocumentExtraction createExtraction(
             UserDocument document,
-            String extractedText
+            String content
     ) {
-        return DocumentExtraction.builder()
+        DocumentExtraction extraction = DocumentExtraction.builder()
                 .document(document)
+                .baseExtraction(null)
                 .extractionStatus(DocumentExtractionStatus.SUCCESS)
-                .extractedText(extractedText)
-                .editedText(null)
+                .versionStatus(DocumentVersionStatus.DRAFT)
+                .content(content)
                 .pageCount(null)
                 .ocrApplied(false)
-                .editable(true)
                 .failureReason(null)
                 .build();
+        extraction.confirm();
+        return extraction;
     }
 
     /*

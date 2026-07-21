@@ -30,11 +30,18 @@ public enum ErrorCode {
     USER_LOGIN_ID_EMAIL_MISMATCH(HttpStatus.NOT_FOUND, "USER_009", "아이디 또는 이메일을 확인해주세요."),
     USER_ACCOUNT_NOT_LOCKED(HttpStatus.BAD_REQUEST, "USER_010", "잠기지 않은 계정입니다."),
 
-    //document extraction
-    DOCUMENT_EXTRACTION_NOT_EDITABLE(
-            HttpStatus.BAD_REQUEST,"DOCUMENT_EXTRACTION_001",
-            "수정할 수 없는 추출 결과입니다."
-    ),
+    //document
+    FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DOCUMENT_001", "파일을 저장하거나 불러오는 중 오류가 발생했습니다."),
+    DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "DOCUMENT_002", "존재하지 않는 자료입니다."),
+    EXTRACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "DOCUMENT_003", "존재하지 않는 추출 버전입니다."),
+    EXTRACTION_NOT_LATEST_DRAFT(HttpStatus.BAD_REQUEST, "DOCUMENT_004", "최신 DRAFT 버전만 확정할 수 있습니다."),
+    EXTRACTION_NOT_CONFIRMABLE(HttpStatus.BAD_REQUEST, "DOCUMENT_005", "확정할 수 있는 DRAFT 버전이 없습니다."),
+    EXTRACTION_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "DOCUMENT_006", "확정되지 않은 추출본이 포함되어 있습니다."),
+    INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "DOCUMENT_007", "지원하지 않는 파일 형식입니다. PDF, JPG, PNG 파일만 업로드할 수 있습니다."),
+    INVALID_DIRECT_INPUT_TYPE(HttpStatus.BAD_REQUEST, "DOCUMENT_008", "직접 입력은 채용공고·회사정보·경험정리 유형만 가능합니다."),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "DOCUMENT_009", "파일 크기는 10MB를 초과할 수 없습니다."),
+    CHANGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "DOCUMENT_010", "이미 확정된 적 있는 자료를 수정할 때는 자잘한 수정/큰 수정 여부를 선택해야 합니다."),
+    EXTRACTION_ALREADY_VERSIONED(HttpStatus.BAD_REQUEST, "DOCUMENT_011", "이미 확정 이력이 있는 자료는 재추출할 수 없습니다. 수정 저장을 이용해주세요."),
 
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다.");

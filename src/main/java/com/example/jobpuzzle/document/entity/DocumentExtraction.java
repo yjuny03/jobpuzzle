@@ -1,12 +1,12 @@
 package com.example.jobpuzzle.document.entity;
 
 import com.example.jobpuzzle.global.common.BaseTimeEntity;
-import com.example.jobpuzzle.global.error.CustomException;
-import com.example.jobpuzzle.global.error.ErrorCode;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -23,17 +23,28 @@ public class DocumentExtraction extends BaseTimeEntity {
     @JoinColumn(name = "document_id", nullable = false)
     private UserDocument document;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "base_extraction_id")
+    private DocumentExtraction baseExtraction;
+
+    // 둘 다 null이면 아직 한 번도 확정된 적 없는 검토 중 상태(최초 확정 전 자유 수정 구간)
+    @Column(name = "major_version")
+    private Integer majorVersion;
+
+    @Column(name = "minor_version")
+    private Integer minorVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "extraction_status", nullable = false, length = 20)
     private DocumentExtractionStatus extractionStatus;
 
-    @Lob
-    @Column(name = "extracted_text", columnDefinition = "LONGTEXT")
-    private String extractedText;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "version_status", length = 20)
+    private DocumentVersionStatus versionStatus;
 
     @Lob
-    @Column(name = "edited_text", columnDefinition = "LONGTEXT")
-    private String editedText;
+    @Column(name = "content", columnDefinition = "LONGTEXT")
+    private String content;
 
     @Column(name = "page_count")
     private Integer pageCount;
@@ -41,40 +52,48 @@ public class DocumentExtraction extends BaseTimeEntity {
     @Column(name = "ocr_applied", nullable = false)
     private boolean ocrApplied = false;
 
-    @Column(name = "editable", nullable = false)
-    private boolean editable = true;
-
-    @Column(name = "failure_reason", length = 255)
+    @Column(name = "failure_reason", length = 500)
     private String failureReason;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
 
     @Builder
     private DocumentExtraction(
             UserDocument document,
+            DocumentExtraction baseExtraction,
+            Integer majorVersion,
+            Integer minorVersion,
             DocumentExtractionStatus extractionStatus,
-            String extractedText,
-            String editedText,
+            DocumentVersionStatus versionStatus,
+            String content,
             Integer pageCount,
             boolean ocrApplied,
-            boolean editable,
             String failureReason
     ) {
         this.document = document;
+        this.baseExtraction = baseExtraction;
+        this.majorVersion = majorVersion;
+        this.minorVersion = minorVersion;
         this.extractionStatus = extractionStatus;
-        this.extractedText = extractedText;
-        this.editedText = editedText;
+        this.versionStatus = versionStatus;
+        this.content = content;
         this.pageCount = pageCount;
         this.ocrApplied = ocrApplied;
-        this.editable = editable;
         this.failureReason = failureReason;
     }
 
-    public void updateEditedText(String editedText) {
-        if (!editable) {
-            throw new CustomException(
-                    ErrorCode.DOCUMENT_EXTRACTION_NOT_EDITABLE
-            );
+    // 이 문서의 첫 확정이면 이 시점에 1.0을 부여하고, 이미 버전이 있으면(수정 저장 시 이미 부여됨) 상태만 바꾼다
+    public void confirm() {
+        if (this.majorVersion == null) {
+            this.majorVersion = 1;
+            this.minorVersion = 0;
         }
+        this.versionStatus = DocumentVersionStatus.CONFIRMED;
+        this.confirmedAt = LocalDateTime.now();
+    }
 
-        this.editedText = editedText;
+    public void supersede() {
+        this.versionStatus = DocumentVersionStatus.SUPERSEDED;
     }
 }
