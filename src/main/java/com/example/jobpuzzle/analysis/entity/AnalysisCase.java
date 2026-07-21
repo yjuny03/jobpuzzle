@@ -57,4 +57,8 @@ public class AnalysisCase extends BaseEntity {
     public void changeJobCategory(JobCategory jobCategory) {
         this.jobCategory = jobCategory;
     }
+
+    public void confirmInput() {
+        this.status = AnalysisCaseStatus.INPUT_CONFIRMED;
+    }
 }

@@ -5,10 +5,15 @@ import com.example.jobpuzzle.analysis.dto.AnalysisCaseJobCategoryUpdateRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseResponse;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceAddRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceResponse;
+import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.entity.AnalysisCase;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseSource;
+import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshotSource;
 import com.example.jobpuzzle.analysis.repository.AnalysisCaseRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisCaseSourceRepository;
+import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
+import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotSourceRepository;
 import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.example.jobpuzzle.document.service.DocumentExtractionService;
@@ -23,14 +28,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AnalysisCaseService {
 
+    private static final Set<UserDocumentType> USER_MATERIAL_TYPES = Set.of(
+            UserDocumentType.RESUME, UserDocumentType.COVER_LETTER,
+            UserDocumentType.PORTFOLIO, UserDocumentType.EXPERIENCE_NOTE
+    );
+
     private final AnalysisCaseRepository analysisCaseRepository;
     private final AnalysisCaseSourceRepository analysisCaseSourceRepository;
+    private final AnalysisInputSnapshotRepository analysisInputSnapshotRepository;
+    private final AnalysisInputSnapshotSourceRepository analysisInputSnapshotSourceRepository;
     private final UserRepository userRepository;
     private final JobCategoryRepository jobCategoryRepository;
     private final DocumentExtractionService documentExtractionService;
@@ -102,6 +115,62 @@ public class AnalysisCaseService {
                 .findByAnalysisCaseSourceIdAndAnalysisCase_AnalysisCaseId(analysisCaseSourceId, analysisCaseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ANALYSIS_CASE_SOURCE_NOT_FOUND));
         analysisCaseSourceRepository.delete(source);
+    }
+
+    // 선택 자료 구성을 검증하고 AnalysisCaseSource를 AnalysisInputSnapshotSource로 고정 복사한 뒤
+    // 스냅샷을 생성하고 상태를 INPUT_CONFIRMED로 전환
+    @Transactional
+    public AnalysisInputSnapshotResponse confirmInput(Long userId, Long analysisCaseId) {
+        AnalysisCase analysisCase = findOwnedCase(userId, analysisCaseId);
+        requireDraft(analysisCase);
+
+        List<AnalysisCaseSource> sources = findSources(analysisCaseId);
+        validateSourceComposition(sources);
+
+        List<Long> extractionIds = sources.stream().map(s -> s.getExtraction().getExtractionId()).toList();
+        documentExtractionService.getConfirmedExtractions(userId, extractionIds);
+
+        AnalysisInputSnapshot snapshot = AnalysisInputSnapshot.builder()
+                .analysisCase(analysisCase)
+                .user(analysisCase.getUser())
+                .jobCategory(analysisCase.getJobCategory())
+                .build();
+        analysisInputSnapshotRepository.save(snapshot);
+
+        List<AnalysisInputSnapshotSource> snapshotSources = sources.stream()
+                .map(source -> AnalysisInputSnapshotSource.builder()
+                        .snapshot(snapshot)
+                        .extraction(source.getExtraction())
+                        .documentType(source.getDocumentType())
+                        .build())
+                .toList();
+        analysisInputSnapshotSourceRepository.saveAll(snapshotSources);
+
+        analysisCase.confirmInput();
+
+        return AnalysisInputSnapshotResponse.of(snapshot, snapshotSources);
+    }
+
+    public AnalysisInputSnapshotResponse getSnapshot(Long userId, Long analysisCaseId) {
+        AnalysisInputSnapshot snapshot = analysisInputSnapshotRepository
+                .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND));
+        List<AnalysisInputSnapshotSource> sources = analysisInputSnapshotSourceRepository
+                .findBySnapshot_SnapshotIdOrderBySnapshotSourceIdAsc(snapshot.getSnapshotId());
+        return AnalysisInputSnapshotResponse.of(snapshot, sources);
+    }
+
+    private void validateSourceComposition(List<AnalysisCaseSource> sources) {
+        long jobPostingCount = sources.stream()
+                .filter(s -> s.getDocumentType() == UserDocumentType.JOB_POSTING)
+                .count();
+        if (jobPostingCount != 1) {
+            throw new CustomException(ErrorCode.ANALYSIS_CASE_JOB_POSTING_REQUIRED);
+        }
+        boolean hasUserMaterial = sources.stream().anyMatch(s -> USER_MATERIAL_TYPES.contains(s.getDocumentType()));
+        if (!hasUserMaterial) {
+            throw new CustomException(ErrorCode.ANALYSIS_CASE_USER_MATERIAL_REQUIRED);
+        }
     }
 
     private JobCategory resolveInitialJobCategory(Long userId, Long jobCategoryId) {

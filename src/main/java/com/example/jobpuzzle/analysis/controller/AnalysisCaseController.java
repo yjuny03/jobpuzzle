@@ -5,6 +5,7 @@ import com.example.jobpuzzle.analysis.dto.AnalysisCaseJobCategoryUpdateRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseResponse;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceAddRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceResponse;
+import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.service.AnalysisCaseService;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
@@ -92,5 +93,29 @@ public class AnalysisCaseController {
                 userDetails.getUser().getUserId(), analysisCaseId, analysisCaseSourceId
         );
         return ResponseEntity.noContent().build();
+    }
+
+    // 선택 자료·기준을 최종 확정하고 분석 입력 스냅샷 생성
+    // POST /api/analysis-cases/{analysisCaseId}/confirm
+    @PostMapping("/api/analysis-cases/{analysisCaseId}/confirm")
+    public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> confirmInput(
+            @PathVariable Long analysisCaseId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        AnalysisInputSnapshotResponse response =
+                analysisCaseService.confirmInput(userDetails.getUser().getUserId(), analysisCaseId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    // 확정된 분석 입력 스냅샷 읽기 전용 조회
+    // GET /api/analysis-cases/{analysisCaseId}/snapshot
+    @GetMapping("/api/analysis-cases/{analysisCaseId}/snapshot")
+    public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> getSnapshot(
+            @PathVariable Long analysisCaseId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        AnalysisInputSnapshotResponse response =
+                analysisCaseService.getSnapshot(userDetails.getUser().getUserId(), analysisCaseId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
