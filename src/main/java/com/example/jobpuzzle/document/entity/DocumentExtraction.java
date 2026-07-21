@@ -27,8 +27,12 @@ public class DocumentExtraction extends BaseTimeEntity {
     @JoinColumn(name = "base_extraction_id")
     private DocumentExtraction baseExtraction;
 
-    @Column(name = "version")
-    private Integer version;
+    // 둘 다 null이면 아직 한 번도 확정된 적 없는 검토 중 상태(최초 확정 전 자유 수정 구간)
+    @Column(name = "major_version")
+    private Integer majorVersion;
+
+    @Column(name = "minor_version")
+    private Integer minorVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "extraction_status", nullable = false, length = 20)
@@ -58,7 +62,8 @@ public class DocumentExtraction extends BaseTimeEntity {
     private DocumentExtraction(
             UserDocument document,
             DocumentExtraction baseExtraction,
-            Integer version,
+            Integer majorVersion,
+            Integer minorVersion,
             DocumentExtractionStatus extractionStatus,
             DocumentVersionStatus versionStatus,
             String content,
@@ -68,7 +73,8 @@ public class DocumentExtraction extends BaseTimeEntity {
     ) {
         this.document = document;
         this.baseExtraction = baseExtraction;
-        this.version = version;
+        this.majorVersion = majorVersion;
+        this.minorVersion = minorVersion;
         this.extractionStatus = extractionStatus;
         this.versionStatus = versionStatus;
         this.content = content;
@@ -77,7 +83,12 @@ public class DocumentExtraction extends BaseTimeEntity {
         this.failureReason = failureReason;
     }
 
+    // 이 문서의 첫 확정이면 이 시점에 1.0을 부여하고, 이미 버전이 있으면(수정 저장 시 이미 부여됨) 상태만 바꾼다
     public void confirm() {
+        if (this.majorVersion == null) {
+            this.majorVersion = 1;
+            this.minorVersion = 0;
+        }
         this.versionStatus = DocumentVersionStatus.CONFIRMED;
         this.confirmedAt = LocalDateTime.now();
     }

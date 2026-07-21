@@ -496,7 +496,6 @@ public class DataInitializer implements ApplicationRunner {
         DocumentExtraction extraction = DocumentExtraction.builder()
                 .document(document)
                 .baseExtraction(null)
-                .version(1)
                 .extractionStatus(DocumentExtractionStatus.SUCCESS)
                 .versionStatus(DocumentVersionStatus.DRAFT)
                 .content(content)

@@ -79,7 +79,7 @@ public class DocumentExtractionAsyncRunner {
             if (pageText == null || pageText.isBlank()) {
                 emptyPageCount++;
             } else {
-                // 여러 페이지 문서를 편집 화면에서 시각적으로 구분해 보이도록, 그리고 나중에 페이지 단위로 원문 위치를 찾을 수 있도록 마커를 남긴다
+                // 여러 페이지 문서를 편집 화면에서 시각적으로 구분해 보이도록, 그리고 나중에 페이지 단위로 원문 위치를 찾을 수 있도록 마커를 남김
                 content.append("[").append(page.pageNumber()).append("페이지]\n");
                 content.append(pageText).append("\n\n");
             }
@@ -114,13 +114,12 @@ public class DocumentExtractionAsyncRunner {
         return ExtractionOutcome.success(text, null, true);
     }
 
+    // 추출 직후엔 항상 버전 번호 없이 저장 (첫 확정 시점에 1.0 부여 - DocumentExtraction.confirm() 참고)
     private void saveExtraction(UserDocument document, ExtractionOutcome outcome) {
         boolean completeFailure = outcome.status() == DocumentExtractionStatus.FAILED;
-        Integer nextVersion = completeFailure ? null : nextVersionFor(document.getDocumentId());
 
         DocumentExtraction extraction = DocumentExtraction.builder()
                 .document(document)
-                .version(nextVersion)
                 .extractionStatus(outcome.status())
                 .versionStatus(completeFailure ? null : DocumentVersionStatus.DRAFT)
                 .content(completeFailure ? null : outcome.text())
@@ -132,13 +131,7 @@ public class DocumentExtractionAsyncRunner {
         documentExtractionRepository.save(extraction);
     }
 
-    private Integer nextVersionFor(Long documentId) {
-        return documentExtractionRepository.findMaxVersionByDocumentId(documentId)
-                .map(v -> v + 1)
-                .orElse(1);
-    }
-
-    // 추출 진행 중 사용자가 원본 보관 설정을 바꿨을 수 있으므로 완료 시점에 최신 값을 다시 읽어 판단한다
+    // 추출 진행 중 사용자가 원본 보관 설정을 바꿨을 수 있으므로 완료 시점에 최신 값을 다시 읽어 판단
     private void applyRetentionPolicy(Long documentId) {
         UserDocument document = userDocumentRepository.findById(documentId).orElse(null);
         if (document != null && !document.isKeepOriginal() && document.getFilePath() != null) {

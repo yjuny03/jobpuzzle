@@ -64,7 +64,7 @@ public class DocumentService {
         return DocumentResponse.from(document);
     }
 
-    // 직접 입력은 추출 파이프라인을 거치지 않고 그 자리에서 최초 DRAFT 버전까지 생성
+    // 직접 입력은 추출 파이프라인을 거치지 않고 그 자리에서 미확정 DRAFT까지 생성 (버전은 첫 확정 시점에 부여)
     @Transactional
     public ExtractionVersionResponse registerTextDocument(Long userId, DirectDocumentRegisterRequest request) {
         if (!DIRECT_INPUT_ALLOWED_TYPES.contains(request.getDocumentType())) {
@@ -84,7 +84,6 @@ public class DocumentService {
 
         DocumentExtraction extraction = DocumentExtraction.builder()
                 .document(document)
-                .version(1)
                 .extractionStatus(DocumentExtractionStatus.SUCCESS)
                 .versionStatus(DocumentVersionStatus.DRAFT)
                 .content(request.getContent())
@@ -102,7 +101,7 @@ public class DocumentService {
 
         Page<DocumentListResponse> response = documents.map(document -> {
             DocumentExtraction latest = documentExtractionRepository
-                    .findByDocument_DocumentIdOrderByVersionDesc(document.getDocumentId())
+                    .findByDocument_DocumentIdOrderByExtractionIdDesc(document.getDocumentId())
                     .stream()
                     .findFirst()
                     .orElse(null);
@@ -115,7 +114,7 @@ public class DocumentService {
     public DocumentDetailResponse getDocumentDetail(Long userId, Long documentId) {
         UserDocument document = findOwnedDocument(userId, documentId);
         List<DocumentExtraction> versions =
-                documentExtractionRepository.findByDocument_DocumentIdOrderByVersionDesc(documentId);
+                documentExtractionRepository.findByDocument_DocumentIdOrderByExtractionIdDesc(documentId);
 
         ExtractionVersionResponse latest = versions.stream()
                 .findFirst()

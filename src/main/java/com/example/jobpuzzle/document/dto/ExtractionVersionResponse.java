@@ -8,14 +8,16 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-// JSON-00(DocumentExtractionResult) 계약과 동일한 응답
+// JSON-00(DocumentExtractionResult) 계약 기반 응답. majorVersion/minorVersion이 둘 다 null이면
+// 아직 한 번도 확정되지 않은 검토 중 버전(자유 수정 구간)이라는 뜻
 @Getter
 public class ExtractionVersionResponse {
 
     private final Long extractionId;
     private final Long documentId;
     private final UserDocumentType documentType;
-    private final Integer version;
+    private final Integer majorVersion;
+    private final Integer minorVersion;
     private final DocumentExtractionStatus extractionStatus;
     private final DocumentVersionStatus versionStatus;
     private final String content;
@@ -27,7 +29,8 @@ public class ExtractionVersionResponse {
     private final String failureReason;
 
     private ExtractionVersionResponse(
-            Long extractionId, Long documentId, UserDocumentType documentType, Integer version,
+            Long extractionId, Long documentId, UserDocumentType documentType,
+            Integer majorVersion, Integer minorVersion,
             DocumentExtractionStatus extractionStatus, DocumentVersionStatus versionStatus, String content,
             Long baseExtractionId, Integer pageCount, boolean ocrApplied,
             LocalDateTime createdAt, LocalDateTime confirmedAt, String failureReason
@@ -35,7 +38,8 @@ public class ExtractionVersionResponse {
         this.extractionId = extractionId;
         this.documentId = documentId;
         this.documentType = documentType;
-        this.version = version;
+        this.majorVersion = majorVersion;
+        this.minorVersion = minorVersion;
         this.extractionStatus = extractionStatus;
         this.versionStatus = versionStatus;
         this.content = content;
@@ -52,7 +56,8 @@ public class ExtractionVersionResponse {
                 extraction.getExtractionId(),
                 extraction.getDocument().getDocumentId(),
                 extraction.getDocument().getDocumentType(),
-                extraction.getVersion(),
+                extraction.getMajorVersion(),
+                extraction.getMinorVersion(),
                 extraction.getExtractionStatus(),
                 extraction.getVersionStatus(),
                 extraction.getContent(),

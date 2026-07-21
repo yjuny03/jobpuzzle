@@ -16,21 +16,23 @@ public class DocumentListResponse {
     private final UserDocumentType documentType;
     private final String displayName;
     private final UserDocumentSourceType sourceType;
-    private final Integer latestVersion;
+    private final Integer latestMajorVersion;
+    private final Integer latestMinorVersion;
     private final DocumentVersionStatus latestVersionStatus;
     private final LocalDateTime deletedAt;
     private final LocalDateTime updatedAt;
 
     private DocumentListResponse(
             Long documentId, UserDocumentType documentType, String displayName, UserDocumentSourceType sourceType,
-            Integer latestVersion, DocumentVersionStatus latestVersionStatus,
+            Integer latestMajorVersion, Integer latestMinorVersion, DocumentVersionStatus latestVersionStatus,
             LocalDateTime deletedAt, LocalDateTime updatedAt
     ) {
         this.documentId = documentId;
         this.documentType = documentType;
         this.displayName = displayName;
         this.sourceType = sourceType;
-        this.latestVersion = latestVersion;
+        this.latestMajorVersion = latestMajorVersion;
+        this.latestMinorVersion = latestMinorVersion;
         this.latestVersionStatus = latestVersionStatus;
         this.deletedAt = deletedAt;
         this.updatedAt = updatedAt;
@@ -43,7 +45,8 @@ public class DocumentListResponse {
                 document.getDocumentType(),
                 document.getDisplayName(),
                 document.getSourceType(),
-                latestExtraction != null ? latestExtraction.getVersion() : null,
+                latestExtraction != null ? latestExtraction.getMajorVersion() : null,
+                latestExtraction != null ? latestExtraction.getMinorVersion() : null,
                 latestExtraction != null ? latestExtraction.getVersionStatus() : null,
                 document.getDeletedAt(),
                 document.getUpdatedAt()
