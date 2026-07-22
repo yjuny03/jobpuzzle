@@ -68,6 +68,10 @@ public class UserService {
         if (checkEmailDuplicate(request.getEmail())) {
             throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
         }
+        // 이메일 인증 코드 재검증 - /join/verify로 미리 확인했더라도 가입 처리 시점에 다시 확인
+        if (!emailVerificationStore.verify(request.getEmail(), request.getCode())) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
         // 비밀번호 정책 검증
         validatePassword(request.getPassword());
 
@@ -84,6 +88,22 @@ public class UserService {
         User user = User.createLocalUser(request.getLoginId(), encodedPassword, request.getEmail(),
                 request.getName(), jobCategory);
         userRepository.save(user);
+        emailVerificationStore.invalidate(request.getEmail());
+    }
+
+    // 회원가입 - 아직 가입되지 않은 이메일인지 확인 후 인증 코드 발송
+    public void sendJoinEmailCode(String email) {
+        if (checkEmailDuplicate(email)) {
+            throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
+        }
+        mailService.sendMail(email);
+    }
+
+    // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
+    public void verifyJoinEmailCode(String email, int inputCode) {
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
     }
 
     // 아이디 중복 확인 - true면 이미 사용 중인 아이디 (회원가입 화면에서 실시간 체크용)

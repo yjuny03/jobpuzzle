@@ -62,6 +62,7 @@ public class SecurityConfig {
     // 인증 없이 호출 가능한 공개 API 경로
     private static final String[] PUBLIC_API_URLS = {
             "/api/user/join",
+            "/api/user/join/**",
             "/api/user/login",
             "/api/user/check-id",
             "/api/user/check-email",

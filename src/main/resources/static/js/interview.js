@@ -1,7 +1,11 @@
-// interview.js — 면접 준비: 질문 생성 flow (dummy data, simplified but functional)
+// interview.js — 면접 준비: 질문 생성 flow
+// 모드 선택/약점 선택/질문-채팅 화면은 아직 더미 데이터
+// 맞춤 면접 질문의 "자료 선택 -> 확정" 단계만
 
 (function () {
   'use strict';
+
+  var DF = window.DocumentFlow;
 
   var MODES = [
     { id: 'basic', icon: 'basic', label: '기본 질문 모드', desc: '직무 공통 질문으로 빠르게 연습해요' },
@@ -15,41 +19,11 @@
     { tag: '역할 구분 불명확', desc: '본인이 직접 수행한 역할을 더 명확하게 구분해서 답하면 좋아요', resolved: true }
   ];
 
-  var MAJOR_OPTIONS = ['IT·개발', '경영·사무', '디자인'];
-  var MINOR_BY_MAJOR = { 'IT·개발': ['백엔드 개발', '프론트엔드 개발', '데이터 분석'], '경영·사무': ['인사 채용', '마케팅'], '디자인': ['UX/UI 디자인', 'BX 디자인'] };
-  var LEVEL_OPTIONS = ['신입', '경력 1~3년', '경력 3년 이상'];
+  var CAREER_LEVEL_LABEL = { NEW: '신입', EXPERIENCED: '경력', ANY: '경력무관' };
+  var COMPANY_TYPES = ['JOB_POSTING', 'COMPANY_INFO'];
+  var CANDIDATE_TYPES = ['RESUME', 'COVER_LETTER', 'PORTFOLIO', 'EXPERIENCE_NOTE'];
 
-  var MATERIAL_CATEGORIES_COMPANY = [
-    { key: 'jobPosting', label: '채용공고', docs: [{ id: 'jd1', title: 'LUME 백엔드 개발자 공고', date: '2026.07.07' }] },
-    { key: 'companyInfo', label: '회사 정보', docs: [{ id: 'ci1', title: 'LUME 회사 정보', date: '2026.07.06' }] }
-  ];
-  var MATERIAL_CATEGORIES_CANDIDATE = [
-    { key: 'resume', label: '이력서', docs: [{ id: 'r1', title: '홍길동_이력서', date: '2026.07.07' }] },
-    { key: 'coverLetter', label: '자기소개서', docs: [{ id: 'c1', title: '홍길동_자기소개서', date: '2026.07.07' }] },
-    { key: 'portfolio', label: '포트폴리오', docs: [{ id: 'p1', title: '백엔드_프로젝트_포트폴리오', date: '2026.07.05' }] },
-    { key: 'experience', label: '경험정리', docs: [{ id: 'e1', title: '경험_정리_STAR노트', date: '2026.06.28' }] }
-  ];
-
-  var COMPANY_SUGGESTIONS = ['LUME', 'LUME커머스', '네이버클라우드'];
-
-  var COMPANY_EXTRACT = {
-    jobTitle: '백엔드 개발자',
-    mainDuties: '- 서버 API 설계 및 개발 (RESTful 기반)\n- 데이터베이스 설계 및 쿼리 최적화\n- 서비스 성능 개선 및 모니터링',
-    requirements: '- Java 또는 Kotlin 기반 웹 개발 경험\n- Spring Boot, JPA 사용 경험\n- RDBMS 설계 및 SQL 작성 경험',
-    preferred: '- 대규모 트래픽 처리 경험\n- AWS 등 클라우드 인프라 운영 경험',
-    processInfo: '서류 → 코딩테스트 → 1차 실무면접 → 2차 임원면접 → 처우협의',
-    url: 'https://recruit.lume.io/backend',
-    company: { name: 'LUME', industry: 'IT·소프트웨어', serviceDesc: '커머스 플랫폼 LUME는 중소형 판매자를 위한 온라인 쇼핑몰 구축·운영 솔루션을 제공합니다.', values: '"기술로 판매자의 성장을 돕는다"는 미션 아래, 안정성과 실행 속도를 함께 추구합니다.', talentProfile: '문제를 스스로 정의하고 해결하는 주도성, 데이터 기반 의사결정, 협업 커뮤니케이션 역량을 중요하게 봅니다.', refUrl: 'https://lume.io' }
-  };
-
-  var RESUME_CARD = { name: '홍길동', desiredJob: '백엔드 개발자', education: 'OO대학교 컴퓨터공학과, 2018.03 ~ 2022.02, 학사', skills: 'Java, Kotlin, Spring Boot, JPA, MySQL, Redis, Docker, AWS', experience: '주문 API 응답속도 40% 개선, 동시접속 처리량 3배 확대 (2024.01~06) / 사내 관리자 대시보드 구축 (2023.09~12)', certs: '정보처리기사, AWS SAA, 교내 해커톤 우수상' };
-  var COVER_CARD = { desiredJob: '백엔드 개발자', motivation: 'LUME의 대용량 트래픽 처리 기술력과 커머스 서비스 비전에 공감해 지원했습니다.', coreExperience: '온라인 쇼핑몰 백엔드 개발 프로젝트에서 주문·결제 API를 설계하고 캐싱 전략을 도입해 응답속도를 40% 개선했습니다.', collabExperience: '프론트엔드 팀과 API 스펙에 대한 의견 차이가 있었을 때 회의를 통해 조율했습니다.', jobConnection: '대규모 트래픽 처리와 REST API 설계 경험이 LUME 백엔드 개발자 직무와 연결됩니다.', futureGoal: '입사 후 서비스 장애 대응 프로세스를 함께 고도화하고 싶습니다.' };
-  var PORTFOLIO_CARDS = [
-    { projectName: '스마트몰 주문/결제 API 설계', period: '2024.01 ~ 2024.06', role: '백엔드 설계 및 구현 (본인 담당)', tech: 'Spring Boot, Redis, MySQL, AWS', coreContent: '주문·결제·재고 도메인의 REST API를 설계했습니다.', problemSolving: '피크 시간대 응답 지연 문제를 프로파일링으로 파악하고 캐싱으로 해결했습니다.', outcome: 'API 응답속도 40% 개선, 동시접속 처리량 3배 확대' },
-    { projectName: '사내 관리자 대시보드', period: '2023.09 ~ 2023.12', role: '풀스택 개발', tech: 'Node.js, MongoDB, React', coreContent: '수기 정산·재고 관리 업무를 대시보드로 전환했습니다.', problemSolving: '현업 인터뷰로 우선순위 기능을 선정하고 반복 개선했습니다.', outcome: '처리 시간 20% 단축' }
-  ];
-  var EXPERIENCE_CARD = { situation: '프론트엔드 팀과 응답 데이터 구조에 대한 의견이 갈렸습니다.', taskGoal: '일정 지연 없이 양 팀이 동의할 수 있는 스펙을 확정해야 했습니다.', action: '실사용 시나리오를 정리해 회의를 열고 우선순위 기준을 세워 조율했습니다.', result: '하루 만에 합의에 도달했고 문서화 프로세스를 제안해 반영했습니다.', tech: 'Notion, Figma', learned: '갈등은 사실과 시나리오로 풀어야 빠르게 합의된다는 것을 배웠습니다.', interviewPoint: '데이터 기반 조율과 재발 방지 제안을 강조하고 싶습니다.' };
-
+  // ---- (JSON-01/02/05 연동 전까지 임시로 남겨둔 연결 분석 결과 더미) ----
   var CONNECTION_SCENARIOS = {
     full: {
       level: 'HIGH', pct: 96,
@@ -91,19 +65,33 @@
   var state = {
     step: 'mode', mode: null,
     selectedWeaknessTag: null,
-    companyName: '', companySearchInput: '',
-    desiredJobMajor: 'IT·개발', desiredJobMinor: '백엔드 개발', desiredJobLevel: '신입',
-    selectedDocs: {}, // key -> Set of ids
-    materialPanelOpen: {},
-    companyExtract: JSON.parse(JSON.stringify(COMPANY_EXTRACT)),
-    reviewTab: 'company', reviewSub: 'resume',
+
+    // 자료 선택 단계
+    docsLoaded: false,
+    allDocs: [],
+    jobCategories: [],
+    selectedMainCategory: null,
+    selectedSubCategory: null,
+    selectedJobCategoryId: null,
+    selectedDocIds: {}, // documentId -> true
+    selectedExtractionIds: {}, // documentId -> CONFIRMED extractionId
+    registerTargetType: null,
+    materialRegisterMethod: 'file',
+    analysisCaseId: null,
+
     connectionScenario: 'full',
     questions: [],
     selectedQIdx: null,
     hintOpen: false,
-    draftAnswer: '',
-    textEntryKey: null, textEntryDraft: null
+    draftAnswer: ''
   };
+
+  function uniqueInOrder(values) {
+    var seen = {};
+    var result = [];
+    values.forEach(function (v) { if (!seen[v]) { seen[v] = true; result.push(v); } });
+    return result;
+  }
 
   function icon(name) {
     var icons = {
@@ -121,6 +109,7 @@
     else if (state.step === 'weaknessPick') root.innerHTML = renderWeaknessPick();
     else if (state.step === 'materialSelect') root.innerHTML = renderMaterialSelect();
     else if (state.step === 'materialReview') root.innerHTML = renderMaterialReview();
+    else if (state.step === 'submitted') root.innerHTML = renderSubmitted();
     else if (state.step === 'connectionResult') root.innerHTML = renderConnectionResult();
     else if (state.step === 'list') root.innerHTML = renderQuestionList();
     bindStepEvents();
@@ -130,7 +119,7 @@
   function renderModeStep() {
     return '<div class="card card--pad-lg">' +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">질문 모드를 선택하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">선택한 모드에 맞춰 질문을 생성해드려요 · LUME 백엔드 개발자</p>' +
+      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">선택한 모드에 맞춰 질문을 생성해드려요</p>' +
       '<div class="mode-grid">' + MODES.map(function (m) {
         return '<div class="mode-card" data-mode="' + m.id + '"><div class="mode-card__icon">' + icon(m.icon) + '</div><p class="mode-card__title">' + m.label + '</p><p class="mode-card__desc">' + m.desc + '</p></div>';
       }).join('') + '</div></div>';
@@ -153,132 +142,279 @@
     return '<div style="margin-bottom:16px;"><button class="btn-sm" data-action="' + action + '">' + icon('back') + ' ' + label + '</button></div>';
   }
 
-  // ---- step: material select ----
-  function docListHtml(cat) {
-    var selected = state.selectedDocs[cat.key] || {};
+  // ---- step: material select (실제 API 연동) ----
+  function enterMaterialSelect() {
+    state.step = 'materialSelect';
+    render();
+    loadMaterialSelectData().then(render);
+  }
+
+  function loadMaterialSelectData() {
+    return Promise.all([
+      DF.api('/documents?size=100'),
+      state.jobCategories.length ? Promise.resolve(state.jobCategories) : DF.api('/job-category'),
+      DF.api('/user/me')
+    ]).then(function (results) {
+      state.allDocs = (results[0] && results[0].content) || [];
+      state.jobCategories = results[1] || [];
+      state.docsLoaded = true;
+
+      // 회원 기본 관심 직무를 초기값으로 제공 (아직 아무것도 선택 안 한 첫 진입 시에만)
+      var defaultJobCategoryId = results[2] && results[2].defaultJobCategoryId;
+      if (defaultJobCategoryId && !state.selectedJobCategoryId) {
+        var match = state.jobCategories.filter(function (c) { return String(c.jobCategoryId) === String(defaultJobCategoryId); })[0];
+        if (match) {
+          state.selectedMainCategory = match.mainCategory;
+          state.selectedSubCategory = match.subCategory;
+          state.selectedJobCategoryId = match.jobCategoryId;
+        }
+      }
+    }).catch(function (e) { alert(e.message); });
+  }
+
+  function docListHtml(type) {
+    var docs = state.allDocs.filter(function (d) { return d.documentType === type; });
     var html = '';
-    if (cat.docs.length) {
-      html += cat.docs.map(function (doc) {
-        var checked = !!selected[doc.id];
-        return '<div class="material-doc-row' + (checked ? ' is-checked' : '') + '" data-toggle-doc="' + cat.key + '|' + doc.id + '"><div class="material-checkbox"></div><div><p style="font-size:12.5px; font-weight:600; margin:0;">' + doc.title + '</p><p style="font-size:11px; color:#8A93A3; margin:2px 0 0;">' + doc.date + ' 등록</p></div></div>';
+    if (docs.length) {
+      html += docs.map(function (d) {
+        var selectable = d.latestVersionStatus === 'CONFIRMED';
+        if (!selectable) {
+          var status = DF.statusLabel(null, d.latestVersionStatus);
+          return '<div class="material-doc-row" style="opacity:.55; cursor:default;"><div class="material-checkbox"></div>' +
+            '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
+            '<p style="font-size:11px; margin:2px 0 0; color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
+        }
+        var checked = !!state.selectedDocIds[d.documentId];
+        return '<div class="material-doc-row' + (checked ? ' is-checked' : '') + '" data-toggle-doc="' + d.documentId + '"><div class="material-checkbox"></div>' +
+          '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
+          '<p style="font-size:11px; color:#8A93A3; margin:2px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + ' · 확정됨</p></div></div>';
       }).join('');
     } else {
       html += '<p style="font-size:11.5px; color:#8A93A3; margin:0 0 10px;">등록된 자료가 없어요</p>';
     }
-    var panelOpen = !!state.materialPanelOpen[cat.key];
-    if (panelOpen) {
-      html += '<div style="display:flex; gap:6px; flex-wrap:wrap;">' +
-        '<button class="material-register-btn material-register-btn--primary" data-reg-text="' + cat.key + '">텍스트로 입력</button>' +
-        '<button class="material-register-btn" data-reg-file="' + cat.key + '">이미지 업로드</button>' +
-        '<button class="material-register-btn" data-reg-file="' + cat.key + '">PDF 업로드</button>' +
-        '<button class="material-register-btn" style="background:transparent; border:none; color:#8A93A3;" data-close-panel="' + cat.key + '">취소</button></div>';
-    } else {
-      html += '<button class="material-register-btn" data-open-panel="' + cat.key + '">+ 자료 등록하기</button>';
-    }
+    html += '<button class="material-register-btn" data-open-register="' + type + '">+ 자료 등록하기</button>';
     return html;
   }
 
   function renderMaterialSelect() {
-    var majorOpts = MAJOR_OPTIONS.map(function (m) { return '<option' + (m === state.desiredJobMajor ? ' selected' : '') + '>' + m + '</option>'; }).join('');
-    var minorOpts = (MINOR_BY_MAJOR[state.desiredJobMajor] || []).map(function (m) { return '<option' + (m === state.desiredJobMinor ? ' selected' : '') + '>' + m + '</option>'; }).join('');
-    var levelOpts = LEVEL_OPTIONS.map(function (l) { return '<option' + (l === state.desiredJobLevel ? ' selected' : '') + '>' + l + '</option>'; }).join('');
+    if (!state.docsLoaded) {
+      return '<div class="card card--pad-lg">' + backBtn('backToMode', '모드 다시 선택') + '<p class="text-faint">불러오는 중...</p></div>';
+    }
 
-    var suggestions = state.companySearchInput
-      ? COMPANY_SUGGESTIONS.filter(function (s) { return s.toLowerCase().indexOf(state.companySearchInput.toLowerCase()) !== -1; })
+    var mainCategories = uniqueInOrder(state.jobCategories.map(function (c) { return c.mainCategory; }));
+    var mainOpts = '<option value="">선택해주세요</option>' + mainCategories.map(function (m) {
+      return '<option value="' + esc(m) + '"' + (m === state.selectedMainCategory ? ' selected' : '') + '>' + esc(m) + '</option>';
+    }).join('');
+
+    var subCategories = state.selectedMainCategory
+      ? uniqueInOrder(state.jobCategories.filter(function (c) { return c.mainCategory === state.selectedMainCategory; }).map(function (c) { return c.subCategory; }))
       : [];
+    var subOpts = '<option value="">' + (state.selectedMainCategory ? '선택해주세요' : '대분류를 먼저 선택해주세요') + '</option>' +
+      subCategories.map(function (s) { return '<option value="' + esc(s) + '"' + (s === state.selectedSubCategory ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
+
+    var levelMatches = (state.selectedMainCategory && state.selectedSubCategory)
+      ? state.jobCategories.filter(function (c) { return c.mainCategory === state.selectedMainCategory && c.subCategory === state.selectedSubCategory; })
+      : [];
+    var levelOpts = '<option value="">' + (levelMatches.length ? '선택해주세요' : '중분류를 먼저 선택해주세요') + '</option>' +
+      levelMatches.map(function (c) {
+        return '<option value="' + c.jobCategoryId + '"' + (String(c.jobCategoryId) === String(state.selectedJobCategoryId) ? ' selected' : '') + '>' + (CAREER_LEVEL_LABEL[c.careerLevel] || c.careerLevel) + '</option>';
+      }).join('');
 
     return '<div class="card card--pad-lg">' +
       backBtn('backToMode', '모드 다시 선택') +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">면접에 사용할 자료를 선택하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">이미 등록된 자료 중 여러 개를 선택하거나, 없으면 새로 등록해주세요 · 텍스트, 이미지, PDF로 등록할 수 있어요</p>' +
+      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
       '<div class="material-columns">' +
         '<div><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">회사 공고 / 회사 정보</p>' +
-          '<div class="material-category">' +
-            '<p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">회사명 <span style="color:#D64545;">*</span> <span style="font-weight:400; color:#8A93A3;">필수 입력</span></p>' +
-            '<input id="company-name-input" class="text-input" placeholder="회사명을 검색하거나 입력하세요" value="' + esc(state.companyName || state.companySearchInput) + '" style="margin-bottom:6px;">' +
-            (suggestions.length ? '<div class="flex-row gap-8" style="flex-wrap:wrap;">' + suggestions.map(function (s) { return '<button class="chip" data-pick-company="' + s + '">' + s + '</button>'; }).join('') + '</div>' :
-              (state.companySearchInput && !state.companyName ? '<p style="font-size:11px; color:#8A93A3; margin:2px 0 0;">검색 결과가 없어요. 입력한 이름 그대로 등록돼요.</p>' : '')) +
-          '</div>' +
-          MATERIAL_CATEGORIES_COMPANY.map(function (cat) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + cat.label + '</p>' + docListHtml(cat) + '</div>'; }).join('') +
+          COMPANY_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
         '<div>' +
           '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:12px; padding:14px; margin-bottom:14px;">' +
             '<p style="font-size:11px; color:#8A93A3; margin:0 0 8px;">희망 직무</p>' +
             '<div class="flex-row gap-8" style="flex-wrap:wrap;">' +
-              '<select id="major-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + majorOpts + '</select>' +
-              '<select id="minor-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + minorOpts + '</select>' +
-              '<select id="level-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + levelOpts + '</select>' +
+              '<select id="material-main-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + mainOpts + '</select>' +
+              '<select id="material-sub-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (state.selectedMainCategory ? '' : ' disabled') + '>' + subOpts + '</select>' +
+              '<select id="material-level-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (levelMatches.length ? '' : ' disabled') + '>' + levelOpts + '</select>' +
             '</div></div>' +
           '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
-          MATERIAL_CATEGORIES_CANDIDATE.map(function (cat) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + cat.label + '</p>' + docListHtml(cat) + '</div>'; }).join('') +
+          CANDIDATE_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
       '</div>' +
-      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" data-action="goMaterialReview">다음: 자료 확인하기</button></div>' +
+      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-select-next">다음: 자료 확인하기</button></div>' +
     '</div>';
   }
 
-  // ---- step: material review ----
-  function reviewFieldRow(label, key, value, height) {
-    return '<div style="margin-bottom:16px;"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + label + '</p>' +
-      '<textarea class="textarea-input" style="height:' + (height || 76) + 'px;" data-company-field="' + key + '">' + esc(value) + '</textarea></div>';
+  function goMaterialReview() {
+    if (!state.selectedJobCategoryId) { alert('희망 직무를 선택해주세요.'); return; }
+    var selectedIds = Object.keys(state.selectedDocIds);
+    if (!selectedIds.length) { alert('자료를 1개 이상 선택해주세요.'); return; }
+
+    Promise.all(selectedIds.map(function (id) {
+      if (state.selectedExtractionIds[id]) return Promise.resolve();
+      return DF.api('/documents/' + id).then(function (detail) {
+        var confirmed = detail.confirmedVersions && detail.confirmedVersions[0];
+        if (confirmed) state.selectedExtractionIds[id] = confirmed.extractionId;
+      });
+    })).then(function () {
+      state.step = 'materialReview';
+      render();
+    }).catch(function (e) { alert(e.message); });
   }
 
+  // ---- step: material review (선택 내용 읽기 전용 확인 + 확정) ----
   function renderMaterialReview() {
-    var ce = state.companyExtract;
-    var companyTabHtml = state.companyName
-      ? '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 10px;">채용공고</p>' +
-        '<div style="background:#F6F8FB; border-radius:12px; padding:16px 18px; margin-bottom:16px;"><p style="font-size:14.5px; font-weight:700; margin:0 0 2px;">' + esc(state.companyName) + '</p><p style="font-size:12.5px; color:#8A93A3; margin:0;">' + esc(ce.jobTitle) + '</p></div>' +
-        reviewFieldRow('주요업무', 'mainDuties', ce.mainDuties, 96) +
-        reviewFieldRow('자격요건', 'requirements', ce.requirements, 96) +
-        reviewFieldRow('우대사항', 'preferred', ce.preferred, 96) +
-        reviewFieldRow('전형정보', 'processInfo', ce.processInfo, 56) +
-        '<div style="margin-bottom:20px;"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">공고 URL</p><input class="text-input" value="' + esc(ce.url) + '" data-company-field="url"></div>' +
-        '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 10px;">회사 정보</p>' +
-        '<div class="grid-2" style="margin-bottom:16px;"><div><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">회사명</p><input class="text-input" value="' + esc(ce.company.name) + '" data-company-nested="name"></div><div><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">산업군</p><input class="text-input" value="' + esc(ce.company.industry) + '" data-company-nested="industry"></div></div>' +
-        reviewFieldRowNested('서비스/제품 설명', 'serviceDesc', ce.company.serviceDesc, 72) +
-        reviewFieldRowNested('회사 가치관', 'values', ce.company.values, 56) +
-        reviewFieldRowNested('인재상', 'talentProfile', ce.company.talentProfile, 56) +
-        '<div><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">참고 URL</p><input class="text-input" value="' + esc(ce.company.refUrl) + '" data-company-nested="refUrl"></div>'
-      : '<p style="font-size:12.5px; color:#8A93A3; margin:0;">회사명이 입력되지 않았어요. 이전 단계에서 회사명을 입력해주세요.</p>';
+    var byType = {};
+    Object.keys(state.selectedDocIds).forEach(function (id) {
+      var doc = state.allDocs.filter(function (d) { return String(d.documentId) === String(id); })[0];
+      if (!doc) return;
+      byType[doc.documentType] = byType[doc.documentType] || [];
+      byType[doc.documentType].push(doc);
+    });
 
-    var subTabs = ['resume', 'coverLetter', 'portfolio', 'experience'];
-    var subLabels = { resume: '이력서', coverLetter: '자기소개서', portfolio: '포트폴리오', experience: '경험정리' };
-    var candidateTabHtml = '<div style="display:flex; align-items:center; gap:8px; background:#F3F8FD; border:1px solid #DCE7F3; border-radius:10px; padding:10px 14px; margin-bottom:16px;"><span style="font-size:12px; color:#8A93A3;">희망 직무</span><span style="font-size:12.5px; font-weight:700;">' + state.desiredJobMajor + ' &gt; ' + state.desiredJobMinor + ' · ' + state.desiredJobLevel + '</span></div>';
-    candidateTabHtml += '<div class="review-sub-tabbar">' + subTabs.map(function (s) { return '<button class="' + (state.reviewSub === s ? 'is-active' : '') + '" data-review-sub="' + s + '">' + subLabels[s] + '</button>'; }).join('') + '</div>';
-
-    if (state.reviewSub === 'resume') {
-      var r = RESUME_CARD;
-      candidateTabHtml += '<div class="review-card">' + miniField('이름', r.name) + miniField('희망직무', r.desiredJob) + miniField('학력', r.education) + miniField('기술', r.skills) + miniField('프로젝트/경험', r.experience) + miniField('자격/수상', r.certs) + '</div>';
-    } else if (state.reviewSub === 'coverLetter') {
-      var c = COVER_CARD;
-      candidateTabHtml += '<div class="review-card">' + miniField('지원직무', c.desiredJob) + miniField('지원동기', c.motivation) + miniField('핵심경험', c.coreExperience) + miniField('협업/갈등해결 경험', c.collabExperience) + miniField('직무 연결성', c.jobConnection) + miniField('입사 후 목표', c.futureGoal) + '</div>';
-    } else if (state.reviewSub === 'portfolio') {
-      candidateTabHtml += PORTFOLIO_CARDS.map(function (p) {
-        return '<div class="review-card"><p style="font-size:13px; font-weight:700; margin:0 0 4px;">' + p.projectName + '</p><p style="font-size:11.5px; color:#8A93A3; margin:0 0 10px;">' + p.period + '</p>' +
-          miniField('내 역할', p.role) + miniField('사용 기술', p.tech) + miniField('핵심 내용', p.coreContent) + miniField('문제 해결 과정', p.problemSolving) + miniField('성과/지표', p.outcome) + '</div>';
-      }).join('');
-    } else if (state.reviewSub === 'experience') {
-      var e = EXPERIENCE_CARD;
-      candidateTabHtml += '<div class="review-card">' + miniField('상황', e.situation) + miniField('과제/목표', e.taskGoal) + miniField('행동', e.action) + miniField('결과', e.result) + miniField('사용 기술', e.tech) + miniField('배운 점', e.learned) + miniField('면접에서 강조할 포인트', e.interviewPoint) + '</div>';
-    }
+    var jc = state.jobCategories.filter(function (c) { return String(c.jobCategoryId) === String(state.selectedJobCategoryId); })[0];
+    var jcLabel = jc ? (jc.mainCategory + ' > ' + jc.subCategory + ' · ' + (CAREER_LEVEL_LABEL[jc.careerLevel] || jc.careerLevel)) : '';
 
     return '<div class="card card--pad-lg">' +
       backBtn('backToMaterialSelect', '자료 다시 선택') +
-      '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">추출된 자료를 확인하고 필요하면 수정하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 18px;">확정을 누르면 이 내용을 기준으로 자료 충분도와 연결 분석을 진행해요</p>' +
-      '<div class="review-sub-tabbar"><button class="' + (state.reviewTab === 'company' ? 'is-active' : '') + '" data-review-tab="company">회사 분석</button><button class="' + (state.reviewTab === 'candidate' ? 'is-active' : '') + '" data-review-tab="candidate">지원자 분석</button></div>' +
-      (state.reviewTab === 'company' ? companyTabHtml : candidateTabHtml) +
-      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" data-action="confirmMaterials">확정하고 분석 시작</button></div>' +
+      '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">선택한 자료와 기준을 확인하세요</p>' +
+      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 18px;">확정을 누르면 이 자료들로 분석을 시작해요. 확정 후에는 자료 구성을 바꿀 수 없어요</p>' +
+      '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:10px; padding:14px; margin-bottom:18px;">' +
+        '<p style="font-size:11px; color:#8A93A3; margin:0 0 4px;">희망 직무</p>' +
+        '<p style="font-size:13.5px; font-weight:700; margin:0;">' + esc(jcLabel) + '</p>' +
+      '</div>' +
+      Object.keys(byType).map(function (type) {
+        return '<div style="margin-bottom:16px;"><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' +
+          byType[type].map(function (d) {
+            return '<div class="review-card" style="padding:12px 16px; margin-bottom:8px;"><p style="font-size:13px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
+              '<p style="font-size:11.5px; color:#8A93A3; margin:4px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + '</p></div>';
+          }).join('') +
+        '</div>';
+      }).join('') +
+      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-review-confirm">확정하고 분석 시작</button></div>' +
     '</div>';
   }
-  function reviewFieldRowNested(label, key, value, height) {
-    return '<div style="margin-bottom:16px;"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + label + '</p><textarea class="textarea-input" style="height:' + height + 'px;" data-company-nested="' + key + '">' + esc(value) + '</textarea></div>';
-  }
-  function miniField(label, value) {
-    return '<div style="margin-bottom:10px;"><p class="review-mini-label">' + label + '</p><textarea class="textarea-input" style="height:44px; font-size:12.5px;">' + esc(value) + '</textarea></div>';
+
+  function submitAnalysisCase() {
+    var confirmBtn = document.getElementById('material-review-confirm');
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '처리 중...'; }
+
+    var extractionIds = Object.keys(state.selectedDocIds).map(function (id) { return state.selectedExtractionIds[id]; });
+
+    DF.api('/analysis-cases', { method: 'POST', json: { jobCategoryId: parseInt(state.selectedJobCategoryId, 10) } })
+      .then(function (analysisCase) {
+        state.analysisCaseId = analysisCase.analysisCaseId;
+        return extractionIds.reduce(function (chain, extractionId) {
+          return chain.then(function () {
+            return DF.api('/analysis-cases/' + state.analysisCaseId + '/sources', { method: 'POST', json: { extractionId: extractionId } });
+          });
+        }, Promise.resolve());
+      })
+      .then(function () {
+        return DF.api('/analysis-cases/' + state.analysisCaseId + '/confirm', { method: 'POST' });
+      })
+      .then(function () {
+        state.step = 'submitted';
+        render();
+      })
+      .catch(function (e) {
+        alert(e.message);
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '확정하고 분석 시작'; }
+      });
   }
 
-  // ---- step: connection result ----
+  // ---- step: submitted ----
+  function renderSubmitted() {
+    return '<div class="card card--pad-lg" style="text-align:center; padding:60px 20px;">' +
+      '<p style="font-size:16px; font-weight:700; margin:0 0 8px;">분석 요청이 접수됐어요</p>' +
+      '<p style="font-size:13px; color:#8A93A3; margin:0 0 24px; line-height:1.7;">공고·회사정보와 지원자 자료 분석이 끝나면 맞춤 질문을 만들어드려요.<br>잠시 후 다시 확인해주세요.</p>' +
+      '<a href="/dashboard.html" class="btn btn--primary" style="text-decoration:none;">대시보드로 이동</a>' +
+    '</div>';
+  }
+
+  // ---- material register modal (등록 -> 추출 확인/수정 -> 확정, document-flow.js 재사용) ----
+  function openMaterialRegisterModal(documentType) {
+    state.registerTargetType = documentType;
+    state.materialRegisterMethod = 'file';
+    document.getElementById('material-register-title').textContent = DF.CATEGORY_LABEL[documentType] + ' 등록';
+    document.getElementById('material-register-name').value = '';
+    document.getElementById('material-register-file').value = '';
+    document.getElementById('material-register-content').value = '';
+    document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.materialMethod === 'file'); });
+    document.querySelector('[data-material-method-panel="file"]').hidden = false;
+    document.querySelector('[data-material-method-panel="text"]').hidden = true;
+    updateMaterialMethodVisibility();
+    document.getElementById('material-register-form').hidden = false;
+    document.getElementById('material-register-panel').hidden = true;
+    document.getElementById('material-register-panel').innerHTML = '';
+    document.getElementById('material-register-modal').hidden = false;
+  }
+
+  function updateMaterialMethodVisibility() {
+    var textTabBtn = document.querySelector('#material-register-modal [data-material-method="text"]');
+    var allowed = DF.DIRECT_INPUT_ALLOWED.indexOf(state.registerTargetType) !== -1;
+    textTabBtn.hidden = !allowed;
+    if (!allowed && state.materialRegisterMethod === 'text') {
+      state.materialRegisterMethod = 'file';
+      document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.materialMethod === 'file'); });
+      document.querySelector('[data-material-method-panel="file"]').hidden = false;
+      document.querySelector('[data-material-method-panel="text"]').hidden = true;
+    }
+  }
+
+  function closeMaterialRegisterModal() {
+    document.getElementById('material-register-modal').hidden = true;
+  }
+
+  function bindMaterialRegisterModal() {
+    document.getElementById('material-register-close').addEventListener('click', closeMaterialRegisterModal);
+    document.getElementById('material-register-cancel').addEventListener('click', closeMaterialRegisterModal);
+
+    document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.materialRegisterMethod = b.dataset.materialMethod;
+        document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+        document.querySelector('[data-material-method-panel="file"]').hidden = state.materialRegisterMethod !== 'file';
+        document.querySelector('[data-material-method-panel="text"]').hidden = state.materialRegisterMethod !== 'text';
+      });
+    });
+
+    document.getElementById('material-register-submit').addEventListener('click', function () {
+      var name = document.getElementById('material-register-name').value.trim();
+      if (!name) { alert('자료명을 입력해주세요.'); return; }
+
+      var opts = { category: state.registerTargetType, name: name, method: state.materialRegisterMethod };
+      if (state.materialRegisterMethod === 'file') {
+        var file = document.getElementById('material-register-file').files[0];
+        if (!file) { alert('파일을 선택해주세요.'); return; }
+        opts.file = file;
+      } else {
+        var content = document.getElementById('material-register-content').value.trim();
+        if (!content) { alert('내용을 입력해주세요.'); return; }
+        opts.content = content;
+      }
+
+      DF.registerDocument(opts).then(function (doc) {
+        document.getElementById('material-register-form').hidden = true;
+        var panelEl = document.getElementById('material-register-panel');
+        panelEl.hidden = false;
+
+        var panel = DF.createExtractPanel(panelEl, {
+          onConfirmed: function (extraction) {
+            state.selectedDocIds[doc.documentId] = true;
+            state.selectedExtractionIds[doc.documentId] = extraction.extractionId;
+            closeMaterialRegisterModal();
+            loadMaterialSelectData().then(render);
+          }
+        });
+        panel.load(doc.documentId);
+        if (opts.method === 'file') {
+          DF.pollExtraction(doc.documentId, function () { panel.reload(); });
+        }
+      }).catch(function (e) { alert(e.message); });
+    });
+  }
+
+  // ---- step: connection result (더미 - JSON-01/02/05 연동 전까지 유지) ----
   var LEVEL_COLOR = { HIGH: '#1E7A4C', MEDIUM: '#185FA5', LOW: '#B5622E', INSUFFICIENT: '#B5433D', NONE: '#8A93A3' };
 
   function renderConnectionResult() {
@@ -325,7 +461,7 @@
     return html;
   }
 
-  // ---- step: question list + chat ----
+  // ---- step: question list + chat (더미 - JSON-11/09/06 연동 전까지 유지) ----
   var MODE_HINTS = {
     basic: '질문의 의도를 파악하고 상황-행동-결과 순서로 답해보세요.',
     weakness: '이전에 부족했던 부분을 의식하며 구체적인 수치와 본인의 역할을 강조해보세요.',
@@ -439,11 +575,9 @@
     document.querySelectorAll('[data-mode]').forEach(function (el) {
       el.addEventListener('click', function () {
         state.mode = el.dataset.mode;
-        if (state.mode === 'basic') { state.step = 'list'; state.questions = []; state.selectedQIdx = null; }
-        else if (state.mode === 'weakness') state.step = 'weaknessPick';
-        else if (state.mode === 'custom') state.step = 'materialSelect';
-        render();
-        if (state.step === 'list') renderChatPanel();
+        if (state.mode === 'basic') { state.step = 'list'; state.questions = []; state.selectedQIdx = null; render(); if (state.step === 'list') renderChatPanel(); }
+        else if (state.mode === 'weakness') { state.step = 'weaknessPick'; render(); }
+        else if (state.mode === 'custom') { enterMaterialSelect(); }
       });
     });
 
@@ -458,21 +592,6 @@
 
     bindAction('backToMode', function () { state.step = 'mode'; render(); });
     bindAction('backToMaterialSelect', function () { state.step = 'materialSelect'; render(); });
-    bindAction('goMaterialReview', function () {
-      if (!state.companyName && state.companySearchInput) state.companyName = state.companySearchInput;
-      state.step = 'materialReview'; render();
-    });
-    bindAction('confirmMaterials', function () {
-      // decide scenario from doc selection breadth (dummy heuristic)
-      var totalSelected = 0;
-      Object.keys(state.selectedDocs).forEach(function (k) { totalSelected += Object.keys(state.selectedDocs[k] || {}).length; });
-      if (!state.companyName) { state.connectionScenario = 'insufficient'; }
-      else if (totalSelected >= 3) state.connectionScenario = 'full';
-      else if (totalSelected >= 1) state.connectionScenario = 'partial';
-      else state.connectionScenario = 'insufficient';
-      state.step = 'connectionResult';
-      render();
-    });
     bindAction('proceedToQuestions', function () { state.step = 'list'; state.questions = []; state.selectedQIdx = null; render(); renderChatPanel(); });
     bindAction('goBasicMode', function () { state.mode = 'basic'; state.step = 'list'; state.questions = []; state.selectedQIdx = null; render(); renderChatPanel(); });
     bindAction('backFromList', function () {
@@ -481,7 +600,7 @@
       render();
     });
     bindAction('finishAll', function () {
-      try { localStorage.setItem('jobpuzzle_latest_session', JSON.stringify({ title: 'LUME 백엔드 개발자 모의면접', date: new Date().toISOString().slice(0, 10).replace(/-/g, '.'), score: 78 })); } catch (e) {}
+      try { localStorage.setItem('jobpuzzle_latest_session', JSON.stringify({ title: '모의면접', date: new Date().toISOString().slice(0, 10).replace(/-/g, '.'), score: 78 })); } catch (e) {}
       window.location.href = '/interview-result.html';
     });
 
@@ -489,112 +608,54 @@
       el.addEventListener('click', function () { state.selectedQIdx = parseInt(el.dataset.selectQ, 10); state.hintOpen = false; renderQuestionListInPlace(); });
     });
 
-    // material select interactions
-    var companyInput = document.getElementById('company-name-input');
-    if (companyInput) {
-      companyInput.addEventListener('input', function () { state.companySearchInput = companyInput.value; state.companyName = ''; render(); });
-    }
-    document.querySelectorAll('[data-pick-company]').forEach(function (el) {
-      el.addEventListener('click', function () { state.companyName = el.dataset.pickCompany; state.companySearchInput = el.dataset.pickCompany; render(); });
+    if (state.step === 'materialSelect') bindMaterialSelectEvents();
+    if (state.step === 'materialReview') bindMaterialReviewEvents();
+
+    if (document.getElementById('chat-panel')) renderChatPanel();
+  }
+
+  function bindMaterialSelectEvents() {
+    var mainSel = document.getElementById('material-main-select');
+    if (mainSel) mainSel.addEventListener('change', function () {
+      state.selectedMainCategory = mainSel.value || null;
+      state.selectedSubCategory = null;
+      state.selectedJobCategoryId = null;
+      render();
     });
-    var majorSel = document.getElementById('major-select');
-    if (majorSel) majorSel.addEventListener('change', function () { state.desiredJobMajor = majorSel.value; state.desiredJobMinor = (MINOR_BY_MAJOR[majorSel.value] || [])[0] || ''; render(); });
-    var minorSel = document.getElementById('minor-select');
-    if (minorSel) minorSel.addEventListener('change', function () { state.desiredJobMinor = minorSel.value; });
-    var levelSel = document.getElementById('level-select');
-    if (levelSel) levelSel.addEventListener('change', function () { state.desiredJobLevel = levelSel.value; });
+    var subSel = document.getElementById('material-sub-select');
+    if (subSel) subSel.addEventListener('change', function () {
+      state.selectedSubCategory = subSel.value || null;
+      state.selectedJobCategoryId = null;
+      render();
+    });
+    var levelSel = document.getElementById('material-level-select');
+    if (levelSel) levelSel.addEventListener('change', function () { state.selectedJobCategoryId = levelSel.value || null; });
 
     document.querySelectorAll('[data-toggle-doc]').forEach(function (el) {
       el.addEventListener('click', function () {
-        var parts = el.dataset.toggleDoc.split('|');
-        var key = parts[0], id = parts[1];
-        state.selectedDocs[key] = state.selectedDocs[key] || {};
-        if (state.selectedDocs[key][id]) delete state.selectedDocs[key][id]; else state.selectedDocs[key][id] = true;
+        var id = el.dataset.toggleDoc;
+        if (state.selectedDocIds[id]) delete state.selectedDocIds[id]; else state.selectedDocIds[id] = true;
         render();
       });
     });
-    document.querySelectorAll('[data-open-panel]').forEach(function (el) { el.addEventListener('click', function () { state.materialPanelOpen[el.dataset.openPanel] = true; render(); }); });
-    document.querySelectorAll('[data-close-panel]').forEach(function (el) { el.addEventListener('click', function () { state.materialPanelOpen[el.dataset.closePanel] = false; render(); }); });
-    document.querySelectorAll('[data-reg-file]').forEach(function (el) { el.addEventListener('click', function () { alert('데모: 파일 업로드는 실제 서비스에서 지원돼요.'); }); });
-    document.querySelectorAll('[data-reg-text]').forEach(function (el) { el.addEventListener('click', function () { openTextEntry(el.dataset.regText); }); });
+    document.querySelectorAll('[data-open-register]').forEach(function (el) {
+      el.addEventListener('click', function () { openMaterialRegisterModal(el.dataset.openRegister); });
+    });
+    var nextBtn = document.getElementById('material-select-next');
+    if (nextBtn) nextBtn.addEventListener('click', goMaterialReview);
+  }
 
-    // material review interactions
-    document.querySelectorAll('[data-review-tab]').forEach(function (el) { el.addEventListener('click', function () { state.reviewTab = el.dataset.reviewTab; render(); }); });
-    document.querySelectorAll('[data-review-sub]').forEach(function (el) { el.addEventListener('click', function () { state.reviewSub = el.dataset.reviewSub; render(); }); });
-    document.querySelectorAll('[data-company-field]').forEach(function (el) { el.addEventListener('input', function () { state.companyExtract[el.dataset.companyField] = el.value; }); });
-    document.querySelectorAll('[data-company-nested]').forEach(function (el) { el.addEventListener('input', function () { state.companyExtract.company[el.dataset.companyNested] = el.value; }); });
-
-    if (document.getElementById('chat-panel')) renderChatPanel();
+  function bindMaterialReviewEvents() {
+    var confirmBtn = document.getElementById('material-review-confirm');
+    if (confirmBtn) confirmBtn.addEventListener('click', submitAnalysisCase);
   }
 
   function bindAction(name, fn) {
     document.querySelectorAll('[data-action="' + name + '"]').forEach(function (el) { el.addEventListener('click', fn); });
   }
 
-  // ---- text entry modal (register material as text, mirrors mydata style) ----
-  var MATERIAL_LABELS = { resume: '이력서', coverLetter: '자기소개서', portfolio: '포트폴리오', experience: '경험정리', jobPosting: '채용공고', companyInfo: '회사 정보' };
-  function textEntryDefaults(key) {
-    return {
-      resume: { name: '', desiredJob: '', education: '', skills: '', experience: '', certs: '' },
-      coverLetter: { desiredJob: '', motivation: '', coreExperience: '', collabExperience: '', jobConnection: '', futureGoal: '' },
-      portfolio: { projectName: '', period: '', role: '', tech: '', coreContent: '', problemSolving: '', outcome: '' },
-      experience: { situation: '', taskGoal: '', action: '', result: '', tech: '', learned: '', interviewPoint: '' },
-      jobPosting: { title: '', mainDuties: '', requirements: '', preferred: '', processInfo: '', url: '' },
-      companyInfo: { name: '', industry: '', serviceDesc: '', values: '', talentProfile: '', refUrl: '' }
-    }[key];
-  }
-  function openTextEntry(key) {
-    state.textEntryKey = key;
-    state.textEntryDraft = textEntryDefaults(key);
-    document.getElementById('text-entry-title').textContent = MATERIAL_LABELS[key] + ' 직접 입력';
-    renderTextEntryFields();
-    document.getElementById('text-entry-modal').hidden = false;
-  }
-  function renderTextEntryFields() {
-    var key = state.textEntryKey;
-    var d = state.textEntryDraft;
-    var html = '';
-    var fieldDefs = {
-      resume: [['name', '이름', false], ['desiredJob', '희망직무', false], ['education', '학력', true], ['skills', '기술 스택', true], ['experience', '프로젝트/경력', true], ['certs', '자격/수상', true]],
-      coverLetter: [['desiredJob', '지원직무', false], ['motivation', '지원동기', true], ['coreExperience', '핵심경험', true], ['collabExperience', '협업/갈등해결 경험', true], ['jobConnection', '직무 연결성', true], ['futureGoal', '입사 후 목표', true]],
-      portfolio: [['projectName', '프로젝트명', false], ['period', '기간', false], ['role', '내 역할', true], ['tech', '사용 기술', true], ['coreContent', '핵심 내용', true], ['problemSolving', '문제 해결 과정', true], ['outcome', '성과/지표', true]],
-      experience: [['situation', '상황', true], ['taskGoal', '과제/목표', true], ['action', '행동', true], ['result', '결과', true], ['tech', '사용 기술', false], ['learned', '배운 점', false], ['interviewPoint', '면접에서 강조할 포인트', false]],
-      jobPosting: [['title', '공고명', false], ['mainDuties', '주요업무', true], ['requirements', '자격요건', true], ['preferred', '우대사항', true], ['processInfo', '전형정보', false], ['url', '공고 URL', false]],
-      companyInfo: [['name', '회사명', false], ['industry', '산업군', false], ['serviceDesc', '서비스/제품 설명', true], ['values', '회사 가치관', true], ['talentProfile', '인재상', true], ['refUrl', '참고 URL', false]]
-    };
-    fieldDefs[key].forEach(function (f) {
-      var fieldKey = f[0], label = f[1], isTextarea = f[2];
-      html += '<div style="margin-bottom:10px;">' +
-        (isTextarea ? '<textarea class="textarea-input" style="height:50px;" placeholder="' + label + '" data-te-field="' + fieldKey + '"></textarea>' : '<input class="text-input" placeholder="' + label + '" data-te-field="' + fieldKey + '">') +
-      '</div>';
-    });
-    document.getElementById('text-entry-fields').innerHTML = html;
-    document.querySelectorAll('[data-te-field]').forEach(function (el) {
-      el.addEventListener('input', function () { state.textEntryDraft[el.dataset.teField] = el.value; });
-    });
-  }
-  function bindTextEntryModal() {
-    document.getElementById('text-entry-close').addEventListener('click', function () { document.getElementById('text-entry-modal').hidden = true; });
-    document.getElementById('text-entry-cancel').addEventListener('click', function () { document.getElementById('text-entry-modal').hidden = true; });
-    document.getElementById('text-entry-submit').addEventListener('click', function () {
-      var key = state.textEntryKey;
-      var id = 'new' + Date.now();
-      var catList = MATERIAL_CATEGORIES_COMPANY.concat(MATERIAL_CATEGORIES_CANDIDATE);
-      var cat = catList.filter(function (c) { return c.key === key; })[0];
-      if (cat) {
-        var title = state.textEntryDraft.name || state.textEntryDraft.title || state.textEntryDraft.projectName || ('직접 입력한 ' + MATERIAL_LABELS[key]);
-        cat.docs.push({ id: id, title: title, date: '2026.07.13' });
-        state.selectedDocs[key] = state.selectedDocs[key] || {};
-        state.selectedDocs[key][id] = true;
-      }
-      document.getElementById('text-entry-modal').hidden = true;
-      state.materialPanelOpen[key] = false;
-      render();
-    });
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
-    bindTextEntryModal();
+    bindMaterialRegisterModal();
     render();
   });
 })();

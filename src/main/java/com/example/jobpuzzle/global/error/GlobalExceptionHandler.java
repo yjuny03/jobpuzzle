@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -35,6 +36,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiResponse<>(false, ErrorCode.INVALID_REQUEST.getCode(), message, null));
+    }
+
+    // 업로드 파일이 10MB를 초과함
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException e){
+        return ResponseEntity
+                .status(ErrorCode.FILE_TOO_LARGE.getStatus())
+                .body(ApiResponse.fail(ErrorCode.FILE_TOO_LARGE));
     }
 
     // 존재하지 않는 경로/리소스 요청 - 이전엔 아래 Exception 핸들러에 걸려서 500(서버 내부 오류)으로 잘못 나갔던 걸 분리
