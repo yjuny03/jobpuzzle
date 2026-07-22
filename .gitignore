@@ -39,8 +39,6 @@ out/
 ### api 관련 ###
 application-local.yaml
 
-### lmk 관련 전용 ignore ###
-/docs/
 ### 로컬 파일 저장소 ###
 /storage/
 
