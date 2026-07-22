@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface AnalysisCaseRepository extends JpaRepository<AnalysisCase, Long> {
 
     Optional<AnalysisCase> findByAnalysisCaseIdAndUser_UserId(Long analysisCaseId, Long userId);
+
+    void deleteByUser_UserId(Long userId);
 }

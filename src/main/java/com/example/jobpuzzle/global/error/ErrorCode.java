@@ -36,6 +36,8 @@ public enum ErrorCode {
     EMAIL_CODE_INCORRECT(HttpStatus.BAD_REQUEST, "USER_008", "올바르지 않은 인증 코드입니다."),
     USER_LOGIN_ID_EMAIL_MISMATCH(HttpStatus.NOT_FOUND, "USER_009", "아이디 또는 이메일을 확인해주세요."),
     USER_ACCOUNT_NOT_LOCKED(HttpStatus.BAD_REQUEST, "USER_010", "잠기지 않은 계정입니다."),
+    // 문구는 USER_LOGIN_FAILED와 동일하게 유지하되, 로그인 화면 힌트 분기를 위해 코드만 분리
+    USER_LOGIN_ID_NOT_FOUND(HttpStatus.UNAUTHORIZED, "USER_011", "아이디 또는 비밀번호가 올바르지 않습니다."),
 
     //document
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DOCUMENT_001", "파일을 저장하거나 불러오는 중 오류가 발생했습니다."),

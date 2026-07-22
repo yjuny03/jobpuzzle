@@ -55,6 +55,8 @@
     var saveSuccessConfirm = document.getElementById('save-success-confirm');
 
     function setProfileEditMode(editing) {
+      // 소셜 로그인 계정은 아이디 행 자체가 숨겨져 있어 편집 대상에서 자연히 제외됨
+      idInput.disabled = !editing;
       emailInput.disabled = !editing;
       nameInput.disabled = !editing;
       editProfileBtn.hidden = editing;
@@ -217,15 +219,26 @@
         return;
       }
 
+      var loginId = idInput.value.trim();
+      if (!currentUser.socialProvider) {
+        if (loginId.length < 4 || loginId.length > 50) {
+          showError(profileError, '아이디는 4~50자로 입력해주세요.');
+          return;
+        }
+      }
+
       saveMyInfo({
         name: name,
         email: email,
+        loginId: loginId,
         defaultJobCategoryId: currentUser.defaultJobCategoryId
       }, profileError, function () {
         currentUser.name = name;
         currentUser.email = email;
+        currentUser.loginId = loginId;
         setProfileEditMode(false);
         saveSuccessModal.hidden = false;
+        document.dispatchEvent(new CustomEvent('app-user-updated', { detail: currentUser }));
       });
     });
 
@@ -248,7 +261,52 @@
         defaultJobCategoryId: Number(selectedJobCategoryId)
       }, jobCategoryError, function () {
         currentUser.defaultJobCategoryId = Number(selectedJobCategoryId);
+        saveSuccessModal.hidden = false;
       });
+    });
+
+    var withdrawBtn = document.getElementById('withdraw-btn');
+    var withdrawConfirmModal = document.getElementById('withdraw-confirm-modal');
+    var withdrawDoneModal = document.getElementById('withdraw-done-modal');
+    var withdrawError = document.getElementById('withdraw-error');
+    var withdrawCancelBtn = document.getElementById('withdraw-cancel-btn');
+    var withdrawConfirmBtn = document.getElementById('withdraw-confirm-btn');
+    var withdrawDoneConfirm = document.getElementById('withdraw-done-confirm');
+
+    withdrawBtn.addEventListener('click', function () {
+      hideError(withdrawError);
+      withdrawConfirmModal.hidden = false;
+    });
+
+    withdrawCancelBtn.addEventListener('click', function () {
+      withdrawConfirmModal.hidden = true;
+    });
+
+    withdrawConfirmBtn.addEventListener('click', function () {
+      hideError(withdrawError);
+
+      fetch('/api/user/me', {
+        method: 'DELETE',
+        credentials: 'same-origin'
+      })
+        .then(function (res) {
+          return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+        })
+        .then(function (result) {
+          if (result.ok && result.body.success) {
+            withdrawConfirmModal.hidden = true;
+            withdrawDoneModal.hidden = false;
+          } else {
+            showError(withdrawError, result.body.message || '탈퇴에 실패했습니다.');
+          }
+        })
+        .catch(function () {
+          showError(withdrawError, '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        });
+    });
+
+    withdrawDoneConfirm.addEventListener('click', function () {
+      window.location.href = '/index.html';
     });
   });
 })();

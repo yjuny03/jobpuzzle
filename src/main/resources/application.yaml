@@ -5,7 +5,7 @@ spring:
     name: jobpuzzle
   datasource:
     url: jdbc:mariadb://localhost:3306/jobpuzzle
-    # 아이디/비밀번호는 application-local.yaml(각자 로컬 전용, git 추적 안 됨)에서 채움
+    # 아이디/비밀번호는 application-local.yaml
     username:
     password:
     driver-class-name: org.mariadb.jdbc.Driver

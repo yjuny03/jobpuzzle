@@ -38,9 +38,8 @@
       </form>
 
       <p class="auth-footer-link">
-        <a href="/find-id" th:href="@{/find-id}">아이디를 잊으셨나요?</a>
-        &nbsp;·&nbsp;
-        <a href="/passwd-reset" th:href="@{/passwd-reset}">비밀번호를 잊으셨나요?</a>
+        <a href="/find-id" th:href="@{/find-id}" id="find-id-link" style="display:none;">아이디를 잊으셨나요?</a>
+        <a href="/passwd-reset" th:href="@{/passwd-reset}" id="passwd-reset-link" style="display:none;">비밀번호를 잊으셨나요?</a>
       </p>
       <p class="auth-footer-link">
         <a href="/unlock" th:href="@{/unlock}">계정이 잠기셨나요?</a>
