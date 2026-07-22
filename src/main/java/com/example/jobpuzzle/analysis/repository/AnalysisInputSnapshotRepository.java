@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface AnalysisInputSnapshotRepository extends JpaRepository<AnalysisInputSnapshot, Long> {
 
     Optional<AnalysisInputSnapshot> findByAnalysisCase_AnalysisCaseIdAndUser_UserId(Long analysisCaseId, Long userId);
+
+    void deleteByUser_UserId(Long userId);
 }

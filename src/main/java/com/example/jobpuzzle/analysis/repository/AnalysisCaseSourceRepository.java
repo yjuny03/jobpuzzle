@@ -18,4 +18,6 @@ public interface AnalysisCaseSourceRepository extends JpaRepository<AnalysisCase
     Optional<AnalysisCaseSource> findByAnalysisCaseSourceIdAndAnalysisCase_AnalysisCaseId(
             Long analysisCaseSourceId, Long analysisCaseId
     );
+
+    void deleteByAnalysisCase_User_UserId(Long userId);
 }

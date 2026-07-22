@@ -17,12 +17,18 @@
     });
   }
 
-  // 로그인된 실제 회원 정보를 불러와서 헤더의 이름/아바타를 채움
-  function loadCurrentUser() {
+  // 헤더의 이름/아바타를 회원 정보로 채움 - 최초 로딩 시와 설정 화면에서 정보 수정 후(app-user-updated) 둘 다 호출됨
+  function renderUserDisplay(user) {
     var nameEl = document.getElementById('app-user-name');
     var avatarEl = document.getElementById('app-user-avatar');
     if (!nameEl || !avatarEl) return;
 
+    nameEl.textContent = (user.name || user.loginId) + '님';
+    avatarEl.textContent = (user.name || user.loginId).charAt(0);
+  }
+
+  // 로그인된 실제 회원 정보를 불러와서 헤더의 이름/아바타를 채움
+  function loadCurrentUser() {
     fetch('/api/user/me', { credentials: 'same-origin' })
       .then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
       .then(function (result) {
@@ -30,9 +36,7 @@
           var user = result.body.data;
           // 사용자 정보를 app-user-loaded 로 저장해서 다른 곳에서도 가져다 쓸 수 있게 만듦
           document.dispatchEvent(new CustomEvent('app-user-loaded', {detail: user}));
-          var displayName = (user.name || user.loginId) + '님';
-          nameEl.textContent = displayName;
-          avatarEl.textContent = (user.name || user.loginId).charAt(0);
+          renderUserDisplay(user);
         } else {
           // 로그인 안 된 상태로 이 화면에 들어온 경우 - 로그인 페이지로 이동
           window.location.href = '/login';
@@ -61,5 +65,8 @@
     bindAppUserMenu();
     bindLogout();
     loadCurrentUser();
+    document.addEventListener('app-user-updated', function (event) {
+      renderUserDisplay(event.detail);
+    });
   });
 })();

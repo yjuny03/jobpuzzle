@@ -94,6 +94,9 @@ public class SecurityConfig {
         PersistentTokenBasedRememberMeServices services = new PersistentTokenBasedRememberMeServices(
                 REMEMBER_ME_KEY, customUserDetailsService, persistentTokenRepository);
         services.setTokenValiditySeconds(REMEMBER_ME_VALID_SECONDS);
+        // 로그인 요청이 JSON body라 AbstractRememberMeServices가 찾는 "remember-me" 파라미터가 항상 없음.
+        // alwaysRemember로 그 체크를 끄고, 호출 여부는 UserService.login()의 autoLogin 분기로 제어함.
+        services.setAlwaysRemember(true);
         return services;
     }
 
