@@ -20,9 +20,5 @@ public class MyInfoUpdateRequest {
     @Size(max = 100, message = "이메일은 100자 이내로 입력해주세요.")
     private String email;
 
-    // 소셜 로그인 회원은 보내더라도 무시됨 (UserService.updateMyInfo 참고)
-    @Size(min = 4, max = 50, message = "아이디는 4~50자로 입력해주세요.")
-    private String loginId;
-
     private Long defaultJobCategoryId;
 }
