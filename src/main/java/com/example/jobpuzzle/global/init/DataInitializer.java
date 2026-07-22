@@ -29,6 +29,8 @@ import com.example.jobpuzzle.guide.entity.JobGuideDocument;
 import com.example.jobpuzzle.guide.entity.JobGuideDocumentSourceType;
 import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
+import com.example.jobpuzzle.global.error.CustomException;
+import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
@@ -44,12 +46,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+// JobCategorySeeder가 만들어 둔 기준 카테고리를 재사용하므로, 반드시 그 뒤에 실행되어야 함
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -58,6 +63,7 @@ import java.util.List;
         name = "enabled",
         havingValue = "true"
 )
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class DataInitializer implements ApplicationRunner {
 
     private static final String DEMO_LOGIN_ID = "demo_user";
@@ -96,16 +102,16 @@ public class DataInitializer implements ApplicationRunner {
         }
 
         /*
-         * 1. 직무 분류 생성
+         * 1. 직무 분류 조회 (JobCategorySeeder가 미리 넣어 둔 기준 카테고리를 재사용)
          */
 
-        JobCategory jobCategory = JobCategory.builder()
-                .mainCategory("IT·개발")
-                .subCategory("백엔드 개발자")
-                .careerLevel(JobCategoryCareerLevel.NEW)
-                .build();
-
-        jobCategoryRepository.save(jobCategory);
+        JobCategory jobCategory = jobCategoryRepository
+                .findByMainCategoryAndSubCategoryAndCareerLevel(
+                        "IT·개발",
+                        "백엔드 개발",
+                        JobCategoryCareerLevel.NEW
+                )
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
 
         /*
          * 2. 사용자 생성
