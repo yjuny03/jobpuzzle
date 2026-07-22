@@ -17,6 +17,13 @@ public enum ErrorCode {
 
     //analysis
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
+    ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
+    ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),
+    ANALYSIS_CASE_SOURCE_DUPLICATE(HttpStatus.BAD_REQUEST, "ANALYSIS_004", "이미 연결된 자료입니다."),
+    ANALYSIS_CASE_JOB_POSTING_ALREADY_SELECTED(HttpStatus.BAD_REQUEST, "ANALYSIS_005", "채용공고는 1건만 선택할 수 있습니다. 기존 자료를 먼저 제거해주세요."),
+    ANALYSIS_CASE_SOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_006", "연결된 자료를 찾을 수 없습니다."),
+    ANALYSIS_CASE_JOB_POSTING_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_007", "채용공고를 정확히 1건 선택해야 합니다."),
+    ANALYSIS_CASE_USER_MATERIAL_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_008", "이력서·자기소개서·포트폴리오·경험정리 중 최소 1건을 선택해야 합니다."),
 
     //user - 회원가입/로그인
     USER_LOGIN_ID_DUPLICATE(HttpStatus.CONFLICT, "USER_001", "이미 사용 중인 아이디입니다."),
@@ -25,12 +32,23 @@ public enum ErrorCode {
     USER_ACCOUNT_LOCKED(HttpStatus.LOCKED, "USER_004", "로그인 실패 횟수 초과로 잠긴 계정입니다. \n이메일 인증으로 잠금 해제할 수 있습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_005", "존재하지 않는 회원입니다."),
     USER_INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "USER_006", "비밀번호는 영문/숫자를 포함해 8~20자로 입력해주세요."),
+    USER_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_007", "등록되지 않은 이메일입니다."),
+    EMAIL_CODE_INCORRECT(HttpStatus.BAD_REQUEST, "USER_008", "올바르지 않은 인증 코드입니다."),
+    USER_LOGIN_ID_EMAIL_MISMATCH(HttpStatus.NOT_FOUND, "USER_009", "아이디 또는 이메일을 확인해주세요."),
+    USER_ACCOUNT_NOT_LOCKED(HttpStatus.BAD_REQUEST, "USER_010", "잠기지 않은 계정입니다."),
 
-    //document extraction
-    DOCUMENT_EXTRACTION_NOT_EDITABLE(
-            HttpStatus.BAD_REQUEST,"DOCUMENT_EXTRACTION_001",
-            "수정할 수 없는 추출 결과입니다."
-    ),
+    //document
+    FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DOCUMENT_001", "파일을 저장하거나 불러오는 중 오류가 발생했습니다."),
+    DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "DOCUMENT_002", "존재하지 않는 자료입니다."),
+    EXTRACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "DOCUMENT_003", "존재하지 않는 추출 버전입니다."),
+    EXTRACTION_NOT_LATEST_DRAFT(HttpStatus.BAD_REQUEST, "DOCUMENT_004", "최신 DRAFT 버전만 확정할 수 있습니다."),
+    EXTRACTION_NOT_CONFIRMABLE(HttpStatus.BAD_REQUEST, "DOCUMENT_005", "확정할 수 있는 DRAFT 버전이 없습니다."),
+    EXTRACTION_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "DOCUMENT_006", "확정되지 않은 추출본이 포함되어 있습니다."),
+    INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "DOCUMENT_007", "지원하지 않는 파일 형식입니다. PDF, JPG, PNG 파일만 업로드할 수 있습니다."),
+    INVALID_DIRECT_INPUT_TYPE(HttpStatus.BAD_REQUEST, "DOCUMENT_008", "직접 입력은 채용공고·회사정보·경험정리 유형만 가능합니다."),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "DOCUMENT_009", "파일 크기는 10MB를 초과할 수 없습니다."),
+    CHANGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "DOCUMENT_010", "이미 확정된 적 있는 자료를 수정할 때는 자잘한 수정/큰 수정 여부를 선택해야 합니다."),
+    EXTRACTION_ALREADY_VERSIONED(HttpStatus.BAD_REQUEST, "DOCUMENT_011", "이미 확정 이력이 있는 자료는 재추출할 수 없습니다. 수정 저장을 이용해주세요."),
 
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다.");

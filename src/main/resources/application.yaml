@@ -37,7 +37,33 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 app:
   data-initializer:
     enabled: false
 
+  storage:
+    local:
+      base-dir: ./storage/documents
+
+  ocr:
+    google-vision:
+      credentials-path: ./credentials/google-vision-service-account.json
+
+  mail:
+    host: smtp.naver.com
+    port: 465
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+        starttls:
+          enable: false

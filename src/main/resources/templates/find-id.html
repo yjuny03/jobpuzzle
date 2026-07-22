@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>아이디 찾기 — JobPuzzle</title>
+  <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+  <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
+</head>
+
+<body>
+
+  <div th:replace="~{fragments/header :: landingHeader}"></div>
+
+  <main class="auth-shell">
+    <div class="auth-card">
+      <h1 class="auth-card__title">아이디 찾기</h1>
+      <p class="auth-card__subtitle">가입하신 이메일로 인증 코드를 보내드려요</p>
+
+      <div class="auth-error" id="find-id-error"></div>
+
+      <div class="auth-form">
+        <div class="auth-field" id="email-step">
+          <label class="field-label" for="email">이메일</label>
+          <div class="auth-field-row">
+            <input class="text-input" type="email" id="email" name="email" autocomplete="email" required>
+            <button class="btn-sm" type="button" id="send-code-btn">인증코드 발송</button>
+          </div>
+          <span class="field-hint" id="send-hint"></span>
+        </div>
+
+        <div class="auth-field" id="code-step" hidden>
+          <label class="field-label" for="code">인증 코드</label>
+          <div class="auth-field-row">
+            <input class="text-input" type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+            <button class="btn-sm" type="button" id="verify-btn">확인</button>
+          </div>
+          <span class="field-hint">이메일로 받은 6자리 코드를 3분 내에 입력해주세요.</span>
+        </div>
+
+        <div class="auth-result" id="find-id-result" hidden>
+          회원님의 아이디는 <strong id="result-login-id"></strong> 입니다.
+          <a href="/login" th:href="@{/login}">로그인하러 가기</a>
+        </div>
+      </div>
+
+      <p class="auth-footer-link">
+        <a href="/passwd-reset" th:href="@{/passwd-reset}">비밀번호를 잊으셨나요?</a>
+        &nbsp;·&nbsp;
+        <a href="/login" th:href="@{/login}">로그인으로 돌아가기</a>
+      </p>
+    </div>
+  </main>
+
+  <script src="/js/find-id.js" th:src="@{/js/find-id.js}"></script>
+</body>
+
+</html>

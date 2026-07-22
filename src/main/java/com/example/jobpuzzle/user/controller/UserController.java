@@ -2,9 +2,18 @@ package com.example.jobpuzzle.user.controller;
 
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.dto.AccountUnlockSendRequest;
+import com.example.jobpuzzle.user.dto.AccountUnlockVerifyRequest;
+import com.example.jobpuzzle.user.dto.EmailSendRequest;
+import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailSendRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetSendRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetVerifyRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
 import com.example.jobpuzzle.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,6 +43,22 @@ public class UserController {
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<Void>> join(@Valid @RequestBody JoinRequest request) {
         userService.join(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 발송
+    // POST /api/user/join/send-code { email }
+    @PostMapping("/join/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendJoinEmailCode(@Valid @RequestBody JoinEmailSendRequest request) {
+        userService.sendJoinEmailCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
+    // POST /api/user/join/verify { email, code }
+    @PostMapping("/join/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyJoinEmailCode(@Valid @RequestBody JoinEmailVerifyRequest request) {
+        userService.verifyJoinEmailCode(request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -94,6 +119,62 @@ public class UserController {
                                                         HttpServletRequest httpRequest,
                                                         HttpServletResponse httpResponse) {
         userService.withdraw(userDetails, httpRequest, httpResponse);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 발송
+    // POST /api/user/find-id/send-code { email }
+    @PostMapping("/find-id/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@Valid @RequestBody EmailSendRequest request) {
+        userService.sendVerificationCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 검증 후 로그인 아이디 반환
+    // POST /api/user/find-id/verify { email, code }
+    @PostMapping("/find-id/verify")
+    public ResponseEntity<ApiResponse<String>> verifyVerificationCode(@Valid @RequestBody EmailVerifyRequest request) {
+        String loginId = userService.verifyCodeAndFindLoginId(request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(loginId));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 발송
+    // POST /api/user/passwd-reset/send-code { loginId, email }
+    @PostMapping("/passwd-reset/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendPasswordResetCode(@Valid @RequestBody PasswordResetSendRequest request) {
+        userService.sendPasswordResetCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 유효시간 내에 재설정 완료해야 함)
+    // POST /api/user/passwd-reset/verify { loginId, email, code }
+    @PostMapping("/passwd-reset/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyPasswordResetCode(@Valid @RequestBody PasswordResetVerifyRequest request) {
+        userService.verifyPasswordResetCode(request.getLoginId(), request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 재확인 후 새 비밀번호로 변경
+    // POST /api/user/passwd-reset/reset { loginId, email, code, newPassword }
+    @PostMapping("/passwd-reset/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        userService.resetPassword(request.getLoginId(), request.getEmail(), request.getCode(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 발송
+    // POST /api/user/unlock/send-code { loginId, email }
+    @PostMapping("/unlock/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendUnlockCode(@Valid @RequestBody AccountUnlockSendRequest request) {
+        userService.sendUnlockCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 검증 (검증 성공 시 그 자리에서 잠금 해제까지 처리됨)
+    // POST /api/user/unlock/verify { loginId, email, code }
+    @PostMapping("/unlock/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyAndUnlock(@Valid @RequestBody AccountUnlockVerifyRequest request) {
+        userService.verifyAndUnlock(request.getLoginId(), request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

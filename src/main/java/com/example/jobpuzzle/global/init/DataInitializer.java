@@ -10,6 +10,7 @@ import com.example.jobpuzzle.ai.log.AiCallLogRepository;
 import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.analysis.entity.CandidateMaterialAnalysis;
+import com.example.jobpuzzle.analysis.entity.CandidateMaterialAnalysisSource;
 import com.example.jobpuzzle.analysis.entity.ConfirmedAnalysisSnapshot;
 import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
 import com.example.jobpuzzle.analysis.repository.CandidateMaterialAnalysisRepository;
@@ -17,6 +18,7 @@ import com.example.jobpuzzle.analysis.repository.ConfirmedAnalysisSnapshotReposi
 import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.DocumentExtractionStatus;
+import com.example.jobpuzzle.document.entity.DocumentVersionStatus;
 import com.example.jobpuzzle.document.entity.UserDocument;
 import com.example.jobpuzzle.document.entity.UserDocumentSourceType;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
@@ -125,32 +127,38 @@ public class DataInitializer implements ApplicationRunner {
 
         UserDocument jobPostingDocument = createTextDocument(
                 user,
-                UserDocumentType.JOB_POSTING
+                UserDocumentType.JOB_POSTING,
+                "테스트 채용공고"
         );
 
         UserDocument companyInfoDocument = createTextDocument(
                 user,
-                UserDocumentType.COMPANY_INFO
+                UserDocumentType.COMPANY_INFO,
+                "테스트 회사정보"
         );
 
         UserDocument resumeDocument = createTextDocument(
                 user,
-                UserDocumentType.RESUME
+                UserDocumentType.RESUME,
+                "테스트 이력서"
         );
 
         UserDocument coverLetterDocument = createTextDocument(
                 user,
-                UserDocumentType.COVER_LETTER
+                UserDocumentType.COVER_LETTER,
+                "테스트 자기소개서"
         );
 
         UserDocument portfolioDocument = createTextDocument(
                 user,
-                UserDocumentType.PORTFOLIO
+                UserDocumentType.PORTFOLIO,
+                "테스트 포트폴리오"
         );
 
         UserDocument experienceNoteDocument = createTextDocument(
                 user,
-                UserDocumentType.EXPERIENCE_NOTE
+                UserDocumentType.EXPERIENCE_NOTE,
+                "테스트 경험정리"
         );
 
         userDocumentRepository.saveAll(List.of(
@@ -422,21 +430,72 @@ public class DataInitializer implements ApplicationRunner {
                         "DataInitializer 지원자 자료 분석"
                 );
 
+        /*
+         * CandidateMaterialAnalysis에는 AI가 여러 사용자 자료를 종합하여 만든
+         * 분석 결과만 저장한다.
+         *
+         * 실제 분석에 사용한 이력서·자기소개서·포트폴리오·경험노트는
+         * CandidateMaterialAnalysisSource를 통해 별도로 여러 건 연결한다.
+         */
         CandidateMaterialAnalysis candidateAnalysis =
                 CandidateMaterialAnalysis.builder()
                         .user(user)
                         .jobCategory(jobCategory)
-                        .resumeDocument(resumeDocument)
-                        .coverLetterDocument(coverLetterDocument)
-                        .portfolioDocument(portfolioDocument)
-                        .experienceNoteDocument(experienceNoteDocument)
-                        .resumeAnalysis(CandidateMaterialAnalysis.Resume.from(candidateResult.getResume()))
-                        .coverLetterAnalysis(CandidateMaterialAnalysis.CoverLetter.from(candidateResult.getCoverLetter()))
-                        .portfolioAnalysis(CandidateMaterialAnalysis.Portfolio.from(candidateResult.getPortfolio()))
-                        .experienceNoteAnalysis(CandidateMaterialAnalysis.ExperienceNote.from(candidateResult.getExperienceNote()))
+
+                        // AI 응답 DTO를 DB JSON 저장용 객체로 변환
+                        .resumeAnalysis(
+                                CandidateMaterialAnalysis.Resume.from(
+                                        candidateResult.getResume()
+                                )
+                        )
+                        .coverLetterAnalysis(
+                                CandidateMaterialAnalysis.CoverLetter.from(
+                                        candidateResult.getCoverLetter()
+                                )
+                        )
+                        .portfolioAnalysis(
+                                CandidateMaterialAnalysis.Portfolio.from(
+                                        candidateResult.getPortfolio()
+                                )
+                        )
+                        .experienceNoteAnalysis(
+                                CandidateMaterialAnalysis.ExperienceNote.from(
+                                        candidateResult.getExperienceNote()
+                                )
+                        )
                         .missingEvidence(candidateResult.getMissingEvidence())
                         .aiCallLog(candidateCallLog)
                         .build();
+
+        /*
+         * 분석에 사용한 원본 문서와 확정 추출 결과를 Source 엔티티로 연결한다.
+         *
+         * CandidateMaterialAnalysis의 sources에 cascade = CascadeType.ALL이 있으므로
+         * candidateAnalysis만 저장해도 Source 엔티티까지 함께 저장된다.
+         */
+        addCandidateAnalysisSource(
+                candidateAnalysis,
+                resumeDocument,
+                resumeExtraction
+        );
+
+        addCandidateAnalysisSource(
+                candidateAnalysis,
+                coverLetterDocument,
+                coverLetterExtraction
+        );
+
+        addCandidateAnalysisSource(
+                candidateAnalysis,
+                portfolioDocument,
+                portfolioExtraction
+        );
+
+        addCandidateAnalysisSource(
+                candidateAnalysis,
+                experienceNoteDocument,
+                experienceNoteExtraction
+        );
 
         candidateMaterialAnalysisRepository.save(candidateAnalysis);
 
@@ -467,33 +526,69 @@ public class DataInitializer implements ApplicationRunner {
     // TEXT 입력 방식의 사용자 문서 생성
     private UserDocument createTextDocument(
             User user,
-            UserDocumentType documentType
+            UserDocumentType documentType,
+            String displayName
     ) {
         return UserDocument.builder()
                 .user(user)
                 .documentType(documentType)
                 .sourceType(UserDocumentSourceType.TEXT)
+                .displayName(displayName)
                 .filePath(null)
                 .fileName(null)
                 .keepOriginal(false)
-                .version(1)
                 .build();
     }
 
-    // 사용자 문서에서 정상 추출된 테스트 텍스트 생성
+    // 사용자 문서에서 정상 추출되어 확정 완료된 테스트 버전 생성
     private DocumentExtraction createExtraction(
             UserDocument document,
-            String extractedText
+            String content
     ) {
-        return DocumentExtraction.builder()
+        DocumentExtraction extraction = DocumentExtraction.builder()
                 .document(document)
+                .baseExtraction(null)
                 .extractionStatus(DocumentExtractionStatus.SUCCESS)
-                .extractedText(extractedText)
-                .editedText(null)
+                .versionStatus(DocumentVersionStatus.DRAFT)
+                .content(content)
                 .pageCount(null)
                 .ocrApplied(false)
-                .editable(true)
                 .failureReason(null)
                 .build();
+        extraction.confirm();
+        return extraction;
+    }
+
+    /*
+     * 한 번의 사용자 자료 분석에 사용된 원본 문서와 확정 추출 결과를
+     * CandidateMaterialAnalysisSource로 생성하여 분석 결과에 연결한다.
+     *
+     * CandidateMaterialAnalysis의 sources에 CascadeType.ALL이 적용되어 있으므로
+     * 부모 분석 결과를 저장하면 연결된 Source도 함께 저장된다.
+     */
+    private void addCandidateAnalysisSource(
+            CandidateMaterialAnalysis analysis,
+            UserDocument document,
+            DocumentExtraction extraction
+    ) {
+        // 해당 자료가 없으면 Source를 생성하지 않는다.
+        if (document == null || extraction == null) {
+            return;
+        }
+
+        CandidateMaterialAnalysisSource source =
+                CandidateMaterialAnalysisSource.builder()
+                        // 어느 사용자 자료 분석 결과에 사용됐는지 연결
+                        .analysis(analysis)
+
+                        // 사용한 원본 문서
+                        .document(document)
+
+                        // 실제 AI 분석에 사용한 확정 추출 결과
+                        .extraction(extraction)
+                        .build();
+
+        // 부모 엔티티의 sources 목록에 추가
+        analysis.addSource(source);
     }
 }

@@ -127,3 +127,20 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+.auth-result {
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: #1E9161;
+  background: #EAFAF3;
+  border: 1px solid #CFEEE1;
+  border-radius: 8px;
+  padding: 14px 16px;
+  text-align: center;
+  line-height: 1.6;
+}
+.auth-result a {
+  display: block;
+  margin-top: 6px;
+  font-weight: 600;
+}

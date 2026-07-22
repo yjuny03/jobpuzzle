@@ -10,6 +10,7 @@ import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
 import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.repository.EmailVerificationStore;
 import com.example.jobpuzzle.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -51,6 +52,10 @@ public class UserService {
     // 자동로그인 토큰 DB 삭제용 - rememberMeServices.logout()은 쿠키만 지우고 DB 토큰은 안 지워서 별도로 호출
     private final PersistentTokenRepository persistentTokenRepository;
 
+    // 인증 코드 메일 발송 서비스
+    private final MailService mailService;
+    private final EmailVerificationStore emailVerificationStore;
+
     // 비밀번호 정책 - 영문/숫자 각각 1자 이상 포함, 8~20자
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,20}$");
 
@@ -63,6 +68,10 @@ public class UserService {
         // 이메일 중복 체크
         if (checkEmailDuplicate(request.getEmail())) {
             throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
+        }
+        // 이메일 인증 코드 재검증 - /join/verify로 미리 확인했더라도 가입 처리 시점에 다시 확인
+        if (!emailVerificationStore.verify(request.getEmail(), request.getCode())) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
         }
         // 비밀번호 정책 검증
         validatePassword(request.getPassword());
@@ -77,6 +86,22 @@ public class UserService {
         User user = User.createLocalUser(request.getLoginId(), encodedPassword, request.getEmail(),
                 request.getName(), jobCategory);
         userRepository.save(user);
+        emailVerificationStore.invalidate(request.getEmail());
+    }
+
+    // 회원가입 - 아직 가입되지 않은 이메일인지 확인 후 인증 코드 발송
+    public void sendJoinEmailCode(String email) {
+        if (checkEmailDuplicate(email)) {
+            throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
+        }
+        mailService.sendMail(email);
+    }
+
+    // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
+    public void verifyJoinEmailCode(String email, int inputCode) {
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
     }
 
     // 아이디 중복 확인 - true면 이미 사용 중인 아이디 (회원가입 화면에서 실시간 체크용)
@@ -160,12 +185,85 @@ public class UserService {
         SecurityContextHolder.clearContext();
     }
 
-    public void findLoginId() {
-        // TODO: 이메일 인증 인프라 준비되면 구현 (현재 메일 발송 설정 없음)
+    // 인증 코드 검증 및 이메일로 로그인 아이디 반환
+    public String verifyCodeAndFindLoginId(String email, int inputCode) {
+        if(!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+        return userRepository.findLoginIdByEmail(email);
     }
 
-    public void resetPassword() {
-        // TODO: 이메일 인증 인프라 준비되면 구현 (현재 메일 발송 설정 없음)
+    // User에 존재하는 이메일로 인증 코드 발송
+    public void sendVerificationCode(String email) {
+        if(userRepository.existsByEmail(email)) {
+            mailService.sendMail(email);
+        } else {
+            throw new CustomException(ErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+    }
+
+    // 비밀번호 재설정 - 아이디+이메일이 같은 계정인지 확인 후 인증 코드 발송
+    public void sendPasswordResetCode(String loginId, String email) {
+        if (!userRepository.existsByLoginIdAndEmail(loginId, email)) {
+            throw new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH);
+        }
+        mailService.sendMail(email);
+    }
+
+    // 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음)
+    public void verifyPasswordResetCode(String loginId, String email, int inputCode) {
+        if (!userRepository.existsByLoginIdAndEmail(loginId, email)) {
+            throw new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH);
+        }
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+    }
+
+    // 비밀번호 재설정 - 인증 코드 재확인 후 비밀번호 변경, 완료 시점에 인증 코드 무효화
+    public void resetPassword(String loginId, String email, int inputCode, String newPassword) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+
+        validatePassword(newPassword);
+        user.changePassword(passwordEncoder.encode(newPassword));
+        emailVerificationStore.invalidate(email);
+    }
+
+    // 계정 잠금 해제 - 아이디+이메일이 같은 계정인지, 실제로 잠긴 계정인지 확인 후 인증 코드 발송
+    public void sendUnlockCode(String loginId, String email) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!Boolean.TRUE.equals(user.getIsLocked())) {
+            throw new CustomException(ErrorCode.USER_ACCOUNT_NOT_LOCKED);
+        }
+
+        mailService.sendMail(email);
+    }
+
+    // 계정 잠금 해제 - 인증 코드 검증 성공 시 그 자리에서 잠금 해제 처리, 완료 시점에 인증 코드 무효화
+    public void verifyAndUnlock(String loginId, String email, int inputCode) {
+        User user = userRepository.findByLoginId(loginId)
+                .filter(u -> u.getEmail().equals(email))
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_LOGIN_ID_EMAIL_MISMATCH));
+
+        if (!Boolean.TRUE.equals(user.getIsLocked())) {
+            throw new CustomException(ErrorCode.USER_ACCOUNT_NOT_LOCKED);
+        }
+
+        if (!emailVerificationStore.verify(email, inputCode)) {
+            throw new CustomException(ErrorCode.EMAIL_CODE_INCORRECT);
+        }
+
+        user.unlock();
+        emailVerificationStore.invalidate(email);
     }
 
     // 내 정보 조회 - 로그인된 회원 기준
