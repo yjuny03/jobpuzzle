@@ -133,11 +133,6 @@ public class User extends BaseEntity {
         this.defaultJobCategory = defaultJobCategory;
     }
 
-    // 아이디 변경 - 소셜 로그인 회원은 로그인에 아이디를 쓰지 않으므로 호출하지 않음
-    public void changeLoginId(String loginId) {
-        this.loginId = loginId;
-    }
-
     // 비밀번호 재설정 - encodedPassword는 암호화된 값이어야 함
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;

@@ -300,15 +300,6 @@ public class UserService {
             throw new CustomException(ErrorCode.USER_EMAIL_DUPLICATE);
         }
 
-        // 아이디를 바꾸는 경우에만 중복 체크 - 소셜 로그인 회원은 아이디를 로그인에 쓰지 않으므로 변경 대상에서 제외
-        if (user.getSocialProvider() == null
-                && request.getLoginId() != null && !request.getLoginId().equals(user.getLoginId())) {
-            if (userRepository.existsByLoginIdAndUserIdNot(request.getLoginId(), user.getUserId())) {
-                throw new CustomException(ErrorCode.USER_LOGIN_ID_DUPLICATE);
-            }
-            user.changeLoginId(request.getLoginId());
-        }
-
         user.updateProfile(request.getName(), request.getEmail(), jobCategory);
     }
 

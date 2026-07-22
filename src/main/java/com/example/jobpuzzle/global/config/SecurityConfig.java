@@ -37,8 +37,8 @@ public class SecurityConfig {
     // 자동로그인 토큰 서명에 쓰는 애플리케이션 키 (외부에 노출되면 안 됨)
     private static final String REMEMBER_ME_KEY = "jobpuzzle-remember-me-key";
 
-    // 자동로그인 유지 기간 - 30일
-    private static final int REMEMBER_ME_VALID_SECONDS = 60 * 60 * 24 * 30;
+    // 자동로그인 유지 기간 - 7일
+    private static final int REMEMBER_ME_VALID_SECONDS = 60 * 60 * 24 * 7;
 
     // 정적 리소스 경로 - 인증 없이 접근 허용할 CSS/JS/이미지 경로
     private static final String[] STATIC_URLS = {
