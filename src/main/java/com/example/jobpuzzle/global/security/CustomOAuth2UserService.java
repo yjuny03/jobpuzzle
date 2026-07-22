@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 카카오 로그인 요청
+// 카카오/구글 로그인 요청
 @Service
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
@@ -21,10 +21,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         OAuth2User oAuth2User = super.loadUser(userRequest);
+        String registrationId = userRequest.getClientRegistration().getRegistrationId();
         String userNameAttributeName = userRequest.getClientRegistration()
                 .getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
 
-        OAuthAttributes attributes = OAuthAttributes.ofKakao(userNameAttributeName, oAuth2User.getAttributes());
+        OAuthAttributes attributes = "google".equals(registrationId)
+                ? OAuthAttributes.ofGoogle(userNameAttributeName, oAuth2User.getAttributes())
+                : OAuthAttributes.ofKakao(userNameAttributeName, oAuth2User.getAttributes());
 
         // 정보갱신 & 회원가입처리
         User user = userRepository.findBySocialProviderAndSocialId(attributes.getProvider(), attributes.getSocialId())

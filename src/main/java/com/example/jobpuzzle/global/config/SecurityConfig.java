@@ -2,6 +2,7 @@ package com.example.jobpuzzle.global.config;
 
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetailsService;
+import com.example.jobpuzzle.global.security.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,8 +22,11 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    // 카카오 로그인 성공 시 회원 조회/생성을 처리하는 서비스
+    // 카카오/구글 로그인 성공 시 회원 조회/생성을 처리하는 서비스
     private final CustomOAuth2UserService customOAuth2UserService;
+
+    // 소셜 로그인 성공 후 직무 설정 여부에 따라 이동할 화면을 결정하는 핸들러
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
     // 자동로그인 시 쿠키의 회원을 다시 찾아오는 데 사용
     private final CustomUserDetailsService customUserDetailsService;
@@ -110,13 +114,15 @@ public class SecurityConfig {
                 .rememberMe(rememberMe -> rememberMe
                         .rememberMeServices(rememberMeServices())
                 )
-                // 카카오 로그인 설정 - 로그인 성공 시 customOAuth2UserService가 회원 조회/생성 처리
+                // 카카오/구글 로그인 설정 - 로그인 성공 시 customOAuth2UserService가 회원 조회/생성 처리
                 .oauth2Login(oauth2 -> oauth2
                         // 커스텀 로그인 페이지 지정 - 안 하면 스프링이 /login을 가로채서 자체 기본 로그인 화면을 띄워버림
                         .loginPage("/login")
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
+                        // 로그인 성공 후 이동할 화면 - 직무 미설정 회원은 설정 화면으로, 그 외엔 메인 화면으로 분기
+                        .successHandler(oAuth2LoginSuccessHandler)
                 );
         return http.build();
 

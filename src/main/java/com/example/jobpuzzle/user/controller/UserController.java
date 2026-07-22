@@ -15,6 +15,7 @@ import com.example.jobpuzzle.user.dto.PasswordResetRequest;
 import com.example.jobpuzzle.user.dto.PasswordResetSendRequest;
 import com.example.jobpuzzle.user.dto.PasswordResetVerifyRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -98,27 +99,30 @@ public class UserController {
 
     // 내 정보 조회 - 로그인된 사용자만 호출 가능 (프론트에서 로그인 상태 판단할 때도 사용)
     // GET /api/user/me
+    // expression="user"로 받는 이유: 아이디/비번 로그인은 CustomUserDetails, 카카오/구글 로그인은 CustomOAuth2User가
+    // principal로 들어오는데, 두 타입 다 getUser()를 갖고 있어서 SpEL로 공통 추출함
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(ApiResponse.success(userService.getMyInfo(userDetails)));
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(
+            @AuthenticationPrincipal(expression = "user") User user) {
+        return ResponseEntity.ok(ApiResponse.success(userService.getMyInfo(user)));
     }
 
     // 내 정보 수정 - 이름/이메일/기본 관심 직무
     // PUT /api/user/me { name, email, defaultJobCategoryId }
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<Void>> updateMyInfo(@Valid @RequestBody MyInfoUpdateRequest request,
-                                                            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        userService.updateMyInfo(request, userDetails);
+                                                            @AuthenticationPrincipal(expression = "user") User user) {
+        userService.updateMyInfo(request, user);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // 회원 탈퇴
     // DELETE /api/user/me - 상태를 WITHDRAWN으로 바꾸고 로그인 상태도 함께 해제
     @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> withdraw(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ResponseEntity<ApiResponse<Void>> withdraw(@AuthenticationPrincipal(expression = "user") User user,
                                                         HttpServletRequest httpRequest,
                                                         HttpServletResponse httpResponse) {
-        userService.withdraw(userDetails, httpRequest, httpResponse);
+        userService.withdraw(user, httpRequest, httpResponse);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
