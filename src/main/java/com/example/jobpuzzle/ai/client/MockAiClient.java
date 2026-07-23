@@ -1,17 +1,22 @@
 package com.example.jobpuzzle.ai.client;
 
+import com.example.jobpuzzle.ai.dto.AnswerEvaluationResult;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult.*;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult.*;
+import com.example.jobpuzzle.ai.dto.WeaknessAnswerEvaluationResult;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
+import com.example.jobpuzzle.interview.entity.FollowUpQuestionType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
+import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
+import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -137,81 +142,126 @@ public class MockAiClient implements AiClient {
                 .build();
     }
 
+    // 원 질문·꼬리질문 답변을 평가하여 JSON-06 형식으로 반환
+    @Override
+    public AnswerEvaluationResult evaluateAnswer(String prompt) {
+        return AnswerEvaluationResult.builder()
+                .interviewMode(InterviewSessionMode.COMPANY_FIT)
+                .currentFollowUpDepth(0)
+                .score(76)
+                .scoreLabel("현재 답변의 기준 충족도")
+                .passThreshold(70)
+                .evaluationDetail(AnswerEvaluationResult.EvaluationDetail.builder()
+                        .intentMatch(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(80).comment("질문 의도에 맞게 답변함").build())
+                        .specificity(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(70).comment("행동 과정이 다소 추상적임").build())
+                        .ownRole(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(85).comment("담당 범위가 명확함").build())
+                        .problemSolving(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(65).comment("해결 과정 설명이 부족함").build())
+                        .resultExpression(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(60).comment("결과 표현이 부족함").build())
+                        .requirementConnection(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(78).comment("공고 요구사항과 연결됨").build())
+                        .guideAlignment(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(72).comment("기술 선택 이유가 부족함").build())
+                        .deliveryClarity(AnswerEvaluationResult.DimensionScore.builder()
+                                .score(82).comment("답변 구조가 이해하기 쉬움").build())
+                        .build())
+                .weaknessTags(List.of("RESULT_EXPRESSION_WEAK", "PROBLEM_SOLVING_WEAK"))
+                .summary("본인 역할은 명확하나 해결 과정과 결과 표현을 보완해야 함")
+                .improvementDirection(List.of("문제 해결 단계와 결과를 구체적으로 설명"))
+                .followUp(AnswerEvaluationResult.FollowUp.builder()
+                        .depth(1)
+                        .question("가장 어려웠던 문제와 해결 단계를 설명해주세요.")
+                        .type(FollowUpQuestionType.SPECIFICITY)
+                        .targetWeakness("PROBLEM_SOLVING_WEAK")
+                        .reason("해결 과정의 구체적인 근거가 부족함")
+                        .build())
+                .build();
+    }
+
+    // 약점 보완 모드의 단일 관점 재평가를 JSON-10 형식으로 반환
+    @Override
+    public WeaknessAnswerEvaluationResult evaluateWeaknessAnswer(String prompt) {
+        return WeaknessAnswerEvaluationResult.builder()
+                .targetWeaknessTag("SPECIFICITY_WEAK")
+                .targetDimension("specificity")
+                .currentFollowUpDepth(1)
+                .score(78)
+                .passThreshold(70)
+                .comment("행동 과정은 구체화됐으나 결과 확인 방식이 부족함")
+                .passed(true)
+                .followUp(WeaknessAnswerEvaluationResult.FollowUp.builder()
+                        .depth(2)
+                        .question("그 행동의 결과를 어떤 기준이나 지표로 확인했는지 설명해주세요.")
+                        .type(FollowUpQuestionType.RESULT_CHECK)
+                        .reason("1차 꼬리답변 이후에도 결과 근거 확인이 필요함")
+                        .build())
+                .build();
+    }
+
     @Override
     public FinalReportResult finalReport(String prompt) {
         return FinalReportResult.builder()
+                .interviewMode(InterviewSessionMode.COMPANY_FIT)
+                .totalQuestionCount(10)
+                .submittedQuestionCount(4)
+                .evaluatedQuestionCount(3)
+                .evaluationFailedQuestionCount(1)
+                .skippedQuestionCount(6)
+                .completionRate(40)
                 .overallScore(78)
                 .scoreLabel("세션 종합 기준 충족도")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
-                                .companyRequirementFit(75)
-                                .experienceSpecificity(70)
-                                .roleClarity(85)
+                                .intentMatch(81)
+                                .specificity(74)
+                                .ownRole(85)
                                 .problemSolving(68)
-                                .resultExpression(62).build())
-                .evidenceSummary(
-                        FinalReportResult.EvidenceSummary.builder()
-                                .requirementConnections(List.of(
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("Spring Boot 기반 백엔드 개발 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
-                                            .build(),
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("RDB 설계 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.MEDIUM)
-                                            .build(),
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("AWS 인프라 운영 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.NONE)
-                                            .build()
-                                ))
+                                .resultExpression(62)
+                                .requirementConnection(75)
+                                .guideAlignment(72)
+                                .deliveryClarity(82)
+                                .build())
+                .basisSummary(
+                        FinalReportResult.BasisSummary.builder()
+                                .jobCategory("IT·개발 / 백엔드")
+                                .careerLevel(JobCategoryCareerLevel.NEW)
+                                .evaluationPassThreshold(70)
                                 .usedGuide(FinalReportResult.UsedGuide.builder()
                                         .guideId(12L)
                                         .version("v1.2")
                                         .build()
                                 )
-                                .missingEvidence(List.of(
-                                    "AWS 인프라 운영 경험 근거 없음",
-                                    "테스트 코드 작성 경험 근거 없음"
+                                .requirementConnections(List.of(
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("Spring Boot 기반 백엔드 개발 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
+                                                .build()
                                 ))
+                                .missingEvidence(List.of("성과 수치 근거 부족"))
+                                .targetWeaknessTag(null)
+                                .targetDimension(null)
+                                .originEvaluationIds(List.of())
                                 .build())
-                .weaknessTagSummaries(List.of(
+                .weaknessTagSummary(List.of(
                         FinalReportResult.WeaknessTagSummary.builder()
                                 .tag("RESULT_EXPRESSION_WEAK")
-                                .count(4).build(),
-                        FinalReportResult.WeaknessTagSummary.builder()
-                                .tag("PROBLEM_SOLVING_WEAK")
                                 .count(2).build()))
-                .nextPracticeRecommendations(List.of(
-                        FinalReportResult.NextPracticeRecommendation.builder()
-                                .questionType(InterviewQuestionType.EXPERIENCE)
-                                .reason("성과 표현 부족이 누적 확인됨").build(),
+                .nextPracticeRecommendation(List.of(
                         FinalReportResult.NextPracticeRecommendation.builder()
                                 .questionType(InterviewQuestionType.PROBLEM_SOLVING)
-                                .reason("문제 해결 과정 서술이 반복적으로 부족함").build()))
+                                .reason("해결 과정 설명 보완 필요").build()))
                 .improvementSuggestion(
                         FinalReportResult.ImprovementSuggestion.builder()
-                                .resume(List.of(
-                                        "담당 API, 사용 기술, 정량적 결과를 구체적으로 추가",
-                                        "AWS 관련 실습 경험을 스킬 항목에 보완"
-                                ))
-                                .coverLetter(List.of(
-                                        "공고 요구사항과 프로젝트 경험 간 연결 서술 보강",
-                                        "지원 동기에 구체적인 기술적 문제 해결 사례 추가"
-                                ))
-                                .portfolio(List.of(
-                                        "문제 상황과 해결 과정을 별도 섹션으로 분리해 보완",
-                                        "사용 기술 선택 이유를 프로젝트별로 명시"
-                                ))
-                                .experienceNote(List.of(
-                                        "트래픽 증가 대응 경험을 STAR 구조(상황-과제-행동-결과)로 재정리",
-                                        "정량적 성과(응답시간, 처리량 등) 수치 추가"
-                                )).build())
-                .learningDirections(List.of(
-                        "AWS 배포 · 운영 실습 (EC2, S3 등) 후 포트폴리오에 사용 서비스 · 과정 · 문제해결 내용 추가",
-                        "문제 해결 경험을 정량적 성과 중심으로 서술하는 연습"
-                        )
-                )
+                                .resume(List.of("담당 기능과 결과를 구체적으로 추가"))
+                                .coverLetter(List.of("직무 연결성을 보완"))
+                                .portfolio(List.of("문제 해결 과정을 별도 정리"))
+                                .experienceNote(List.of("성과를 포함해 STAR로 재정리"))
+                                .build())
+                .learningDirection(List.of("AWS 배포 기초 학습"))
                 .build();
     }
 

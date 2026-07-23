@@ -4,7 +4,8 @@ import com.example.jobpuzzle.ai.client.MockAiClient;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.log.AiCallLog;
-import com.example.jobpuzzle.ai.log.AiCallLogResultType;
+import com.example.jobpuzzle.ai.log.AiExecutionStage;
+import com.example.jobpuzzle.ai.log.AiInputReferenceType;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import com.example.jobpuzzle.ai.log.AiCallLogRepository;
 import com.example.jobpuzzle.ai.prompt.PromptTemplate;
@@ -386,11 +387,14 @@ public class DataInitializer implements ApplicationRunner {
         AiCallLog jobPostingCallLog = AiCallLog.builder()
                 .provider(AiProvider.MOCK)
                 .model("mock-v1")
+                .executionStage(AiExecutionStage.JOB_POSTING_ANALYSIS)
+                .inputReferenceType(AiInputReferenceType.ANALYSIS_SNAPSHOT)
+                .inputReferenceId("seed-job-posting-analysis")
+                .inputFingerprint("seed-job-posting-analysis")
                 .promptTemplate(jobPostingPrompt)
                 .promptVersion(jobPostingPrompt.getVersion())
                 .guide(null)
                 .guideVersion(null)
-                .resultType(AiCallLogResultType.JOB_POSTING_ANALYSIS)
                 .build();
 
         aiCallLogRepository.save(jobPostingCallLog);
@@ -412,8 +416,7 @@ public class DataInitializer implements ApplicationRunner {
 
         jobPostingAnalysisRepository.save(jobPostingAnalysis);
 
-        // 분석 결과 저장 후 다형 참조 resultId를 연결
-        jobPostingCallLog.complete(jobPostingAnalysis.getAnalysisId());
+        jobPostingCallLog.complete();
 
         /*
          * 10. Mock 지원자 자료 분석
@@ -422,11 +425,14 @@ public class DataInitializer implements ApplicationRunner {
         AiCallLog candidateCallLog = AiCallLog.builder()
                 .provider(AiProvider.MOCK)
                 .model("mock-v1")
+                .executionStage(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
+                .inputReferenceType(AiInputReferenceType.ANALYSIS_SNAPSHOT)
+                .inputReferenceId("seed-candidate-material-analysis")
+                .inputFingerprint("seed-candidate-material-analysis")
                 .promptTemplate(candidatePrompt)
                 .promptVersion(candidatePrompt.getVersion())
                 .guide(null)
                 .guideVersion(null)
-                .resultType(AiCallLogResultType.CANDIDATE_MATERIAL_ANALYSIS)
                 .build();
 
         aiCallLogRepository.save(candidateCallLog);
@@ -505,8 +511,7 @@ public class DataInitializer implements ApplicationRunner {
 
         candidateMaterialAnalysisRepository.save(candidateAnalysis);
 
-        // 분석 결과 저장 후 다형 참조 resultId를 연결
-        candidateCallLog.complete(candidateAnalysis.getAnalysisId());
+        candidateCallLog.complete();
 
         /*
          * 11. 확정 분석 스냅샷 생성
