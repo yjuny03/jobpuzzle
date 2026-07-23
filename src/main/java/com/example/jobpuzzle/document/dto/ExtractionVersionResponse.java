@@ -3,6 +3,7 @@ package com.example.jobpuzzle.document.dto;
 import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.DocumentExtractionStatus;
 import com.example.jobpuzzle.document.entity.DocumentVersionStatus;
+import com.example.jobpuzzle.document.entity.UserDocumentSourceType;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
 import lombok.Getter;
 
@@ -16,6 +17,7 @@ public class ExtractionVersionResponse {
     private final Long extractionId;
     private final Long documentId;
     private final UserDocumentType documentType;
+    private final UserDocumentSourceType sourceType;
     private final Integer majorVersion;
     private final Integer minorVersion;
     private final DocumentExtractionStatus extractionStatus;
@@ -29,7 +31,7 @@ public class ExtractionVersionResponse {
     private final String failureReason;
 
     private ExtractionVersionResponse(
-            Long extractionId, Long documentId, UserDocumentType documentType,
+            Long extractionId, Long documentId, UserDocumentType documentType, UserDocumentSourceType sourceType,
             Integer majorVersion, Integer minorVersion,
             DocumentExtractionStatus extractionStatus, DocumentVersionStatus versionStatus, String content,
             Long baseExtractionId, Integer pageCount, boolean ocrApplied,
@@ -38,6 +40,7 @@ public class ExtractionVersionResponse {
         this.extractionId = extractionId;
         this.documentId = documentId;
         this.documentType = documentType;
+        this.sourceType = sourceType;
         this.majorVersion = majorVersion;
         this.minorVersion = minorVersion;
         this.extractionStatus = extractionStatus;
@@ -56,6 +59,7 @@ public class ExtractionVersionResponse {
                 extraction.getExtractionId(),
                 extraction.getDocument().getDocumentId(),
                 extraction.getDocument().getDocumentType(),
+                extraction.getDocument().getSourceType(),
                 extraction.getMajorVersion(),
                 extraction.getMinorVersion(),
                 extraction.getExtractionStatus(),

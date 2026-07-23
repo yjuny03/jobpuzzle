@@ -15,7 +15,6 @@ public class AnalysisInputSnapshotResponse {
 
     private final Long snapshotId;
     private final Long analysisCaseId;
-    private final Long userId;
     private final String mainCategory;
     private final String subCategory;
     private final JobCategoryCareerLevel careerLevel;
@@ -23,12 +22,11 @@ public class AnalysisInputSnapshotResponse {
     private final LocalDateTime createdAt;
 
     private AnalysisInputSnapshotResponse(
-            Long snapshotId, Long analysisCaseId, Long userId, String mainCategory, String subCategory,
+            Long snapshotId, Long analysisCaseId, String mainCategory, String subCategory,
             JobCategoryCareerLevel careerLevel, List<AnalysisInputSnapshotSourceResponse> sources, LocalDateTime createdAt
     ) {
         this.snapshotId = snapshotId;
         this.analysisCaseId = analysisCaseId;
-        this.userId = userId;
         this.mainCategory = mainCategory;
         this.subCategory = subCategory;
         this.careerLevel = careerLevel;
@@ -41,7 +39,6 @@ public class AnalysisInputSnapshotResponse {
         return new AnalysisInputSnapshotResponse(
                 snapshot.getSnapshotId(),
                 snapshot.getAnalysisCase().getAnalysisCaseId(),
-                snapshot.getUser().getUserId(),
                 jobCategory.getMainCategory(),
                 jobCategory.getSubCategory(),
                 jobCategory.getCareerLevel(),
