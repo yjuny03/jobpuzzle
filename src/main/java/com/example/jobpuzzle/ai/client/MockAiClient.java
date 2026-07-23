@@ -2,82 +2,255 @@ package com.example.jobpuzzle.ai.client;
 
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult.*;
+import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult.*;
+import com.example.jobpuzzle.ai.dto.SourceReference;
 import com.example.jobpuzzle.ai.log.AiProvider;
+import com.example.jobpuzzle.ai.validation.AnalysisSourceMarkerParser;
 import com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
+import com.example.jobpuzzle.analysis.entity.RequirementType;
+import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class MockAiClient implements AiClient {
 
-    // 채용공고 내용을 분석하여 구조화된 공고 분석 결과를 반환
-    @Override
-    public JobPostingAnalysisResult analyzeJobPosting(String prompt) {
-        return JobPostingAnalysisResult.builder()
-                .mainTasks(List.of("백엔드 API 설계 및 개발"
-                        ,"DB 스키마 설계"
-                ))
-                .requirements(List.of("Spring Boot 기반 개발 경험"
-                        , "RDB 설계 경험"
-                ))
-                .preferred(List.of("AWS 인프라 경험"
-                        , "테스트 코드 작성 경험"
-                ))
-                .companyValues(List.of("주도적 문제 해결",
-                        "협업 커뮤니케이션"
-                ))
-                .coreCompetencies(List.of("API 설계",
-                        "장애 대응"
-                ))
-                .missingEvidence(List.of())
-                .build();
+    private final ObjectMapper objectMapper;
+    private final AnalysisSourceMarkerParser markerParser;
+
+    public MockAiClient(ObjectMapper objectMapper, AnalysisSourceMarkerParser markerParser) {
+        this.objectMapper = objectMapper;
+        this.markerParser = markerParser;
     }
 
-    // 이력서·자기소개서 등 지원자 자료를 분석하여 구조화된 분석 결과를 반환
+    // Mock도 실제 Provider와 동일하게 marker 기반 원시 JSON 문자열을 반환한다.
     @Override
-    public CandidateMaterialAnalysisResult analyzeCandidateMaterial(String prompt) {
-        return CandidateMaterialAnalysisResult.builder()
-                .resume(Resume.builder()
-                        .experiences(List.of(Experience.builder()
-                                        .title("학습 관리 플랫폼 팀 프로젝트")
-                                        .period("2025.03-2025.06")
-                                .build()))
-                        .skills(List.of("Spring Boot", "MySQL", "JPA"))
-                        .roles(List.of("백엔드 API 개발","DB 설계"))
-                        .results(List.of("회원가입 기능 구현 완료"))
-                        .build())
-                .coverLetter(CoverLetter.builder()
-                        .motivation("백엔드 개발 직무 지원 동기 요약")
-                        .values("문제를 구조적으로 해결하는 것을 중요하게 생각함")
-                        .experienceNarratives(List.of("팀 프로젝트 중 API 설계 경험 서술"))
-                        .jobConnection("공고의 백엔드 개발 업무와 프로젝트 경험 연결 서술")
-                        .build())
-                .portfolio(Portfolio.builder()
-                        .projectStructure(List.of(ProjectStructure.builder()
-                                        .projectName("학습 관리 플랫폼")
-                                        .role("백엔드")
-                                .build()))
-                        .contributions(List.of("회원가입/로그인 API 구현"))
-                        .techUsageReason(List.of("인증 및 인가 처리를 위해 Spring Security 사용"))
-                        .outputs(List.of("Swagger 기반 API 문서"))
-                        .build())
-                .experienceNote(ExperienceNote.builder()
-                        .starCandidates(List.of(StarCandidate.builder()
-                                        .situation("트래픽 증가로 응답 지연 발생")
-                                        .task("조회 성능 개선")
-                                .build()))
-                        .build())
-                .missingEvidence(List.of())
-                .build();
+    public String analyzeJobPosting(String prompt) {
+        List<AnalysisSourceMarkerParser.SourceMarker> markers = markerParser.parsePrompt(prompt).stream()
+                .filter(marker -> marker.documentType() == com.example.jobpuzzle.document.entity.UserDocumentType.JOB_POSTING
+                        || marker.documentType() == com.example.jobpuzzle.document.entity.UserDocumentType.COMPANY_INFO)
+                .toList();
+        List<JobPostingAnalysisResult.Item> tasks = markers.isEmpty() ? List.of() : List.of(
+                JobPostingAnalysisResult.Item.builder().itemId("task-001").text(excerpt(markers.get(0))).sourceRefs(List.of(reference(markers.get(0)))).build()
+        );
+        return json(JobPostingAnalysisResult.builder()
+                .mainTasks(tasks).requirements(List.of()).preferred(List.of()).companyValues(List.of())
+                .coreCompetencies(List.of()).conflicts(List.of()).missingEvidence(List.of()).build());
+    }
+
+    // 선택된 지원자 자료 marker가 있을 때만 해당 문서 유형의 구조화 항목을 만든다.
+    @Override
+    public String analyzeCandidateMaterial(String prompt) {
+        List<AnalysisSourceMarkerParser.SourceMarker> markers = markerParser.parsePrompt(prompt).stream()
+                .filter(marker -> Set.of(com.example.jobpuzzle.document.entity.UserDocumentType.RESUME,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.COVER_LETTER,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.PORTFOLIO,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.EXPERIENCE_NOTE).contains(marker.documentType()))
+                .toList();
+        var types = markerParser.documentTypesInPrompt(prompt).stream()
+                .filter(type -> Set.of(com.example.jobpuzzle.document.entity.UserDocumentType.RESUME,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.COVER_LETTER,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.PORTFOLIO,
+                        com.example.jobpuzzle.document.entity.UserDocumentType.EXPERIENCE_NOTE).contains(type))
+                .toList();
+        return json(CandidateMaterialAnalysisResult.builder()
+                .availableDocumentTypes(types)
+                .resume(types.contains(com.example.jobpuzzle.document.entity.UserDocumentType.RESUME) ? markerOfOrEmpty(markers, com.example.jobpuzzle.document.entity.UserDocumentType.RESUME, marker -> Resume.builder()
+                        .experiences(List.of(Experience.builder().experienceId("exp-001").title(excerpt(marker)).summary(excerpt(marker)).sourceRefs(List.of(reference(marker))).build()))
+                        .skills(List.of()).roles(List.of()).results(List.of()).build(), Resume.builder().experiences(List.of()).skills(List.of()).roles(List.of()).results(List.of()).build()) : null)
+                .coverLetter(types.contains(com.example.jobpuzzle.document.entity.UserDocumentType.COVER_LETTER) ? markerOfOrEmpty(markers, com.example.jobpuzzle.document.entity.UserDocumentType.COVER_LETTER, marker -> CoverLetter.builder()
+                        .motivation(SummaryEvidence.builder().summary(excerpt(marker)).sourceRefs(List.of(reference(marker))).build())
+                        .experienceNarratives(List.of()).build(), CoverLetter.builder().experienceNarratives(List.of()).build()) : null)
+                .portfolio(types.contains(com.example.jobpuzzle.document.entity.UserDocumentType.PORTFOLIO) ? markerOfOrEmpty(markers, com.example.jobpuzzle.document.entity.UserDocumentType.PORTFOLIO, marker -> Portfolio.builder()
+                        .projects(List.of(Project.builder().projectId("project-001").projectName(excerpt(marker)).structure(excerpt(marker)).role("작성자 역할")
+                                .contributions(List.of()).techUsageReasons(List.of()).problemSolving(List.of()).outputs(List.of()).sourceRefs(List.of(reference(marker))).build())).build(), Portfolio.builder().projects(List.of()).build()) : null)
+                .experienceNote(types.contains(com.example.jobpuzzle.document.entity.UserDocumentType.EXPERIENCE_NOTE) ? markerOfOrEmpty(markers, com.example.jobpuzzle.document.entity.UserDocumentType.EXPERIENCE_NOTE, marker -> ExperienceNote.builder()
+                        .starCandidates(List.of(StarCandidate.builder().candidateId("star-001").situation(excerpt(marker)).missingParts(List.of()).sourceRefs(List.of(reference(marker))).build())).build(), ExperienceNote.builder().starCandidates(List.of()).build()) : null)
+                .missingEvidence(List.of()).build());
+    }
+
+    // 렌더링된 JSON-05 입력 구역을 읽어 검증 가능한 결정적 원시 JSON을 생성한다.
+    @Override
+    public String generateCustomizedAnalysis(String renderedPrompt) {
+        JobPostingAnalysisResult jobPosting = readSection(renderedPrompt, "JOB_POSTING_ANALYSIS", JobPostingAnalysisResult.class);
+        CandidateMaterialAnalysisResult candidate = readSection(renderedPrompt, "CANDIDATE_MATERIAL_ANALYSIS", CandidateMaterialAnalysisResult.class);
+        JsonNode guide = readSectionTree(renderedPrompt, "GUIDE_CONTEXT");
+        List<SourceReference> candidateRefs = candidateSourceRefs(candidate);
+        List<RequirementInput> requirements = requirements(jobPosting);
+        ReadinessResultStatus status = readiness(requirements, candidateRefs, guide.path("matchType").asText());
+        boolean canGenerateQuestions = status == ReadinessResultStatus.SUFFICIENT || status == ReadinessResultStatus.PARTIAL;
+
+        List<CustomizedAnalysisGenerationResult.RequirementMatch> matches = new java.util.ArrayList<>();
+        for (RequirementInput input : requirements) {
+            boolean hasCandidateEvidence = !candidateRefs.isEmpty();
+            MatchAnalysisResultMatchLevel matchLevel = hasCandidateEvidence ? MatchAnalysisResultMatchLevel.HIGH : MatchAnalysisResultMatchLevel.NONE;
+            matches.add(CustomizedAnalysisGenerationResult.RequirementMatch.builder()
+                    .matchId("match-" + input.requirementId())
+                    .requirementId(input.requirementId()).requirementType(input.requirementType()).requirement(input.requirement())
+                    .postingSourceRefs(input.sourceRefs())
+                    .candidateEvidence(hasCandidateEvidence ? candidateRefs.get(0).getEvidenceText() : null)
+                    .candidateSourceRefs(hasCandidateEvidence ? List.of(candidateRefs.get(0)) : List.of())
+                    .matchLevel(matchLevel).reason(hasCandidateEvidence ? "입력 지원자 근거와 연결됨" : "입력 지원자 근거를 찾지 못함")
+                    .missingPoint(matchLevel == MatchAnalysisResultMatchLevel.HIGH ? null : "지원자 경험 근거 보완 필요")
+                    .build());
+        }
+
+        List<CustomizedAnalysisGenerationResult.Question> questions = canGenerateQuestions && !matches.isEmpty()
+                ? List.of(question(matches.get(0), candidateRefs.get(0))) : List.of();
+        List<CustomizedAnalysisGenerationResult.Task> tasks = matches.stream()
+                .filter(match -> match.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH)
+                .map(this::task).toList();
+        return json(CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(status).canGenerateQuestions(canGenerateQuestions)
+                        .reason("입력 구조화 결과 기준 준비도").limitations(limitations(status)).build())
+                .requirementMatches(matches).questions(questions).tasks(tasks).build());
+    }
+
+    private ReadinessResultStatus readiness(List<RequirementInput> requirements, List<SourceReference> candidateRefs, String guideMatchType) {
+        if (requirements.isEmpty()) return ReadinessResultStatus.POSTING_LACK;
+        if (candidateRefs.isEmpty()) return ReadinessResultStatus.CANDIDATE_LACK;
+        if (GuideMatchType.NONE.name().equals(guideMatchType)) return ReadinessResultStatus.GUIDE_LACK;
+        if (GuideMatchType.FALLBACK_PARENT_CATEGORY.name().equals(guideMatchType)
+                || GuideMatchType.FALLBACK_COMMON.name().equals(guideMatchType)) return ReadinessResultStatus.PARTIAL;
+        return ReadinessResultStatus.SUFFICIENT;
+    }
+
+    private List<String> limitations(ReadinessResultStatus status) {
+        return status == ReadinessResultStatus.SUFFICIENT ? List.of() : List.of(status.name());
+    }
+
+    private CustomizedAnalysisGenerationResult.Question question(CustomizedAnalysisGenerationResult.RequirementMatch match, SourceReference candidateRef) {
+        return CustomizedAnalysisGenerationResult.Question.builder().questionId("question-" + match.getRequirementId())
+                .questionType(InterviewQuestionType.COMPANY_FIT).question(match.getRequirement() + " 경험을 설명해주세요.")
+                .intent("요구사항과 지원자 근거의 연결 확인")
+                .evaluationFocus(List.of(com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection))
+                .relatedMatchId(match.getMatchId()).relatedRequirementId(match.getRequirementId())
+                .sourceRefs(List.of(match.getPostingSourceRefs().get(0), candidateRef))
+                .reviewStatus(InterviewQuestionReviewStatus.PASS).build();
+    }
+
+    private CustomizedAnalysisGenerationResult.Task task(CustomizedAnalysisGenerationResult.RequirementMatch match) {
+        return CustomizedAnalysisGenerationResult.Task.builder().taskId("task-" + match.getRequirementId())
+                .relatedMatchId(match.getMatchId()).relatedRequirementId(match.getRequirementId())
+                .matchLevel(ActionPlanMatchLevel.valueOf(match.getMatchLevel().name()))
+                .missingPoint(match.getMissingPoint()).suggestion("관련 경험 근거를 보완하세요.").build();
+    }
+
+    private List<RequirementInput> requirements(JobPostingAnalysisResult result) {
+        List<RequirementInput> inputs = new java.util.ArrayList<>();
+        result.getRequirements().forEach(value -> inputs.add(new RequirementInput(value.getRequirementId(), RequirementType.REQUIRED, value.getText(), value.getSourceRefs())));
+        result.getPreferred().forEach(value -> inputs.add(new RequirementInput(value.getRequirementId(), RequirementType.PREFERRED, value.getText(), value.getSourceRefs())));
+        return inputs;
+    }
+
+    private List<SourceReference> candidateSourceRefs(CandidateMaterialAnalysisResult result) {
+        List<SourceReference> refs = new java.util.ArrayList<>();
+        if (result.getResume() != null) {
+            result.getResume().getExperiences().forEach(value -> refs.addAll(value.getSourceRefs()));
+            result.getResume().getSkills().forEach(value -> refs.addAll(value.getSourceRefs()));
+            result.getResume().getRoles().forEach(value -> refs.addAll(value.getSourceRefs()));
+            result.getResume().getResults().forEach(value -> refs.addAll(value.getSourceRefs()));
+        }
+        if (result.getCoverLetter() != null) {
+            addSummaryRefs(refs, result.getCoverLetter().getMotivation()); addSummaryRefs(refs, result.getCoverLetter().getValues());
+            result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummaryRefs(refs, value)); addSummaryRefs(refs, result.getCoverLetter().getJobConnection());
+        }
+        if (result.getPortfolio() != null) result.getPortfolio().getProjects().forEach(value -> refs.addAll(value.getSourceRefs()));
+        if (result.getExperienceNote() != null) result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
+        return refs;
+    }
+
+    private void addSummaryRefs(List<SourceReference> refs, CandidateMaterialAnalysisResult.SummaryEvidence value) {
+        if (value != null) refs.addAll(value.getSourceRefs());
+    }
+
+    private <T> T readSection(String prompt, String name, Class<T> type) {
+        try { return objectMapper.readValue(section(prompt, name), type); }
+        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+    }
+
+    private JsonNode readSectionTree(String prompt, String name) {
+        try { return objectMapper.readTree(section(prompt, name)); }
+        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+    }
+
+    private String section(String prompt, String name) {
+        String start = "<" + name + ">"; String end = "</" + name + ">";
+        int opening = findTagOutsideJsonString(prompt, start, 0);
+        if (opening < 0) throw new IllegalArgumentException("missing mock input opening tag: " + name);
+        if (findTagOutsideJsonString(prompt, end, 0) >= 0 && findTagOutsideJsonString(prompt, end, 0) < opening) {
+            throw new IllegalArgumentException("mock input closing tag precedes opening tag: " + name);
+        }
+        if (findTagOutsideJsonString(prompt, start, opening + start.length()) >= 0) {
+            throw new IllegalArgumentException("duplicate mock input opening tag: " + name);
+        }
+        int closing = findTagOutsideJsonString(prompt, end, opening + start.length());
+        if (closing < 0) throw new IllegalArgumentException("missing mock input closing tag: " + name);
+        if (findTagOutsideJsonString(prompt, end, closing + end.length()) >= 0) {
+            throw new IllegalArgumentException("duplicate mock input closing tag: " + name);
+        }
+        return prompt.substring(opening + start.length(), closing).trim();
+    }
+
+    // JSON 문자열 안의 태그 텍스트는 무시해 실제 렌더링 구역의 경계만 찾는다.
+    private int findTagOutsideJsonString(String value, String tag, int fromIndex) {
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int index = 0; index <= value.length() - tag.length(); index++) {
+            char character = value.charAt(index);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+                continue;
+            }
+            if (character == '"') { quoted = true; continue; }
+            if (index >= fromIndex && value.startsWith(tag, index)) return index;
+        }
+        return -1;
+    }
+
+    private record RequirementInput(String requirementId, RequirementType requirementType, String requirement, List<SourceReference> sourceRefs) { }
+
+    private <T> T markerOf(List<AnalysisSourceMarkerParser.SourceMarker> markers, com.example.jobpuzzle.document.entity.UserDocumentType type,
+                           java.util.function.Function<AnalysisSourceMarkerParser.SourceMarker, T> mapper) {
+        return markers.stream().filter(marker -> marker.documentType() == type).findFirst().map(mapper).orElse(null);
+    }
+
+    private <T> T markerOfOrEmpty(List<AnalysisSourceMarkerParser.SourceMarker> markers, com.example.jobpuzzle.document.entity.UserDocumentType type,
+                                  java.util.function.Function<AnalysisSourceMarkerParser.SourceMarker, T> mapper, T emptyValue) {
+        return markerOf(markers, type, mapper) == null ? emptyValue : markerOf(markers, type, mapper);
+    }
+
+    private SourceReference reference(AnalysisSourceMarkerParser.SourceMarker marker) {
+        return SourceReference.builder().extractionId(marker.extractionId()).documentId(marker.documentId()).documentType(marker.documentType())
+                .pageNumber(marker.pageNumber()).segmentId(marker.segmentId()).evidenceText(excerpt(marker)).build();
+    }
+
+    private String excerpt(AnalysisSourceMarkerParser.SourceMarker marker) {
+        String text = marker.segmentText().trim();
+        return text.length() <= 80 ? text : text.substring(0, 80);
+    }
+
+    private String json(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("mock JSON serialization failed", exception);
+        }
     }
 
     // 확정된 분석 정보를 바탕으로 적합도, 면접 질문, 보완 과제를 생성
@@ -219,6 +392,11 @@ public class MockAiClient implements AiClient {
     @Override
     public AiProvider getProvider() {
         return AiProvider.MOCK;
+    }
+
+    @Override
+    public String getModel() {
+        return "mock-fixed-sample";
     }
 
     @Override

@@ -1,8 +1,6 @@
 package com.example.jobpuzzle.ai.client;
 
-import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
-import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import org.springframework.stereotype.Component;
@@ -11,13 +9,18 @@ import org.springframework.stereotype.Component;
 public class AnthropicClient implements AiClient {
 
     @Override
-    public JobPostingAnalysisResult analyzeJobPosting(String prompt) {
-        return null;
+    public String analyzeJobPosting(String prompt) {
+        return "{}";
     }
 
     @Override
-    public CandidateMaterialAnalysisResult analyzeCandidateMaterial(String prompt) {
-        return null;
+    public String analyzeCandidateMaterial(String prompt) {
+        return "{}";
+    }
+
+    @Override
+    public String generateCustomizedAnalysis(String renderedPrompt) {
+        return "{}";
     }
 
     @Override
@@ -32,7 +35,12 @@ public class AnthropicClient implements AiClient {
 
     @Override
     public AiProvider getProvider() {
-        return null;
+        return AiProvider.ANTHROPIC;
+    }
+
+    @Override
+    public String getModel() {
+        return "anthropic-unconfigured";
     }
 
     @Override

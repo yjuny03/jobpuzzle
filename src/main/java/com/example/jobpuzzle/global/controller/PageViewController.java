@@ -14,4 +14,9 @@ public class PageViewController {
     public String page(@PathVariable String page) {
         return page;
     }
+
+    @GetMapping("/analysis/{analysisCaseId}")
+    public String analysisResult(@PathVariable Long analysisCaseId) {
+        return "analysis";
+    }
 }
