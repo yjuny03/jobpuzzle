@@ -2,17 +2,34 @@ package com.example.jobpuzzle.ai.log;
 
 import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.guide.entity.JobGuideDocument;
-import jakarta.persistence.*;
-import lombok.Builder;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+// AI 호출의 입력 기준과 실행 상태를 남겨 단계별 재사용·재시도를 판단한다.
 @Getter
 @Entity
 @NoArgsConstructor
-@Table(name = "ai_call_log")
+@Table(
+        name = "ai_call_log",
+        indexes = @Index(
+                name = "idx_ai_call_log_stage_fingerprint_status",
+                columnList = "execution_stage,input_fingerprint,status"
+        )
+)
 public class AiCallLog {
 
     @Id
@@ -27,44 +44,44 @@ public class AiCallLog {
     @Column(name = "model", nullable = false, length = 100)
     private String model;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "execution_stage", nullable = false, length = 50)
+    private AiExecutionStage executionStage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "input_reference_type", nullable = false, length = 30)
+    private AiInputReferenceType inputReferenceType;
+
+    @Column(name = "input_reference_id", nullable = false, length = 100)
+    private String inputReferenceId;
+
+    @Column(name = "input_fingerprint", nullable = false, length = 64)
+    private String inputFingerprint;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prompt_template_id")
+    @JoinColumn(name = "prompt_template_id", nullable = false)
     private PromptTemplate promptTemplate;
 
-    // 호출 시 사용한 프롬프트 버전 스냅샷
-    @Column(name = "prompt_version", length = 20)
+    @Column(name = "prompt_version", nullable = false, length = 20)
     private String promptVersion;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guide_id")
     private JobGuideDocument guide;
 
-    // 호출 시 사용한 가이드 버전 스냅샷
     @Column(name = "guide_version", length = 20)
     private String guideVersion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "result_type", nullable = false, length = 50)
-    private AiCallLogResultType resultType;
+    @Column(name = "started_at", nullable = false)
+    private LocalDateTime startedAt;
 
-    // resultType에 따라 서로 다른 결과 테이블의 PK 참조
-    @Column(name = "result_id")
-    private Long resultId;
-
-    @Column(name = "requested_at", nullable = false)
-    private LocalDateTime requestedAt;
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private AiCallLogStatus status;
 
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
-
-    @Column(name = "error_message", columnDefinition = "TEXT")
-    private String errorMessage;
-
-    // 호출 전 null, 검증 성공 true, 검증 실패 false
     @Column(name = "valid")
     private Boolean valid;
 
@@ -72,49 +89,67 @@ public class AiCallLog {
     @Column(name = "error_type", nullable = false, length = 30)
     private AiCallLogErrorType errorType;
 
+    @Column(name = "error_message", length = 1000)
+    private String errorMessage;
+
+    @Column(name = "reused", nullable = false)
+    private boolean reused;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reused_from_call_id")
+    private AiCallLog reusedFromCall;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_ai_call_log_id")
+    private AiCallLog parentAiCallLog;
+
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
 
-    @Builder
-    private AiCallLog(
+    public static AiCallLog pending(
             AiProvider provider,
             String model,
+            AiExecutionStage executionStage,
+            AiInputReferenceType inputReferenceType,
+            String inputReferenceId,
+            String inputFingerprint,
             PromptTemplate promptTemplate,
-            String promptVersion,
             JobGuideDocument guide,
-            String guideVersion,
-            AiCallLogResultType resultType
+            AiCallLog parentAiCallLog
     ) {
-        this.provider = provider;
-        this.model = model;
-        this.promptTemplate = promptTemplate;
-        this.promptVersion = promptVersion;
-        this.guide = guide;
-        this.guideVersion = guideVersion;
-        this.resultType = resultType;
-
-        this.requestedAt = LocalDateTime.now();
-        this.status = AiCallLogStatus.REQUESTED;
-        this.errorType = AiCallLogErrorType.NONE;
-        this.retryCount = 0;
-        this.valid = null;
+        AiCallLog log = new AiCallLog();
+        log.provider = provider;
+        log.model = model;
+        log.executionStage = executionStage;
+        log.inputReferenceType = inputReferenceType;
+        log.inputReferenceId = inputReferenceId;
+        log.inputFingerprint = inputFingerprint;
+        log.promptTemplate = promptTemplate;
+        log.promptVersion = promptTemplate.getVersion();
+        log.guide = guide;
+        log.guideVersion = guide == null ? null : guide.getVersion();
+        log.status = AiCallLogStatus.PENDING;
+        log.errorType = AiCallLogErrorType.NONE;
+        log.reused = false;
+        log.retryCount = parentAiCallLog == null ? 0 : parentAiCallLog.retryCount + 1;
+        log.parentAiCallLog = parentAiCallLog;
+        return log;
     }
 
-    // AI 응답 검증 및 결과 저장 완료
-    public void complete(Long resultId) {
-        this.resultId = resultId;
-        this.status = AiCallLogStatus.SUCCESS;
+    public void start() {
+        this.status = AiCallLogStatus.RUNNING;
+        this.startedAt = LocalDateTime.now();
+    }
+
+    public void succeed() {
+        this.status = AiCallLogStatus.SUCCEEDED;
         this.valid = true;
         this.errorType = AiCallLogErrorType.NONE;
         this.errorMessage = null;
         this.completedAt = LocalDateTime.now();
     }
 
-    // 호출·파싱·검증 실패
-    public void fail(
-            AiCallLogErrorType errorType,
-            String errorMessage
-    ) {
+    public void fail(AiCallLogErrorType errorType, String errorMessage) {
         this.status = AiCallLogStatus.FAILED;
         this.valid = false;
         this.errorType = errorType;
@@ -122,8 +157,13 @@ public class AiCallLog {
         this.completedAt = LocalDateTime.now();
     }
 
-    // 동일 호출 재시도 횟수 증가
-    public void increaseRetryCount() {
-        this.retryCount++;
+    public void reuse(AiCallLog sourceCall) {
+        this.status = AiCallLogStatus.SUCCEEDED;
+        this.valid = true;
+        this.reused = true;
+        this.reusedFromCall = sourceCall;
+        this.errorType = AiCallLogErrorType.NONE;
+        this.errorMessage = null;
+        this.completedAt = LocalDateTime.now();
     }
 }

@@ -11,7 +11,7 @@ public interface ConfirmedAnalysisSnapshotRepository extends JpaRepository<Confi
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM ConfirmedAnalysisSnapshot s " +
             "WHERE s.confirmedBy.userId = :userId " +
-            "OR s.candidateAnalysis.user.userId = :userId " +
-            "OR s.jobPostingAnalysis.jobPosting.user.userId = :userId")
+            "OR s.candidateAnalysis.snapshot.user.userId = :userId " +
+            "OR s.jobPostingAnalysis.snapshot.user.userId = :userId")
     void deleteAllRelatedToUser(@Param("userId") Long userId);
 }

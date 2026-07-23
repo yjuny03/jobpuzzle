@@ -62,6 +62,9 @@ spring:
         starttls:
           enable: false
 app:
+  ai:
+    running-timeout-seconds: 600
+
   data-initializer:
     enabled: false
 

@@ -61,4 +61,18 @@ public class AnalysisCase extends BaseEntity {
     public void confirmInput() {
         this.status = AnalysisCaseStatus.INPUT_CONFIRMED;
     }
+
+    // 초기 분석이 시작됐음을 표시하며, 이후 전체 파이프라인 완료 전까지 진행 상태를 유지한다.
+    public void startAnalyzing() {
+        if (this.status == AnalysisCaseStatus.INPUT_CONFIRMED) {
+            this.status = AnalysisCaseStatus.ANALYZING;
+        }
+    }
+
+    // 모든 JSON-05 결과가 원자적으로 저장된 경우에만 분석 작업을 완료한다.
+    public void complete() {
+        if (this.status == AnalysisCaseStatus.ANALYZING) {
+            this.status = AnalysisCaseStatus.COMPLETED;
+        }
+    }
 }
