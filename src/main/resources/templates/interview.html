@@ -45,8 +45,9 @@
         <button class="tabbar__btn" data-material-method="text">직접 입력</button>
       </div>
       <div data-material-method-panel="file">
-        <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input" id="material-register-file">
-        <p class="file-name-preview">PDF, JPG, PNG 파일만 가능하며 최대 10MB까지 업로드할 수 있습니다.</p>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input" id="material-register-file" multiple>
+        <p class="file-name-preview">PDF는 1개, 이미지는 여러 장(최대 20장)을 한 번에 선택할 수 있습니다. 파일당 최대 10MB, 전체 20MB까지 업로드할 수 있습니다.</p>
+        <p class="file-name-preview" id="material-register-file-list"></p>
       </div>
       <div data-material-method-panel="text" hidden>
         <textarea class="textarea-input" id="material-register-content" style="height:180px;" placeholder="내용을 직접 입력해주세요"></textarea>

@@ -9,6 +9,13 @@ spring:
     username:
     password:
     driver-class-name: org.mariadb.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
   security:
     oauth2:
       client:
@@ -35,18 +42,10 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
   servlet:
     multipart:
       max-file-size: 10MB
-      max-request-size: 10MB
+      max-request-size: 20MB
 
   mail:
     host: smtp.naver.com
@@ -75,3 +74,6 @@ app:
   ocr:
     google-vision:
       credentials-path: ./credentials/google-vision-service-account.json
+
+evaluation:
+  pass-threshold: 70

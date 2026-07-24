@@ -177,6 +177,7 @@
     renderRegisterCategoryGrid();
     document.getElementById('register-name').value = '';
     document.getElementById('register-file').value = '';
+    document.getElementById('register-file-list').textContent = '';
     document.getElementById('register-content').value = '';
     document.getElementById('register-keep-original').checked = false;
     document.querySelectorAll('#register-modal [data-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.method === 'file'); });
@@ -216,6 +217,9 @@
     document.getElementById('open-register').addEventListener('click', openRegisterModal);
     document.getElementById('register-close').addEventListener('click', function () { document.getElementById('register-modal').hidden = true; });
     document.getElementById('register-cancel').addEventListener('click', function () { document.getElementById('register-modal').hidden = true; });
+    document.getElementById('register-file').addEventListener('change', function () {
+      document.getElementById('register-file-list').textContent = DF.describeSelectedFiles(this.files);
+    });
     document.querySelectorAll('#register-modal [data-method]').forEach(function (b) {
       b.addEventListener('click', function () {
         state.registerMethod = b.dataset.method;
@@ -231,10 +235,10 @@
       if (!category || !name) { alert('자료 종류와 자료명을 입력해주세요.'); return; }
 
       if (state.registerMethod === 'file') {
-        var file = document.getElementById('register-file').files[0];
-        if (!file) { alert('파일을 선택해주세요.'); return; }
+        var files = document.getElementById('register-file').files;
+        if (!files.length) { alert('파일을 선택해주세요.'); return; }
         var keepOriginal = document.getElementById('register-keep-original').checked;
-        DF.registerDocument({ method: 'file', category: category, name: name, file: file, keepOriginal: keepOriginal })
+        DF.registerDocument({ method: 'file', category: category, name: name, files: files, keepOriginal: keepOriginal })
           .then(function (doc) {
             document.getElementById('register-modal').hidden = true;
             state.docsPage = 0;

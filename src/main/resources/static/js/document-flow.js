@@ -73,13 +73,20 @@
     return pages.map(function (text, idx) { return '[' + (idx + 1) + '페이지]\n' + text; }).join('\n\n');
   }
 
+  // 선택된 파일 목록을 안내 텍스트로 요약 (이미지 여러 장 선택 시 파일명 나열)
+  function describeSelectedFiles(files) {
+    if (!files || files.length === 0) return '';
+    if (files.length === 1) return '선택됨: ' + files[0].name;
+    return files.length + '개 파일 선택됨: ' + Array.prototype.map.call(files, function (f) { return f.name; }).join(', ');
+  }
+
   // 파일 업로드(등록 + 자동 추출 트리거) 또는 직접 입력으로 자료 등록
   function registerDocument(opts) {
     var category = opts.category;
     var name = opts.name;
     if (opts.method === 'file') {
       var fd = new FormData();
-      fd.append('file', opts.file);
+      for (var i = 0; i < opts.files.length; i++) fd.append('files', opts.files[i]);
       fd.append('documentType', category);
       fd.append('displayName', name);
       fd.append('keepOriginal', !!opts.keepOriginal);
@@ -327,6 +334,7 @@
     splitPages: splitPages,
     hasPageMarkers: hasPageMarkers,
     joinPages: joinPages,
+    describeSelectedFiles: describeSelectedFiles,
     registerDocument: registerDocument,
     pollExtraction: pollExtraction,
     createExtractPanel: createExtractPanel
