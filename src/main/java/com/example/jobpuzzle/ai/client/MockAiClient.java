@@ -17,8 +17,6 @@ import com.example.jobpuzzle.analysis.entity.RequirementType;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
-import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
-import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,9 +46,44 @@ public class MockAiClient implements AiClient {
         List<JobPostingAnalysisResult.Item> tasks = markers.isEmpty() ? List.of() : List.of(
                 JobPostingAnalysisResult.Item.builder().itemId("task-001").text(excerpt(markers.get(0))).sourceRefs(List.of(reference(markers.get(0)))).build()
         );
+
+        AnalysisSourceMarkerParser.SourceMarker postingMarker = markers.stream()
+                .filter(marker -> marker.documentType()
+                        == com.example.jobpuzzle.document.entity.UserDocumentType.JOB_POSTING)
+                .findFirst()
+                .orElse(null);
+
+        List<JobPostingAnalysisResult.Requirement> requirements =
+                postingMarker == null
+                        ? List.of()
+                        : List.of(
+                        JobPostingAnalysisResult.Requirement.builder()
+                                .requirementId("requirement-001")
+                                .text("Java 및 Spring Boot 기반 백엔드 개발 경험")
+                                .sourceRefs(List.of(reference(postingMarker)))
+                                .build()
+                );
+
+        List<JobPostingAnalysisResult.Requirement> preferred =
+                postingMarker == null
+                        ? List.of()
+                        : List.of(
+                        JobPostingAnalysisResult.Requirement.builder()
+                                .requirementId("preferred-001")
+                                .text("테스트 코드 작성 및 배포 경험")
+                                .sourceRefs(List.of(reference(postingMarker)))
+                                .build()
+                );
+
         return json(JobPostingAnalysisResult.builder()
-                .mainTasks(tasks).requirements(List.of()).preferred(List.of()).companyValues(List.of())
-                .coreCompetencies(List.of()).conflicts(List.of()).missingEvidence(List.of()).build());
+                .mainTasks(tasks)
+                .requirements(requirements)
+                .preferred(preferred)
+                .companyValues(List.of())
+                .coreCompetencies(List.of())
+                .conflicts(List.of())
+                .missingEvidence(List.of())
+                .build());
     }
 
     // 선택된 지원자 자료 marker가 있을 때만 해당 문서 유형의 구조화 항목을 만든다.
@@ -167,11 +200,15 @@ public class MockAiClient implements AiClient {
             result.getResume().getResults().forEach(value -> refs.addAll(value.getSourceRefs()));
         }
         if (result.getCoverLetter() != null) {
-            addSummaryRefs(refs, result.getCoverLetter().getMotivation()); addSummaryRefs(refs, result.getCoverLetter().getValues());
-            result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummaryRefs(refs, value)); addSummaryRefs(refs, result.getCoverLetter().getJobConnection());
+            addSummaryRefs(refs, result.getCoverLetter().getMotivation());
+            addSummaryRefs(refs, result.getCoverLetter().getValues());
+            result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummaryRefs(refs, value));
+            addSummaryRefs(refs, result.getCoverLetter().getJobConnection());
         }
-        if (result.getPortfolio() != null) result.getPortfolio().getProjects().forEach(value -> refs.addAll(value.getSourceRefs()));
-        if (result.getExperienceNote() != null) result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
+        if (result.getPortfolio() != null)
+            result.getPortfolio().getProjects().forEach(value -> refs.addAll(value.getSourceRefs()));
+        if (result.getExperienceNote() != null)
+            result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
         return refs;
     }
 
@@ -180,17 +217,24 @@ public class MockAiClient implements AiClient {
     }
 
     private <T> T readSection(String prompt, String name, Class<T> type) {
-        try { return objectMapper.readValue(section(prompt, name), type); }
-        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+        try {
+            return objectMapper.readValue(section(prompt, name), type);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid mock input section: " + name);
+        }
     }
 
     private JsonNode readSectionTree(String prompt, String name) {
-        try { return objectMapper.readTree(section(prompt, name)); }
-        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+        try {
+            return objectMapper.readTree(section(prompt, name));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid mock input section: " + name);
+        }
     }
 
     private String section(String prompt, String name) {
-        String start = "<" + name + ">"; String end = "</" + name + ">";
+        String start = "<" + name + ">";
+        String end = "</" + name + ">";
         int opening = findTagOutsideJsonString(prompt, start, 0);
         if (opening < 0) throw new IllegalArgumentException("missing mock input opening tag: " + name);
         if (findTagOutsideJsonString(prompt, end, 0) >= 0 && findTagOutsideJsonString(prompt, end, 0) < opening) {
@@ -219,13 +263,18 @@ public class MockAiClient implements AiClient {
                 else if (character == '"') quoted = false;
                 continue;
             }
-            if (character == '"') { quoted = true; continue; }
+            if (character == '"') {
+                quoted = true;
+                continue;
+            }
             if (index >= fromIndex && value.startsWith(tag, index)) return index;
         }
         return -1;
     }
 
-    private record RequirementInput(String requirementId, RequirementType requirementType, String requirement, List<SourceReference> sourceRefs) { }
+    private record RequirementInput(String requirementId, RequirementType requirementType, String requirement,
+                                    List<SourceReference> sourceRefs) {
+    }
 
     private <T> T markerOf(List<AnalysisSourceMarkerParser.SourceMarker> markers, com.example.jobpuzzle.document.entity.UserDocumentType type,
                            java.util.function.Function<AnalysisSourceMarkerParser.SourceMarker, T> mapper) {
@@ -315,63 +364,78 @@ public class MockAiClient implements AiClient {
     @Override
     public FinalReportResult finalReport(String prompt) {
         return FinalReportResult.builder()
-                .interviewMode(InterviewSessionMode.COMPANY_FIT)
-                .totalQuestionCount(10)
-                .submittedQuestionCount(4)
-                .evaluatedQuestionCount(3)
-                .evaluationFailedQuestionCount(1)
-                .skippedQuestionCount(6)
-                .completionRate(40)
                 .overallScore(78)
                 .scoreLabel("세션 종합 기준 충족도")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
-                                .intentMatch(81)
-                                .specificity(74)
-                                .ownRole(85)
+                                .companyRequirementFit(75)
+                                .experienceSpecificity(70)
+                                .roleClarity(85)
                                 .problemSolving(68)
-                                .resultExpression(62)
-                                .requirementConnection(75)
-                                .guideAlignment(72)
-                                .deliveryClarity(82)
-                                .build())
-                .basisSummary(
-                        FinalReportResult.BasisSummary.builder()
-                                .jobCategory("IT·개발 / 백엔드")
-                                .careerLevel(JobCategoryCareerLevel.NEW)
-                                .evaluationPassThreshold(70)
+                                .resultExpression(62).build())
+                .evidenceSummary(
+                        FinalReportResult.EvidenceSummary.builder()
+                                .requirementConnections(List.of(
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("Spring Boot 기반 백엔드 개발 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
+                                                .build(),
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("RDB 설계 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.MEDIUM)
+                                                .build(),
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("AWS 인프라 운영 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.NONE)
+                                                .build()
+                                ))
                                 .usedGuide(FinalReportResult.UsedGuide.builder()
                                         .guideId(12L)
                                         .version("v1.2")
                                         .build()
                                 )
-                                .requirementConnections(List.of(
-                                        FinalReportResult.RequirementConnections.builder()
-                                                .requirement("Spring Boot 기반 백엔드 개발 경험")
-                                                .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
-                                                .build()
+                                .missingEvidence(List.of(
+                                        "AWS 인프라 운영 경험 근거 없음",
+                                        "테스트 코드 작성 경험 근거 없음"
                                 ))
-                                .missingEvidence(List.of("성과 수치 근거 부족"))
-                                .targetWeaknessTag(null)
-                                .targetDimension(null)
-                                .originEvaluationIds(List.of())
                                 .build())
-                .weaknessTagSummary(List.of(
+                .weaknessTagSummaries(List.of(
                         FinalReportResult.WeaknessTagSummary.builder()
                                 .tag("RESULT_EXPRESSION_WEAK")
+                                .count(4).build(),
+                        FinalReportResult.WeaknessTagSummary.builder()
+                                .tag("PROBLEM_SOLVING_WEAK")
                                 .count(2).build()))
-                .nextPracticeRecommendation(List.of(
+                .nextPracticeRecommendations(List.of(
+                        FinalReportResult.NextPracticeRecommendation.builder()
+                                .questionType(InterviewQuestionType.EXPERIENCE)
+                                .reason("성과 표현 부족이 누적 확인됨").build(),
                         FinalReportResult.NextPracticeRecommendation.builder()
                                 .questionType(InterviewQuestionType.PROBLEM_SOLVING)
-                                .reason("해결 과정 설명 보완 필요").build()))
+                                .reason("문제 해결 과정 서술이 반복적으로 부족함").build()))
                 .improvementSuggestion(
                         FinalReportResult.ImprovementSuggestion.builder()
-                                .resume(List.of("담당 기능과 결과를 구체적으로 추가"))
-                                .coverLetter(List.of("직무 연결성을 보완"))
-                                .portfolio(List.of("문제 해결 과정을 별도 정리"))
-                                .experienceNote(List.of("성과를 포함해 STAR로 재정리"))
-                                .build())
-                .learningDirection(List.of("AWS 배포 기초 학습"))
+                                .resume(List.of(
+                                        "담당 API, 사용 기술, 정량적 결과를 구체적으로 추가",
+                                        "AWS 관련 실습 경험을 스킬 항목에 보완"
+                                ))
+                                .coverLetter(List.of(
+                                        "공고 요구사항과 프로젝트 경험 간 연결 서술 보강",
+                                        "지원 동기에 구체적인 기술적 문제 해결 사례 추가"
+                                ))
+                                .portfolio(List.of(
+                                        "문제 상황과 해결 과정을 별도 섹션으로 분리해 보완",
+                                        "사용 기술 선택 이유를 프로젝트별로 명시"
+                                ))
+                                .experienceNote(List.of(
+                                        "트래픽 증가 대응 경험을 STAR 구조(상황-과제-행동-결과)로 재정리",
+                                        "정량적 성과(응답시간, 처리량 등) 수치 추가"
+                                )).build())
+                .learningDirections(List.of(
+                                "AWS 배포 · 운영 실습 (EC2, S3 등) 후 포트폴리오에 사용 서비스 · 과정 · 문제해결 내용 추가",
+                                "문제 해결 경험을 정량적 성과 중심으로 서술하는 연습"
+                        )
+                )
                 .build();
     }
 

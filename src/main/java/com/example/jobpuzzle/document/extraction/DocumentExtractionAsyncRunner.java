@@ -34,7 +34,7 @@ public class DocumentExtractionAsyncRunner {
 
     @Async("documentExtractionExecutor")
     public void run(Long documentId) {
-        UserDocument document = userDocumentRepository.findById(documentId).orElse(null);
+        UserDocument document = userDocumentRepository.findWithFilesById(documentId).orElse(null);
         if (document == null) {
             log.warn("추출 대상 자료를 찾을 수 없습니다. documentId={}", documentId);
             return;
@@ -161,7 +161,7 @@ public class DocumentExtractionAsyncRunner {
 
     // 추출 진행 중 사용자가 원본 보관 설정을 바꿨을 수 있으므로 완료 시점에 최신 값을 다시 읽어 판단
     private void applyRetentionPolicy(Long documentId) {
-        UserDocument document = userDocumentRepository.findById(documentId).orElse(null);
+        UserDocument document = userDocumentRepository.findWithFilesById(documentId).orElse(null);
         if (document != null && !document.isKeepOriginal() && !document.getFiles().isEmpty()) {
             document.getFiles().forEach(file -> fileStorage.delete(file.getFilePath()));
             document.clearFiles();

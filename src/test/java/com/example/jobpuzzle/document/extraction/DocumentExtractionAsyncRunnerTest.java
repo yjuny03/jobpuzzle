@@ -54,7 +54,7 @@ class DocumentExtractionAsyncRunnerTest {
     @DisplayName("이미지 여러 장을 OCR로 읽어 [N페이지] 마커로 이어붙인다")
     void extractImage_multipleImages_success() throws IOException {
         UserDocument document = imageDocument(true, "cap1.png", "cap2.png");
-        when(userDocumentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(userDocumentRepository.findWithFilesById(1L)).thenReturn(Optional.of(document));
         when(fileStorage.load(anyString())).thenReturn(pngStream(), pngStream());
         when(ocrEngine.recognize(any())).thenReturn("첫번째 이미지 텍스트").thenReturn("두번째 이미지 텍스트");
 
@@ -72,7 +72,7 @@ class DocumentExtractionAsyncRunnerTest {
     @DisplayName("일부 이미지에서만 텍스트가 인식되면 PARTIAL로 저장된다")
     void extractImage_someImagesEmpty_partial() throws IOException {
         UserDocument document = imageDocument(true, "cap1.png", "cap2.png");
-        when(userDocumentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(userDocumentRepository.findWithFilesById(1L)).thenReturn(Optional.of(document));
         when(fileStorage.load(anyString())).thenReturn(pngStream(), pngStream());
         when(ocrEngine.recognize(any())).thenReturn("").thenReturn("두번째 이미지 텍스트");
 
@@ -89,7 +89,7 @@ class DocumentExtractionAsyncRunnerTest {
     @DisplayName("모든 이미지에서 텍스트를 인식하지 못하면 FAILED로 저장된다")
     void extractImage_allImagesEmpty_failed() throws IOException {
         UserDocument document = imageDocument(true, "cap1.png");
-        when(userDocumentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(userDocumentRepository.findWithFilesById(1L)).thenReturn(Optional.of(document));
         when(fileStorage.load(anyString())).thenReturn(pngStream());
         when(ocrEngine.recognize(any())).thenReturn(null);
 
@@ -104,7 +104,7 @@ class DocumentExtractionAsyncRunnerTest {
     @DisplayName("추출 완료 후 원본 보관을 꺼두면 자료에 딸린 파일이 전부 삭제된다")
     void applyRetentionPolicy_deletesAllFiles_whenKeepOriginalFalse() throws IOException {
         UserDocument document = imageDocument(false, "cap1.png", "cap2.png");
-        when(userDocumentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(userDocumentRepository.findWithFilesById(1L)).thenReturn(Optional.of(document));
         when(fileStorage.load(anyString())).thenReturn(pngStream(), pngStream());
         when(ocrEngine.recognize(any())).thenReturn("텍스트");
 
@@ -118,7 +118,7 @@ class DocumentExtractionAsyncRunnerTest {
     @DisplayName("원본 보관을 켜두면 파일이 삭제되지 않는다")
     void applyRetentionPolicy_keepsFiles_whenKeepOriginalTrue() throws IOException {
         UserDocument document = imageDocument(true, "cap1.png");
-        when(userDocumentRepository.findById(1L)).thenReturn(Optional.of(document));
+        when(userDocumentRepository.findWithFilesById(1L)).thenReturn(Optional.of(document));
         when(fileStorage.load(anyString())).thenReturn(pngStream());
         when(ocrEngine.recognize(any())).thenReturn("텍스트");
 
