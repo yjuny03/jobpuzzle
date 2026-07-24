@@ -5,9 +5,12 @@ import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult.*;
 import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
+import com.example.jobpuzzle.ai.dto.BasicQuestionGenerationInput;
+import com.example.jobpuzzle.ai.dto.InterviewQuestionGenerationResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult.*;
 import com.example.jobpuzzle.ai.dto.SourceReference;
+import com.example.jobpuzzle.ai.dto.WeaknessQuestionGenerationInput;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import com.example.jobpuzzle.ai.validation.AnalysisSourceMarkerParser;
 import com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel;
@@ -16,6 +19,7 @@ import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
 import com.example.jobpuzzle.analysis.entity.RequirementType;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
+import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -233,6 +237,94 @@ public class MockAiClient implements AiClient {
     private <T> T markerOfOrEmpty(List<AnalysisSourceMarkerParser.SourceMarker> markers, com.example.jobpuzzle.document.entity.UserDocumentType type,
                                   java.util.function.Function<AnalysisSourceMarkerParser.SourceMarker, T> mapper, T emptyValue) {
         return markerOf(markers, type, mapper) == null ? emptyValue : markerOf(markers, type, mapper);
+    }
+
+    // interview 추가: 실제 AI 대신 JSON-11 계약에 맞춘 결정적 기본 질문 5개를 반환한다.
+    @Override
+    public String generateBasicQuestions(String renderedPrompt) {
+        BasicQuestionGenerationInput input = readSection(
+                renderedPrompt,
+                "BASIC_INPUT",
+                BasicQuestionGenerationInput.class
+        );
+        String job = input.subCategory();
+        List<InterviewQuestionGenerationResult.Question> questions = List.of(
+                generatedQuestion("basic-self-intro", InterviewQuestionType.SELF_INTRO,
+                        job + " 직무와 연결하여 자기소개를 해주세요.",
+                        "직무와 연결된 핵심 경험과 강점 확인",
+                        List.of(InterviewQuestionEvaluationFocus.intentMatch,
+                                InterviewQuestionEvaluationFocus.deliveryClarity)),
+                generatedQuestion("basic-motivation", InterviewQuestionType.MOTIVATION,
+                        job + " 직무를 선택한 이유와 지원 동기를 설명해주세요.",
+                        "직무 선택 이유와 동기의 구체성 확인",
+                        List.of(InterviewQuestionEvaluationFocus.intentMatch,
+                                InterviewQuestionEvaluationFocus.guideAlignment)),
+                generatedQuestion("basic-strength-weakness", InterviewQuestionType.STRENGTH_WEAKNESS,
+                        "본인의 강점과 보완 중인 약점을 실제 경험과 함께 설명해주세요.",
+                        "자기 이해와 개선 행동 확인",
+                        List.of(InterviewQuestionEvaluationFocus.specificity,
+                                InterviewQuestionEvaluationFocus.ownRole)),
+                generatedQuestion("basic-failure-conflict", InterviewQuestionType.FAILURE_CONFLICT,
+                        "실패하거나 갈등을 겪었던 경험과 해결 과정을 설명해주세요.",
+                        "문제 해결 과정과 본인 역할 확인",
+                        List.of(InterviewQuestionEvaluationFocus.problemSolving,
+                                InterviewQuestionEvaluationFocus.resultExpression)),
+                generatedQuestion("basic-job-general", InterviewQuestionType.JOB_GENERAL,
+                        job + " 직무에 필요한 핵심 역량은 무엇이라고 생각하나요?",
+                        "직무 이해와 준비 수준 확인",
+                        List.of(InterviewQuestionEvaluationFocus.intentMatch,
+                                InterviewQuestionEvaluationFocus.guideAlignment))
+        );
+        return json(new InterviewQuestionGenerationResult(questions));
+    }
+
+    // interview 추가: 선택 태그의 최신 평가 1건마다 JSON-09 질문 1개를 반환한다.
+    @Override
+    public String generateWeaknessQuestions(String renderedPrompt) {
+        WeaknessQuestionGenerationInput input = readSection(
+                renderedPrompt,
+                "WEAKNESS_INPUT",
+                WeaknessQuestionGenerationInput.class
+        );
+        InterviewQuestionEvaluationFocus focus =
+                InterviewQuestionEvaluationFocus.valueOf(input.targetDimension());
+        List<InterviewQuestionGenerationResult.Question> questions = input.originEvaluations().stream()
+                .map(origin -> new InterviewQuestionGenerationResult.Question(
+                        "weakness-" + origin.evaluationId(),
+                        InterviewQuestionType.WEAKNESS_FOLLOWUP,
+                        "이전 답변에서 부족했던 " + input.targetWeaknessTag()
+                                + " 부분을 보완하여 다시 설명해주세요.",
+                        "이전 평가 " + origin.evaluationId() + "에서 확인된 약점 보완",
+                        List.of(focus),
+                        origin.evaluationId(),
+                        input.targetWeaknessTag(),
+                        input.targetDimension(),
+                        InterviewQuestionReviewStatus.PASS,
+                        null
+                ))
+                .toList();
+        return json(new InterviewQuestionGenerationResult(questions));
+    }
+
+    private InterviewQuestionGenerationResult.Question generatedQuestion(
+            String questionId,
+            InterviewQuestionType questionType,
+            String question,
+            String intent,
+            List<InterviewQuestionEvaluationFocus> evaluationFocus
+    ) {
+        return new InterviewQuestionGenerationResult.Question(
+                questionId,
+                questionType,
+                question,
+                intent,
+                evaluationFocus,
+                null,
+                null,
+                null,
+                InterviewQuestionReviewStatus.PASS,
+                null
+        );
     }
 
     private SourceReference reference(AnalysisSourceMarkerParser.SourceMarker marker) {
