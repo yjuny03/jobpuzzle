@@ -60,24 +60,37 @@ public class CustomizedSynthesisStageExecutor {
     private final long runningTimeoutSeconds;
 
     public CustomizedSynthesisStageExecutor(AnalysisInputSnapshotRepository snapshotRepository, JobPostingAnalysisRepository jobPostingRepository,
-                                             CandidateMaterialAnalysisRepository candidateRepository, GuideContextResultRepository guideContextRepository,
-                                             GuideContextChunkRepository guideContextChunkRepository, ReadinessResultRepository readinessRepository,
-                                             MatchAnalysisResultRepository matchRepository, ActionPlanRepository actionPlanRepository,
-                                             com.example.jobpuzzle.interview.repository.QuestionSetRepository questionSetRepository,
-                                             com.example.jobpuzzle.interview.repository.InterviewQuestionRepository questionRepository,
-                                             AiCallLogRepository aiCallLogRepository, PromptTemplateRepository promptTemplateRepository,
-                                             AiClientService aiClientService, PromptTemplateRenderer promptTemplateRenderer,
-                                             AiResponseProcessor aiResponseProcessor, CustomizedAnalysisResponseValidator responseValidator,
-                                             CustomizedAnalysisInputMapper inputMapper, CustomizedSynthesisResultWriter resultWriter, ObjectMapper objectMapper,
-                                             @Value("${app.ai.running-timeout-seconds}") long runningTimeoutSeconds,
-                                             PlatformTransactionManager transactionManager) {
-        this.snapshotRepository = snapshotRepository; this.jobPostingRepository = jobPostingRepository; this.candidateRepository = candidateRepository;
-        this.guideContextRepository = guideContextRepository; this.guideContextChunkRepository = guideContextChunkRepository;
-        this.readinessRepository = readinessRepository; this.matchRepository = matchRepository; this.actionPlanRepository = actionPlanRepository;
-        this.questionSetRepository = questionSetRepository; this.questionRepository = questionRepository; this.aiCallLogRepository = aiCallLogRepository;
-        this.promptTemplateRepository = promptTemplateRepository; this.aiClientService = aiClientService; this.promptTemplateRenderer = promptTemplateRenderer;
-        this.aiResponseProcessor = aiResponseProcessor; this.responseValidator = responseValidator; this.inputMapper = inputMapper;
-        this.resultWriter = resultWriter; this.objectMapper = objectMapper; this.runningTimeoutSeconds = runningTimeoutSeconds;
+                                            CandidateMaterialAnalysisRepository candidateRepository, GuideContextResultRepository guideContextRepository,
+                                            GuideContextChunkRepository guideContextChunkRepository, ReadinessResultRepository readinessRepository,
+                                            MatchAnalysisResultRepository matchRepository, ActionPlanRepository actionPlanRepository,
+                                            com.example.jobpuzzle.interview.repository.QuestionSetRepository questionSetRepository,
+                                            com.example.jobpuzzle.interview.repository.InterviewQuestionRepository questionRepository,
+                                            AiCallLogRepository aiCallLogRepository, PromptTemplateRepository promptTemplateRepository,
+                                            AiClientService aiClientService, PromptTemplateRenderer promptTemplateRenderer,
+                                            AiResponseProcessor aiResponseProcessor, CustomizedAnalysisResponseValidator responseValidator,
+                                            CustomizedAnalysisInputMapper inputMapper, CustomizedSynthesisResultWriter resultWriter, ObjectMapper objectMapper,
+                                            @Value("${app.ai.running-timeout-seconds}") long runningTimeoutSeconds,
+                                            PlatformTransactionManager transactionManager) {
+        this.snapshotRepository = snapshotRepository;
+        this.jobPostingRepository = jobPostingRepository;
+        this.candidateRepository = candidateRepository;
+        this.guideContextRepository = guideContextRepository;
+        this.guideContextChunkRepository = guideContextChunkRepository;
+        this.readinessRepository = readinessRepository;
+        this.matchRepository = matchRepository;
+        this.actionPlanRepository = actionPlanRepository;
+        this.questionSetRepository = questionSetRepository;
+        this.questionRepository = questionRepository;
+        this.aiCallLogRepository = aiCallLogRepository;
+        this.promptTemplateRepository = promptTemplateRepository;
+        this.aiClientService = aiClientService;
+        this.promptTemplateRenderer = promptTemplateRenderer;
+        this.aiResponseProcessor = aiResponseProcessor;
+        this.responseValidator = responseValidator;
+        this.inputMapper = inputMapper;
+        this.resultWriter = resultWriter;
+        this.objectMapper = objectMapper;
+        this.runningTimeoutSeconds = runningTimeoutSeconds;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -132,27 +145,33 @@ public class CustomizedSynthesisStageExecutor {
             }
             rejectSucceededLogWithoutResult(snapshotId);
             if (hasActiveExecution(snapshotId)) return null;
-            if (snapshot.getAnalysisCase().getStatus() != AnalysisCaseStatus.ANALYZING) throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);
+            if (snapshot.getAnalysisCase().getStatus() != AnalysisCaseStatus.ANALYZING)
+                throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);
             JobPostingAnalysis jobPosting = jobPostingRepository.findBySnapshot_SnapshotId(snapshotId).orElseThrow(() -> new IllegalStateException("JSON-01 result is missing"));
             CandidateMaterialAnalysis candidate = candidateRepository.findBySnapshot_SnapshotId(snapshotId).orElseThrow(() -> new IllegalStateException("JSON-02 result is missing"));
-            requireSucceeded(jobPosting.getAiCallLog(), "JSON-01"); requireSucceeded(candidate.getAiCallLog(), "JSON-02");
+            requireSucceeded(jobPosting.getAiCallLog(), "JSON-01");
+            requireSucceeded(candidate.getAiCallLog(), "JSON-02");
             GuideContextResult guide = guideContextRepository.findByPurposeAndInputReferenceTypeAndInputReferenceId(
-                    GuideContextPurpose.CUSTOMIZED_SYNTHESIS, GuideContextInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshotId))
+                            GuideContextPurpose.CUSTOMIZED_SYNTHESIS, GuideContextInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshotId))
                     .orElseThrow(() -> new IllegalStateException("JSON-04 result is missing"));
             PromptTemplate template = promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05")
                     .orElseThrow(() -> new CustomException(ErrorCode.AI_PROMPT_TEMPLATE_NOT_FOUND));
             JobPostingAnalysisResult jobDto = inputMapper.jobPosting(jobPosting);
             CandidateMaterialAnalysisResult candidateDto = inputMapper.candidate(candidate);
             GuideContextResultDto guideDto = GuideContextResultDto.from(guide, guideContextChunkRepository.findByGuideContextResult_GuideContextResultIdOrderByDisplayOrderAsc(guide.getGuideContextResultId()));
-            AiProvider provider = aiClientService.getProvider(); String model = aiClientService.getModel();
+            AiProvider provider = aiClientService.getProvider();
+            String model = aiClientService.getModel();
             String fingerprint = fingerprint(provider, model, template, guide, jobDto, candidateDto, guideDto);
             AiCallLog latest = aiCallLogRepository.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdAndInputFingerprintOrderByAiCallLogIdDesc(
                     AiExecutionStage.CUSTOMIZED_SYNTHESIS, AiInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshotId), fingerprint).orElse(null);
-            if (latest != null && stale(latest)) latest.fail(AiCallLogErrorType.STALE_RUNNING, "AI execution timed out");
-            else if (latest != null && (latest.getStatus() == AiCallLogStatus.RUNNING || latest.getStatus() == AiCallLogStatus.PENDING || latest.getStatus() == AiCallLogStatus.SUCCEEDED)) return null;
+            if (latest != null && stale(latest))
+                latest.fail(AiCallLogErrorType.STALE_RUNNING, "AI execution timed out");
+            else if (latest != null && (latest.getStatus() == AiCallLogStatus.RUNNING || latest.getStatus() == AiCallLogStatus.PENDING || latest.getStatus() == AiCallLogStatus.SUCCEEDED))
+                return null;
             AiCallLog log = AiCallLog.pending(provider, model, AiExecutionStage.CUSTOMIZED_SYNTHESIS, AiInputReferenceType.ANALYSIS_SNAPSHOT,
                     String.valueOf(snapshotId), fingerprint, template, guide.getGuide(), latest != null && latest.getStatus() == AiCallLogStatus.FAILED ? latest : null);
-            log.start(); aiCallLogRepository.saveAndFlush(log);
+            log.start();
+            aiCallLogRepository.saveAndFlush(log);
             return new Lease(snapshotId, log.getAiCallLogId(), template, jobDto, candidateDto, guide, guideDto,
                     snapshot.getJobCategory().getMainCategory(), snapshot.getJobCategory().getSubCategory(), snapshot.getJobCategory().getCareerLevel().name());
         });
@@ -164,9 +183,18 @@ public class CustomizedSynthesisStageExecutor {
         }));
     }
 
-    private AnalysisInputSnapshot lockedSnapshot(Long snapshotId) { return snapshotRepository.findWithLockBySnapshotId(snapshotId).orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND)); }
-    private void requireSucceeded(AiCallLog log, String stage) { if (log == null || log.getStatus() != AiCallLogStatus.SUCCEEDED || !Boolean.TRUE.equals(log.getValid())) throw new IllegalStateException(stage + " is not succeeded"); }
-    private boolean hasAnyJson05Result(Long id) { return readinessRepository.existsBySnapshot_SnapshotId(id) || matchRepository.existsBySnapshot_SnapshotId(id) || actionPlanRepository.existsBySnapshot_SnapshotId(id) || questionSetRepository.existsBySnapshot_SnapshotIdAndInterviewMode(id, com.example.jobpuzzle.interview.entity.InterviewSessionMode.COMPANY_FIT); }
+    private AnalysisInputSnapshot lockedSnapshot(Long snapshotId) {
+        return snapshotRepository.findWithLockBySnapshotId(snapshotId).orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND));
+    }
+
+    private void requireSucceeded(AiCallLog log, String stage) {
+        if (log == null || log.getStatus() != AiCallLogStatus.SUCCEEDED || !Boolean.TRUE.equals(log.getValid()))
+            throw new IllegalStateException(stage + " is not succeeded");
+    }
+
+    private boolean hasAnyJson05Result(Long id) {
+        return readinessRepository.existsBySnapshot_SnapshotId(id) || matchRepository.existsBySnapshot_SnapshotId(id) || actionPlanRepository.existsBySnapshot_SnapshotId(id) || questionSetRepository.existsBySnapshot_SnapshotIdAndInterviewMode(id, com.example.jobpuzzle.interview.entity.InterviewSessionMode.COMPANY_FIT);
+    }
 
     // fingerprint와 무관하게 같은 snapshot의 활성 실행은 하나만 허용한다.
     private boolean hasActiveExecution(Long snapshotId) {
@@ -203,8 +231,10 @@ public class CustomizedSynthesisStageExecutor {
             var questions = set == null ? List.<com.example.jobpuzzle.interview.entity.InterviewQuestion>of()
                     : questionRepository.findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(set.getQuestionSetId());
             if (set == null || !sameLog(resultLog, set.getAiCallLog()) || questions.isEmpty() || questions.size() > 10
-                    || questions.stream().anyMatch(question -> question.getReviewStatus() != com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS)) return false;
-        } else if (questionSetRepository.existsBySnapshot_SnapshotIdAndInterviewMode(id, com.example.jobpuzzle.interview.entity.InterviewSessionMode.COMPANY_FIT)) return false;
+                    || questions.stream().anyMatch(question -> question.getReviewStatus() != com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS))
+                return false;
+        } else if (questionSetRepository.existsBySnapshot_SnapshotIdAndInterviewMode(id, com.example.jobpuzzle.interview.entity.InterviewSessionMode.COMPANY_FIT))
+            return false;
         List<ActionPlan> actions = actionPlanRepository.findBySnapshot_SnapshotIdOrderByActionPlanIdAsc(id);
         return actions.stream().allMatch(value -> sameLog(resultLog, value.getAiCallLog()))
                 && matches.stream().filter(value -> value.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH)
@@ -217,20 +247,40 @@ public class CustomizedSynthesisStageExecutor {
         if (posting == null) return false;
         JobPostingAnalysisResult result = inputMapper.jobPosting(posting);
         java.util.Set<String> expected = new java.util.HashSet<>();
-        if (result.getRequirements() != null) result.getRequirements().forEach(value -> expected.add(value.getRequirementId()));
-        if (result.getPreferred() != null) result.getPreferred().forEach(value -> expected.add(value.getRequirementId()));
+        if (result.getRequirements() != null)
+            result.getRequirements().forEach(value -> expected.add(value.getRequirementId()));
+        if (result.getPreferred() != null)
+            result.getPreferred().forEach(value -> expected.add(value.getRequirementId()));
         java.util.Set<String> actual = matches.stream().map(MatchAnalysisResult::getRequirementId).collect(java.util.stream.Collectors.toSet());
         return expected.equals(actual) && expected.size() == matches.size();
     }
-    private boolean isSucceededCustomizedLog(AiCallLog log) { return log != null && log.getStatus() == AiCallLogStatus.SUCCEEDED && log.getExecutionStage() == AiExecutionStage.CUSTOMIZED_SYNTHESIS; }
-    private boolean sameLog(AiCallLog expected, AiCallLog actual) { return isSucceededCustomizedLog(actual) && expected.getAiCallLogId() != null && expected.getAiCallLogId().equals(actual.getAiCallLogId()); }
-    private boolean stale(AiCallLog log) { return (log.getStatus() == AiCallLogStatus.RUNNING || log.getStatus() == AiCallLogStatus.PENDING)
-            && log.getStartedAt() != null && log.getStartedAt().plusSeconds(runningTimeoutSeconds).isBefore(LocalDateTime.now()); }
-    private String fingerprint(AiProvider provider, String model, PromptTemplate template, GuideContextResult guide, Object job, Object candidate, Object guideDto) {
-        try { String value = AiExecutionStage.CUSTOMIZED_SYNTHESIS + "|" + provider + "|" + model + "|" + template.getPromptTemplateId() + "|" + template.getVersion() + "|" + (guide.getGuide() == null ? "null" : guide.getGuide().getGuideId()) + "|" + guide.getGuideVersion() + "|" + objectMapper.writeValueAsString(job) + "|" + objectMapper.writeValueAsString(candidate) + "|" + objectMapper.writeValueAsString(guideDto); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8))); }
-        catch (JsonProcessingException | NoSuchAlgorithmException exception) { throw new IllegalStateException("cannot create JSON-05 fingerprint", exception); }
+
+    private boolean isSucceededCustomizedLog(AiCallLog log) {
+        return log != null && log.getStatus() == AiCallLogStatus.SUCCEEDED && log.getExecutionStage() == AiExecutionStage.CUSTOMIZED_SYNTHESIS;
     }
-    private AiCallLogErrorType errorType(RuntimeException exception) { return exception instanceof AiProcessingException value ? value.getErrorType() : AiCallLogErrorType.PROVIDER_ERROR; }
+
+    private boolean sameLog(AiCallLog expected, AiCallLog actual) {
+        return isSucceededCustomizedLog(actual) && expected.getAiCallLogId() != null && expected.getAiCallLogId().equals(actual.getAiCallLogId());
+    }
+
+    private boolean stale(AiCallLog log) {
+        return (log.getStatus() == AiCallLogStatus.RUNNING || log.getStatus() == AiCallLogStatus.PENDING)
+                && log.getStartedAt() != null && log.getStartedAt().plusSeconds(runningTimeoutSeconds).isBefore(LocalDateTime.now());
+    }
+
+    private String fingerprint(AiProvider provider, String model, PromptTemplate template, GuideContextResult guide, Object job, Object candidate, Object guideDto) {
+        try {
+            String value = AiExecutionStage.CUSTOMIZED_SYNTHESIS + "|" + provider + "|" + model + "|" + template.getPromptTemplateId() + "|" + template.getVersion() + "|" + (guide.getGuide() == null ? "null" : guide.getGuide().getGuideId()) + "|" + guide.getGuideVersion() + "|" + objectMapper.writeValueAsString(job) + "|" + objectMapper.writeValueAsString(candidate) + "|" + objectMapper.writeValueAsString(guideDto);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8)));
+        } catch (JsonProcessingException | NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("cannot create JSON-05 fingerprint", exception);
+        }
+    }
+
+    private AiCallLogErrorType errorType(RuntimeException exception) {
+        return exception instanceof AiProcessingException value ? value.getErrorType() : AiCallLogErrorType.PROVIDER_ERROR;
+    }
+
     private String safeMessage(AiCallLogErrorType errorType, RuntimeException exception) {
         return switch (errorType) {
             case PROVIDER_ERROR -> "AI provider request failed";
@@ -243,6 +293,14 @@ public class CustomizedSynthesisStageExecutor {
             default -> "Customized analysis execution failed";
         };
     }
-    private CustomException integrityConflict() { return new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT); }
-    private record Lease(Long snapshotId, Long aiCallLogId, PromptTemplate promptTemplate, JobPostingAnalysisResult jobPosting, CandidateMaterialAnalysisResult candidate, GuideContextResult guideContext, GuideContextResultDto guideDto, String mainCategory, String subCategory, String careerLevel) { }
+
+    private CustomException integrityConflict() {
+        return new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
+    }
+
+    private record Lease(Long snapshotId, Long aiCallLogId, PromptTemplate promptTemplate,
+                         JobPostingAnalysisResult jobPosting, CandidateMaterialAnalysisResult candidate,
+                         GuideContextResult guideContext, GuideContextResultDto guideDto, String mainCategory,
+                         String subCategory, String careerLevel) {
+    }
 }

@@ -67,6 +67,11 @@ public class AnalysisSourceMarkerParser {
         if (documentType == null || text == null) {
             return List.of();
         }
+
+        // 프롬프트와 DB 원문의 줄바꿈 형식을 동일하게 맞춘다.
+        text = text.replace("\r\n", "\n")
+                .replace("\r", "\n");
+
         List<SourceMarker> markers = new ArrayList<>();
         List<MarkerMatch> matches = new ArrayList<>();
         Matcher matcher = MARKER.matcher(text);
