@@ -133,6 +133,11 @@ public class User extends BaseEntity {
         this.defaultJobCategory = defaultJobCategory;
     }
 
+    // 비밀번호 재설정 - encodedPassword는 암호화된 값이어야 함
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     // 회원 탈퇴 처리 - 상태만 WITHDRAWN으로 바꾸고 탈퇴 시각 기록 (실제 데이터 삭제는 안 함)
     public void withdraw() {
         this.status = UserStatus.WITHDRAWN;
@@ -151,5 +156,12 @@ public class User extends BaseEntity {
     // 로그인 성공 시 호출 - 실패 횟수 초기화
     public void resetLoginFailCount() {
         this.loginFailCount = 0;
+    }
+
+    // 이메일 인증을 통한 계정 잠금 해제 - 실패 횟수/잠금 상태/잠긴 시각을 모두 초기화
+    public void unlock() {
+        this.loginFailCount = 0;
+        this.isLocked = false;
+        this.lockedAt = null;
     }
 }

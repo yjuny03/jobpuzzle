@@ -32,6 +32,9 @@ public class UserDocument extends BaseEntity {
     @Column(name = "source_type", nullable = false, length = 20)
     private UserDocumentSourceType sourceType;
 
+    @Column(name = "display_name", nullable = false, length = 255)
+    private String displayName;
+
     @Column(name = "file_path", length = 500)
     private String filePath;
 
@@ -41,12 +44,6 @@ public class UserDocument extends BaseEntity {
     @Column(name = "keep_original", nullable = false)
     private boolean keepOriginal = false;
 
-    @Column(name = "version", nullable = false)
-    private int version = 1;
-
-    @Column(name = "is_latest", nullable = false)
-    private boolean isLatest = true;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -55,27 +52,29 @@ public class UserDocument extends BaseEntity {
             User user,
             UserDocumentType documentType,
             UserDocumentSourceType sourceType,
+            String displayName,
             String filePath,
             String fileName,
-            boolean keepOriginal,
-            int version
+            boolean keepOriginal
     ) {
         this.user = user;
         this.documentType = documentType;
         this.sourceType = sourceType;
+        this.displayName = displayName;
         this.filePath = filePath;
         this.fileName = fileName;
         this.keepOriginal = keepOriginal;
-        this.version = version <= 0 ? 1 : version;
-        this.isLatest = true;
     }
 
-    public void markAsPreviousVersion() {
-        this.isLatest = false;
+    public void updateKeepOriginal(boolean keepOriginal) {
+        this.keepOriginal = keepOriginal;
+    }
+
+    public void clearFilePath() {
+        this.filePath = null;
     }
 
     public void softDelete() {
         this.deletedAt = LocalDateTime.now();
-        this.isLatest = false;
     }
 }

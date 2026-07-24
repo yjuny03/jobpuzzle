@@ -1,18 +1,29 @@
 package com.example.jobpuzzle.analysis.entity;
 
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
+import com.example.jobpuzzle.ai.dto.SourceReference;
 import com.example.jobpuzzle.ai.log.AiCallLog;
-import com.example.jobpuzzle.document.entity.UserDocument;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.example.jobpuzzle.global.common.BaseEntity;
-import com.example.jobpuzzle.jobcategory.entity.JobCategory;
-import com.example.jobpuzzle.user.entity.User;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.List;
+import java.util.function.Function;
 
 @Getter
 @Entity
@@ -25,278 +36,335 @@ public class CandidateMaterialAnalysis extends BaseEntity {
     @Column(name = "analysis_id")
     private Long analysisId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_category_id", nullable = false)
-    private JobCategory jobCategory;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "resume_document_id")
-    private UserDocument resumeDocument;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cover_letter_document_id")
-    private UserDocument coverLetterDocument;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "portfolio_document_id")
-    private UserDocument portfolioDocument;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "experience_note_document_id")
-    private UserDocument experienceNoteDocument;
+    // JSON-02 결과는 분석 입력 스냅샷 하나당 정확히 한 건만 저장한다.
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "snapshot_id", nullable = false, unique = true)
+    private AnalysisInputSnapshot snapshot;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "resume_analysis",columnDefinition = "json")
+    @Column(name = "available_document_types", nullable = false, columnDefinition = "json")
+    private List<UserDocumentType> availableDocumentTypes;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resume_analysis", columnDefinition = "json")
     private Resume resumeAnalysis;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "cover_letter_analysis",columnDefinition = "json")
+    @Column(name = "cover_letter_analysis", columnDefinition = "json")
     private CoverLetter coverLetterAnalysis;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "portfolio_analysis",columnDefinition = "json")
+    @Column(name = "portfolio_analysis", columnDefinition = "json")
     private Portfolio portfolioAnalysis;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "experience_note_analysis",columnDefinition = "json")
+    @Column(name = "experience_note_analysis", columnDefinition = "json")
     private ExperienceNote experienceNoteAnalysis;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "missing_evidence",columnDefinition = "json")
-    private List<String> missingEvidence;
-
-    @Column(name= "is_edited",nullable = false)
-    private boolean isEdited = false;
+    @Column(name = "missing_evidence", columnDefinition = "json")
+    private List<MissingEvidence> missingEvidence;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ai_call_log_id")
+    @JoinColumn(name = "ai_call_log_id", nullable = false)
     private AiCallLog aiCallLog;
 
     @Builder
     private CandidateMaterialAnalysis(
-            User user,
-            JobCategory jobCategory,
-            UserDocument resumeDocument,
-            UserDocument coverLetterDocument,
-            UserDocument portfolioDocument,
-            UserDocument experienceNoteDocument,
+            AnalysisInputSnapshot snapshot,
+            List<UserDocumentType> availableDocumentTypes,
             Resume resumeAnalysis,
             CoverLetter coverLetterAnalysis,
             Portfolio portfolioAnalysis,
             ExperienceNote experienceNoteAnalysis,
-            List<String> missingEvidence,
+            List<MissingEvidence> missingEvidence,
             AiCallLog aiCallLog
-    ){
-        this.user = user;
-        this.jobCategory = jobCategory;
-        this.resumeDocument = resumeDocument;
-        this.coverLetterDocument = coverLetterDocument;
-        this.portfolioDocument = portfolioDocument;
-        this.experienceNoteDocument = experienceNoteDocument;
+    ) {
+        this.snapshot = snapshot;
+        this.availableDocumentTypes = availableDocumentTypes;
         this.resumeAnalysis = resumeAnalysis;
         this.coverLetterAnalysis = coverLetterAnalysis;
         this.portfolioAnalysis = portfolioAnalysis;
         this.experienceNoteAnalysis = experienceNoteAnalysis;
         this.missingEvidence = missingEvidence;
-        this.isEdited = false;
         this.aiCallLog = aiCallLog;
     }
 
-    /*
-     * AI 응답 DTO의 중첩 객체를 엔티티에서 그대로 사용하면,
-     * AI 응답 구조 변경 시 기존 DB JSON 저장 구조에도 직접 영향을 줄 수 있다.
-     * 따라서 AI 응답 DTO와 DB 저장 모델을 분리하고, from()을 통해 저장용 객체로 변환한다.
-     */
+    // AI 응답 계약을 DB 저장 값으로 명시적으로 변환한다.
+    public static CandidateMaterialAnalysis from(
+            AnalysisInputSnapshot snapshot,
+            CandidateMaterialAnalysisResult result,
+            AiCallLog aiCallLog
+    ) {
+        return CandidateMaterialAnalysis.builder()
+                .snapshot(snapshot)
+                .availableDocumentTypes(copy(result.getAvailableDocumentTypes()))
+                .resumeAnalysis(Resume.from(result.getResume()))
+                .coverLetterAnalysis(CoverLetter.from(result.getCoverLetter()))
+                .portfolioAnalysis(Portfolio.from(result.getPortfolio()))
+                .experienceNoteAnalysis(ExperienceNote.from(result.getExperienceNote()))
+                .missingEvidence(map(result.getMissingEvidence(), MissingEvidence::from))
+                .aiCallLog(aiCallLog)
+                .build();
+    }
+
+    private static <T> List<T> copy(List<T> values) {
+        return values == null ? List.of() : List.copyOf(values);
+    }
+
+    private static <S, T> List<T> map(List<S> values, Function<S, T> mapper) {
+        return values == null ? List.of() : values.stream().map(mapper).toList();
+    }
+
+    private static List<AnalysisSourceReference> sourceRefs(List<SourceReference> values) {
+        return map(values, AnalysisSourceReference::from);
+    }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Resume{
+    public static class Resume {
         private List<Experience> experiences;
-        private List<String> skills;
-        private List<String> roles;
-        private List<String> results;
+        private List<Skill> skills;
+        private List<Role> roles;
+        private List<Result> results;
 
-        public static Resume from(
-                CandidateMaterialAnalysisResult.Resume result
-        ) {
-            // 입력값이 null 일 경우 NullPointerException 발생
-            if (result == null) {
+        public static Resume from(CandidateMaterialAnalysisResult.Resume resume) {
+            if (resume == null) {
                 return null;
             }
-            // AI 응답의 하위 객체 목록을 DB 저장용 하위 객체 목록으로 변환
             return Resume.builder()
-                    .experiences(
-                            result.getExperiences() == null
-                                    ? List.of()
-                                    : result.getExperiences().stream()
-                                    .map(Experience::from)
-                                    .toList()
-                    )
-                    .skills(result.getSkills())
-                    .roles(result.getRoles())
-                    .results(result.getResults())
+                    .experiences(map(resume.getExperiences(), Experience::from))
+                    .skills(map(resume.getSkills(), Skill::from))
+                    .roles(map(resume.getRoles(), Role::from))
+                    .results(map(resume.getResults(), Result::from))
                     .build();
         }
     }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Experience{
+    public static class Experience {
+        private String experienceId;
         private String title;
         private String period;
+        private String summary;
+        private List<AnalysisSourceReference> sourceRefs;
 
-        public static Experience from(
-                CandidateMaterialAnalysisResult.Experience result
-        ) {
-            if (result == null) {
-                return null;
-            }
+        public static Experience from(CandidateMaterialAnalysisResult.Experience experience) {
             return Experience.builder()
-                    .title(result.getTitle())
-                    .period(result.getPeriod())
+                    .experienceId(experience.getExperienceId())
+                    .title(experience.getTitle())
+                    .period(experience.getPeriod())
+                    .summary(experience.getSummary())
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(experience.getSourceRefs()))
                     .build();
         }
     }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class CoverLetter{
-        private String motivation;
-        private String values;
-        private List<String> experienceNarratives;
-        private String jobConnection;
+    public static class Skill {
+        private String skill;
+        private String usageContext;
+        private List<AnalysisSourceReference> sourceRefs;
 
-        public static CoverLetter from(CandidateMaterialAnalysisResult.CoverLetter result){
-            if (result == null) {
-                return null;
-            }
-
-            return CoverLetter.builder()
-                    .motivation(result.getMotivation())
-                    .values(result.getValues())
-                    .experienceNarratives(result.getExperienceNarratives())
-                    .jobConnection(result.getJobConnection())
+        public static Skill from(CandidateMaterialAnalysisResult.Skill skill) {
+            return Skill.builder()
+                    .skill(skill.getSkill())
+                    .usageContext(skill.getUsageContext())
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(skill.getSourceRefs()))
                     .build();
         }
     }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Portfolio{
-        private List<ProjectStructure> projectStructure;
-        private List<String> contributions;
-        private List<String> techUsageReason;
-        private List<String> outputs;
-
-        // AI 응답의 하위 객체 목록을 DB 저장용 하위 객체 목록으로 변환
-        public static Portfolio from (CandidateMaterialAnalysisResult.Portfolio result){
-            if (result == null) {
-                return null;
-            }
-
-            return Portfolio.builder()
-                    .projectStructure(
-                            result.getProjectStructure() == null
-                            ? List.of()
-                            : result.getProjectStructure().stream()
-                                    .map(ProjectStructure::from)
-                                    .toList())
-                    .contributions(result.getContributions())
-                    .techUsageReason(result.getTechUsageReason())
-                    .outputs(result.getOutputs())
-                    .build();
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class ProjectStructure{
-        private String projectName;
+    public static class Role {
         private String role;
+        private String context;
+        private List<AnalysisSourceReference> sourceRefs;
 
-        public static ProjectStructure from(CandidateMaterialAnalysisResult.ProjectStructure result){
-            if (result == null) {
-                return null;
-            }
-
-            return ProjectStructure.builder()
-                    .projectName(result.getProjectName())
-                    .role(result.getRole())
+        public static Role from(CandidateMaterialAnalysisResult.Role role) {
+            return Role.builder()
+                    .role(role.getRole())
+                    .context(role.getContext())
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(role.getSourceRefs()))
                     .build();
         }
     }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class Result {
+        private String result;
+        private List<AnalysisSourceReference> sourceRefs;
+
+        public static Result from(CandidateMaterialAnalysisResult.Result result) {
+            return Result.builder()
+                    .result(result.getResult())
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(result.getSourceRefs()))
+                    .build();
+        }
+    }
+
+    @Getter
     @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class ExperienceNote{
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CoverLetter {
+        private SummaryEvidence motivation;
+        private SummaryEvidence values;
+        private List<SummaryEvidence> experienceNarratives;
+        private SummaryEvidence jobConnection;
+
+        public static CoverLetter from(CandidateMaterialAnalysisResult.CoverLetter coverLetter) {
+            if (coverLetter == null) {
+                return null;
+            }
+            return CoverLetter.builder()
+                    .motivation(SummaryEvidence.from(coverLetter.getMotivation()))
+                    .values(SummaryEvidence.from(coverLetter.getValues()))
+                    .experienceNarratives(map(
+                            coverLetter.getExperienceNarratives(),
+                            SummaryEvidence::from
+                    ))
+                    .jobConnection(SummaryEvidence.from(coverLetter.getJobConnection()))
+                    .build();
+        }
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SummaryEvidence {
+        private String summary;
+        private List<AnalysisSourceReference> sourceRefs;
+
+        public static SummaryEvidence from(CandidateMaterialAnalysisResult.SummaryEvidence evidence) {
+            if (evidence == null) {
+                return null;
+            }
+            return SummaryEvidence.builder()
+                    .summary(evidence.getSummary())
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(evidence.getSourceRefs()))
+                    .build();
+        }
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Portfolio {
+        private List<Project> projects;
+
+        public static Portfolio from(CandidateMaterialAnalysisResult.Portfolio portfolio) {
+            if (portfolio == null) {
+                return null;
+            }
+            return Portfolio.builder()
+                    .projects(map(portfolio.getProjects(), Project::from))
+                    .build();
+        }
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Project {
+        private String projectId;
+        private String projectName;
+        private String structure;
+        private String role;
+        private List<String> contributions;
+        private List<String> techUsageReasons;
+        private List<String> problemSolving;
+        private List<String> outputs;
+        private List<AnalysisSourceReference> sourceRefs;
+
+        public static Project from(CandidateMaterialAnalysisResult.Project project) {
+            return Project.builder()
+                    .projectId(project.getProjectId())
+                    .projectName(project.getProjectName())
+                    .structure(project.getStructure())
+                    .role(project.getRole())
+                    .contributions(copy(project.getContributions()))
+                    .techUsageReasons(copy(project.getTechUsageReasons()))
+                    .problemSolving(copy(project.getProblemSolving()))
+                    .outputs(copy(project.getOutputs()))
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(project.getSourceRefs()))
+                    .build();
+        }
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExperienceNote {
         private List<StarCandidate> starCandidates;
 
-        // AI 응답의 하위 객체 목록을 DB 저장용 하위 객체 목록으로 변환
-        public static ExperienceNote from(CandidateMaterialAnalysisResult.ExperienceNote result){
-            if (result == null) {
+        public static ExperienceNote from(CandidateMaterialAnalysisResult.ExperienceNote experienceNote) {
+            if (experienceNote == null) {
                 return null;
             }
-
             return ExperienceNote.builder()
-                    .starCandidates(
-                            result.getStarCandidates() == null
-                            ? List.of()
-                                    : result.getStarCandidates().stream()
-                                    .map(StarCandidate::from)
-                                    .toList()
-                    )
+                    .starCandidates(map(experienceNote.getStarCandidates(), StarCandidate::from))
                     .build();
         }
     }
 
     @Getter
-    @Setter
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class StarCandidate {
+        private String candidateId;
         private String situation;
         private String task;
+        private String action;
+        private String result;
+        private List<CandidateMaterialAnalysisResult.StarMissingPart> missingParts;
+        private List<AnalysisSourceReference> sourceRefs;
 
-        public static StarCandidate from(CandidateMaterialAnalysisResult.StarCandidate result){
-            if (result == null) {
-                return null;
-            }
-
+        public static StarCandidate from(CandidateMaterialAnalysisResult.StarCandidate candidate) {
             return StarCandidate.builder()
-                    .situation(result.getSituation())
-                    .task(result.getTask())
+                    .candidateId(candidate.getCandidateId())
+                    .situation(candidate.getSituation())
+                    .task(candidate.getTask())
+                    .action(candidate.getAction())
+                    .result(candidate.getResult())
+                    .missingParts(copy(candidate.getMissingParts()))
+                    .sourceRefs(CandidateMaterialAnalysis.sourceRefs(candidate.getSourceRefs()))
                     .build();
         }
     }
 
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MissingEvidence {
+        private String item;
+        private String reason;
+
+        public static MissingEvidence from(CandidateMaterialAnalysisResult.MissingEvidence missing) {
+            return MissingEvidence.builder()
+                    .item(missing.getItem())
+                    .reason(missing.getReason())
+                    .build();
+        }
+    }
 }

@@ -2,10 +2,20 @@ package com.example.jobpuzzle.user.controller;
 
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.dto.AccountUnlockSendRequest;
+import com.example.jobpuzzle.user.dto.AccountUnlockVerifyRequest;
+import com.example.jobpuzzle.user.dto.EmailSendRequest;
+import com.example.jobpuzzle.user.dto.EmailVerifyRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailSendRequest;
+import com.example.jobpuzzle.user.dto.JoinEmailVerifyRequest;
 import com.example.jobpuzzle.user.dto.JoinRequest;
 import com.example.jobpuzzle.user.dto.LoginRequest;
 import com.example.jobpuzzle.user.dto.MyInfoUpdateRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetSendRequest;
+import com.example.jobpuzzle.user.dto.PasswordResetVerifyRequest;
 import com.example.jobpuzzle.user.dto.UserInfoResponse;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +44,22 @@ public class UserController {
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<Void>> join(@Valid @RequestBody JoinRequest request) {
         userService.join(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 발송
+    // POST /api/user/join/send-code { email }
+    @PostMapping("/join/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendJoinEmailCode(@Valid @RequestBody JoinEmailSendRequest request) {
+        userService.sendJoinEmailCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
+    // POST /api/user/join/verify { email, code }
+    @PostMapping("/join/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyJoinEmailCode(@Valid @RequestBody JoinEmailVerifyRequest request) {
+        userService.verifyJoinEmailCode(request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -73,27 +99,86 @@ public class UserController {
 
     // 내 정보 조회 - 로그인된 사용자만 호출 가능 (프론트에서 로그인 상태 판단할 때도 사용)
     // GET /api/user/me
+    // expression="user"로 받는 이유: 아이디/비번 로그인은 CustomUserDetails, 카카오/구글 로그인은 CustomOAuth2User가
+    // principal로 들어오는데, 두 타입 다 getUser()를 갖고 있어서 SpEL로 공통 추출함
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(ApiResponse.success(userService.getMyInfo(userDetails)));
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(
+            @AuthenticationPrincipal(expression = "user") User user) {
+        return ResponseEntity.ok(ApiResponse.success(userService.getMyInfo(user)));
     }
 
     // 내 정보 수정 - 이름/이메일/기본 관심 직무
     // PUT /api/user/me { name, email, defaultJobCategoryId }
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<Void>> updateMyInfo(@Valid @RequestBody MyInfoUpdateRequest request,
-                                                            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        userService.updateMyInfo(request, userDetails);
+                                                            @AuthenticationPrincipal(expression = "user") User user) {
+        userService.updateMyInfo(request, user);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // 회원 탈퇴
     // DELETE /api/user/me - 상태를 WITHDRAWN으로 바꾸고 로그인 상태도 함께 해제
     @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> withdraw(@AuthenticationPrincipal CustomUserDetails userDetails,
+    public ResponseEntity<ApiResponse<Void>> withdraw(@AuthenticationPrincipal(expression = "user") User user,
                                                         HttpServletRequest httpRequest,
                                                         HttpServletResponse httpResponse) {
-        userService.withdraw(userDetails, httpRequest, httpResponse);
+        userService.withdraw(user, httpRequest, httpResponse);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 발송
+    // POST /api/user/find-id/send-code { email }
+    @PostMapping("/find-id/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@Valid @RequestBody EmailSendRequest request) {
+        userService.sendVerificationCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 아이디 찾기 - 인증 코드 검증 후 로그인 아이디 반환
+    // POST /api/user/find-id/verify { email, code }
+    @PostMapping("/find-id/verify")
+    public ResponseEntity<ApiResponse<String>> verifyVerificationCode(@Valid @RequestBody EmailVerifyRequest request) {
+        String loginId = userService.verifyCodeAndFindLoginId(request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(loginId));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 발송
+    // POST /api/user/passwd-reset/send-code { loginId, email }
+    @PostMapping("/passwd-reset/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendPasswordResetCode(@Valid @RequestBody PasswordResetSendRequest request) {
+        userService.sendPasswordResetCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 유효시간 내에 재설정 완료해야 함)
+    // POST /api/user/passwd-reset/verify { loginId, email, code }
+    @PostMapping("/passwd-reset/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyPasswordResetCode(@Valid @RequestBody PasswordResetVerifyRequest request) {
+        userService.verifyPasswordResetCode(request.getLoginId(), request.getEmail(), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 로그인 비밀번호 재설정 - 인증 코드 재확인 후 새 비밀번호로 변경
+    // POST /api/user/passwd-reset/reset { loginId, email, code, newPassword }
+    @PostMapping("/passwd-reset/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        userService.resetPassword(request.getLoginId(), request.getEmail(), request.getCode(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 발송
+    // POST /api/user/unlock/send-code { loginId, email }
+    @PostMapping("/unlock/send-code")
+    public ResponseEntity<ApiResponse<Void>> sendUnlockCode(@Valid @RequestBody AccountUnlockSendRequest request) {
+        userService.sendUnlockCode(request.getLoginId(), request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 계정 잠금 해제 - 인증 코드 검증 (검증 성공 시 그 자리에서 잠금 해제까지 처리됨)
+    // POST /api/user/unlock/verify { loginId, email, code }
+    @PostMapping("/unlock/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyAndUnlock(@Valid @RequestBody AccountUnlockVerifyRequest request) {
+        userService.verifyAndUnlock(request.getLoginId(), request.getEmail(), request.getCode());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

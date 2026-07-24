@@ -38,3 +38,14 @@ out/
 
 ### api 관련 ###
 application-local.yaml
+
+### 로컬 파일 저장소 ###
+/storage/
+
+### 외부 서비스 인증키 ###
+/credentials/
+google-vision-service-account.json
+
+### 관련 자료 ###
+/docs/
+/src/main/resources/docs/

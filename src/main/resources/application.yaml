@@ -5,6 +5,7 @@ spring:
     name: jobpuzzle
   datasource:
     url: jdbc:mariadb://localhost:3306/jobpuzzle
+    # 아이디/비밀번호는 application-local.yaml
     username:
     password:
     driver-class-name: org.mariadb.jdbc.Driver
@@ -23,6 +24,10 @@ spring:
               - profile_nickname
               - account_email
             client-name: Kakao
+          google:
+            scope:
+              - profile
+              - email
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
@@ -37,7 +42,39 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  mail:
+    host: smtp.naver.com
+    port: 465
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+        starttls:
+          enable: false
+<<<<<<< HEAD
+=======
 app:
+  ai:
+    running-timeout-seconds: 600
+
   data-initializer:
     enabled: false
 
+  storage:
+    local:
+      base-dir: ./storage/documents
+
+  ocr:
+    google-vision:
+      credentials-path: ./credentials/google-vision-service-account.json
+>>>>>>> a991e8fbdb7bc2627e62e2487b8adeac5c6e63b1

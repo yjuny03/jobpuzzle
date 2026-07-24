@@ -1,23 +1,71 @@
 package com.example.jobpuzzle.ai.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 
+// JSON-01: 채용공고를 우선 기준으로 회사정보를 함께 구조화한 AI 응답 계약이다.
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-@JsonIgnoreProperties(ignoreUnknown = true) // json 정의서에 없는 키 값이 들어와도 에러 안남
 public class JobPostingAnalysisResult {
 
-    private List<String> mainTasks;
-    private List<String> requirements;
-    private List<String> preferred;
-    private List<String> companyValues;
-    private List<String> coreCompetencies;
-    private List<String> missingEvidence;
+    private List<Item> mainTasks;
+    private List<Requirement> requirements;
+    private List<Requirement> preferred;
+    private List<Item> companyValues;
+    private List<Item> coreCompetencies;
+    private List<Conflict> conflicts;
+    private List<MissingEvidence> missingEvidence;
 
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Item {
+        private String itemId;
+        private String text;
+        private List<SourceReference> sourceRefs;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Requirement {
+        private String requirementId;
+        private String text;
+        private List<SourceReference> sourceRefs;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Conflict {
+        private String field;
+        private String postingValue;
+        private String companyInfoValue;
+        private String appliedValue;
+        private List<SourceReference> sourceRefs;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MissingEvidence {
+        private String item;
+        private String reason;
+    }
 }
