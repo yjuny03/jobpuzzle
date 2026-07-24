@@ -1,10 +1,19 @@
 package com.example.jobpuzzle.interview.dto;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
 public class SessionCreateRequest {
-    // TODO: 클래스 정의서 기준으로 필드 추가
+
+    @NotNull
+    private Long questionSetId;
+
+    @NotEmpty
+    private List<Long> selectedQuestionIds;
 }

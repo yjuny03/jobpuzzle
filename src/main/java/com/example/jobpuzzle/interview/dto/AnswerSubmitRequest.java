@@ -1,10 +1,20 @@
 package com.example.jobpuzzle.interview.dto;
 
+import com.example.jobpuzzle.interview.entity.AnswerType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
 public class AnswerSubmitRequest {
-    // TODO: 클래스 정의서 기준으로 필드 추가
+
+    @NotBlank
+    private String messageText;
+
+    @NotNull
+    private AnswerType answerType;
+
+    private Long parentQuestionMessageId;
 }
