@@ -34,7 +34,6 @@ public class InterviewSession {
     @Column(name = "mode", nullable = false)
     private InterviewSessionMode mode;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guide_id")
     private JobGuideDocument guideDocument;
