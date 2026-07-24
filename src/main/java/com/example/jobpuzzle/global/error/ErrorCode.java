@@ -14,8 +14,10 @@ public enum ErrorCode {
 
     //AI
     AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_001", "AI 응답이 유효하지 않습니다."),
+    AI_PROMPT_TEMPLATE_NOT_FOUND(HttpStatus.CONFLICT, "AI_002", "실행 단계에 사용할 활성 프롬프트 템플릿이 없습니다."),
 
     //analysis
+    JSON05_RESULT_INTEGRITY_CONFLICT(HttpStatus.CONFLICT, "ANALYSIS_010", "JSON-05 result integrity conflict"),
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
     ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
     ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),
@@ -24,6 +26,7 @@ public enum ErrorCode {
     ANALYSIS_CASE_SOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_006", "연결된 자료를 찾을 수 없습니다."),
     ANALYSIS_CASE_JOB_POSTING_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_007", "채용공고를 정확히 1건 선택해야 합니다."),
     ANALYSIS_CASE_USER_MATERIAL_REQUIRED(HttpStatus.BAD_REQUEST, "ANALYSIS_008", "이력서·자기소개서·포트폴리오·경험정리 중 최소 1건을 선택해야 합니다."),
+    ANALYSIS_CASE_NOT_READY(HttpStatus.BAD_REQUEST, "ANALYSIS_009", "입력 확정 또는 분석 진행 상태의 분석 작업만 실행할 수 있습니다."),
 
     //user - 회원가입/로그인
     USER_LOGIN_ID_DUPLICATE(HttpStatus.CONFLICT, "USER_001", "이미 사용 중인 아이디입니다."),
@@ -53,7 +56,11 @@ public enum ErrorCode {
     EXTRACTION_ALREADY_VERSIONED(HttpStatus.BAD_REQUEST, "DOCUMENT_011", "이미 확정 이력이 있는 자료는 재추출할 수 없습니다. 수정 저장을 이용해주세요."),
 
     //job category
-    JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다.");
+    JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다."),
+
+    // guide
+    GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
+    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String code;

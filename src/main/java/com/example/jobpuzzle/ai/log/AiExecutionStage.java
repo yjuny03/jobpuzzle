@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.ai.log;
 
+// AI 실행 단계별 입력 계약과 재실행 기준을 구분한다.
 public enum AiExecutionStage {
     JOB_POSTING_ANALYSIS,
     CANDIDATE_MATERIAL_ANALYSIS,

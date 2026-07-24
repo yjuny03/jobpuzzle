@@ -1,0 +1,26 @@
+.analysis-card { margin-bottom: 16px; }
+.analysis-card h2 { font-size: 15px; margin: 0 0 14px; }
+.analysis-message { padding: 18px; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; }
+.analysis-message--error { border-color: #E8C4C0; background: #FBEEEC; }
+.analysis-stages { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 10px; }
+.analysis-stage { border: 1px solid var(--color-border); border-radius: 10px; padding: 13px; }
+.analysis-stage__name { margin: 0 0 6px; font-weight: 700; font-size: 13px; }
+.analysis-stage__status { margin: 0; color: var(--color-text-muted); font-size: 12px; }
+.analysis-stage--RUNNING { border-color: #91BDE8; background: #F3F8FD; }
+.analysis-stage--SUCCEEDED { border-color: #B9DEC9; background: #E6F4EC; }
+.analysis-stage--FAILED { border-color: #E8C4C0; background: #FBEEEC; }
+.analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.analysis-detail { border-top: 1px solid var(--color-border); padding: 11px 0; }
+.analysis-detail:first-child { border-top: 0; padding-top: 0; }
+.analysis-detail__label { color: var(--color-text-muted); font-size: 12px; margin: 0 0 5px; font-weight: 600; }
+.analysis-detail__value { margin: 0; white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
+.analysis-list { margin: 0; padding-left: 19px; font-size: 13px; line-height: 1.7; }
+.analysis-list li { margin: 4px 0; }
+.analysis-match { border: 1px solid var(--color-border); border-radius: 10px; padding: 14px; margin-top: 10px; }
+.analysis-match h3 { margin: 0 0 10px; font-size: 13.5px; }
+.analysis-badge { display: inline-block; border-radius: 999px; padding: 4px 9px; background: var(--color-primary-tint); color: var(--color-primary); font-size: 11.5px; font-weight: 700; }
+.analysis-empty { color: var(--color-text-muted); margin: 0; font-size: 13px; }
+.analysis-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.analysis-question { border-top: 1px solid var(--color-border); padding: 14px 0; }
+.analysis-question:first-child { border-top: 0; padding-top: 0; }
+@media (max-width: 760px) { .analysis-stages, .analysis-grid { grid-template-columns: 1fr; } }

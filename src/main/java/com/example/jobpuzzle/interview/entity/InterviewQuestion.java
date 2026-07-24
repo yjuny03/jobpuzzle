@@ -1,109 +1,101 @@
 package com.example.jobpuzzle.interview.entity;
 
+import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
+import com.example.jobpuzzle.ai.dto.SourceReference;
+import com.example.jobpuzzle.analysis.entity.AnalysisSourceReference;
+import com.example.jobpuzzle.analysis.entity.MatchAnalysisResult;
+import com.example.jobpuzzle.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
-// QuestionSet에 저장된 세션 생성 전 원 질문. 질문 자체검수와 근거 추적 포함
 @Getter
 @Entity
 @NoArgsConstructor
 @Table(name = "interview_question", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_question_set_key", columnNames = {"question_set_id", "question_key"})
+        @UniqueConstraint(name = "uk_interview_question_set_key", columnNames = {"question_set_id", "question_key"}),
+        @UniqueConstraint(name = "uk_interview_question_set_order", columnNames = {"question_set_id", "display_order"})
 })
-public class InterviewQuestion {
+public class InterviewQuestion extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "question_id")
     private Long questionId;
 
-    @Column(nullable = false)
-    private Long questionSetId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_set_id", nullable = false)
+    private QuestionSet questionSet;
 
-    // AI 응답의 questionId
-    @Column(nullable = false)
+    // AI questionId는 DB PK가 아니라 QuestionSet 안에서 유일한 questionKey로 저장한다.
+    @Column(name = "question_key", nullable = false, length = 100)
     private String questionKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "question_type", nullable = false, length = 30)
     private InterviewQuestionType questionType;
 
     @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
-    private String questionText;
+    @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
+    private String question;
 
     @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "intent", nullable = false, columnDefinition = "TEXT")
     private String intent;
 
-    // JSON. WEAKNESS_REVIEW는 단일 관점
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String evaluationFocus;
+    @Column(name = "evaluation_focus", nullable = false, columnDefinition = "json")
+    private List<InterviewQuestionEvaluationFocus> evaluationFocus;
 
-    // 맞춤 질문의 연결 분석 항목
-    private Long relatedMatchId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "related_match_id")
+    private MatchAnalysisResult relatedMatch;
 
-    // 맞춤 질문의 공고 요구사항 식별자
+    @Column(name = "related_requirement_id", length = 100)
     private String relatedRequirementId;
 
-    // JSON, 기본값 []. 기본·약점 질문은 빈 배열 가능
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String sourceRefs;
+    @Column(name = "source_refs", nullable = false, columnDefinition = "json")
+    private List<AnalysisSourceReference> sourceRefs;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "review_status", nullable = false, length = 20)
     private InterviewQuestionReviewStatus reviewStatus;
 
     @Lob
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "review_note", columnDefinition = "TEXT")
     private String reviewNote;
 
-    // WEAKNESS_REVIEW 질문 생성의 기준 평가 ID. 질문별 1건
-    private Long originEvaluationId;
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder;
 
-    @Column(nullable = false)
-    private Integer displayOrder;
+    // 최종 QuestionSet에는 자체 검수를 통과한 PASS 질문만 저장한다.
+    public static InterviewQuestion from(QuestionSet questionSet, MatchAnalysisResult relatedMatch,
+                                         CustomizedAnalysisGenerationResult.Question value, int displayOrder) {
+        if (value.getReviewStatus() != InterviewQuestionReviewStatus.PASS) {
+            throw new IllegalArgumentException("Only PASS questions can be persisted in a QuestionSet.");
+        }
+        InterviewQuestion question = new InterviewQuestion();
+        question.questionSet = questionSet;
+        question.relatedMatch = relatedMatch;
+        question.questionKey = value.getQuestionId();
+        question.questionType = value.getQuestionType();
+        question.question = value.getQuestion();
+        question.intent = value.getIntent();
+        question.evaluationFocus = value.getEvaluationFocus() == null ? List.of() : List.copyOf(value.getEvaluationFocus());
+        question.relatedRequirementId = value.getRelatedRequirementId();
+        question.sourceRefs = sourceRefs(value.getSourceRefs());
+        question.reviewStatus = value.getReviewStatus();
+        question.reviewNote = value.getReviewNote();
+        question.displayOrder = displayOrder;
+        return question;
+    }
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Builder
-    private InterviewQuestion(
-            Long questionSetId,
-            String questionKey,
-            InterviewQuestionType questionType,
-            String questionText,
-            String intent,
-            String evaluationFocus,
-            Long relatedMatchId,
-            String relatedRequirementId,
-            String sourceRefs,
-            InterviewQuestionReviewStatus reviewStatus,
-            String reviewNote,
-            Long originEvaluationId,
-            Integer displayOrder
-    ) {
-        this.questionSetId = questionSetId;
-        this.questionKey = questionKey;
-        this.questionType = questionType;
-        this.questionText = questionText;
-        this.intent = intent;
-        this.evaluationFocus = evaluationFocus;
-        this.relatedMatchId = relatedMatchId;
-        this.relatedRequirementId = relatedRequirementId;
-        this.sourceRefs = sourceRefs == null ? "[]" : sourceRefs;
-        this.reviewStatus = reviewStatus == null ? InterviewQuestionReviewStatus.PASS : reviewStatus;
-        this.reviewNote = reviewNote;
-        this.originEvaluationId = originEvaluationId;
-        this.displayOrder = displayOrder == null ? 0 : displayOrder;
-
-        this.createdAt = LocalDateTime.now();
+    private static List<AnalysisSourceReference> sourceRefs(List<SourceReference> values) {
+        return values == null ? List.of() : values.stream().map(AnalysisSourceReference::from).toList();
     }
 }
