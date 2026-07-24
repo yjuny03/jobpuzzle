@@ -1,8 +1,8 @@
 package com.example.jobpuzzle.interview.entity;
 
-public enum InterviewSessionStatus {
-    CREATED,
+public enum InterviewSessionQuestionStatus {
+    PENDING,
     IN_PROGRESS,
     COMPLETED,
-    CANCELED
+    SKIPPED
 }

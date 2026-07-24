@@ -1,56 +1,55 @@
 package com.example.jobpuzzle.interview.entity;
 
 import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
+import com.example.jobpuzzle.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "follow_up_question")
-public class FollowUpQuestion {
+public class FollowUpQuestion extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "follow_up_id")
     private Long followUpId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "evaluation_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "evaluation_id", nullable = false, unique = true)
     private AnswerEvaluation evaluation;
 
-    @Lob
-    @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
-    private String questionText;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_message_id", nullable = false, unique = true)
+    private InterviewMessage questionMessage;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "follow_up_type", nullable = false)
+    @Column(name = "follow_up_type", nullable = false, length = 30)
     private FollowUpQuestionType followUpType;
 
     @Column(name = "target_weakness", length = 100)
     private String targetWeakness;
 
     @Lob
-    @Column(name = "reason", columnDefinition = "TEXT")
+    @Column(name = "reason", nullable = false, columnDefinition = "TEXT")
     private String reason;
 
-    @Builder
-    private FollowUpQuestion(
+    public static FollowUpQuestion create(
             AnswerEvaluation evaluation,
-            String questionText,
+            InterviewMessage questionMessage,
             FollowUpQuestionType followUpType,
             String targetWeakness,
             String reason
     ) {
-        this.evaluation = evaluation;
-        this.questionText = questionText;
-        this.followUpType = followUpType;
-        this.targetWeakness = targetWeakness;
-        this.reason = reason;
+        FollowUpQuestion followUp = new FollowUpQuestion();
+        followUp.evaluation = evaluation;
+        followUp.questionMessage = questionMessage;
+        followUp.followUpType = followUpType;
+        followUp.targetWeakness = targetWeakness;
+        followUp.reason = reason;
+        return followUp;
     }
 }

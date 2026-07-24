@@ -60,7 +60,22 @@ public enum ErrorCode {
 
     // guide
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
-    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다.");
+    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다."),
+
+
+    // interview - 면접 세션·질문 선택·답변 진행
+    QUESTION_SET_NOT_READY(HttpStatus.CONFLICT, "INTERVIEW_001", "사용할 수 있는 질문 묶음이 준비되지 않았습니다."),
+    INVALID_QUESTION_SELECTION(HttpStatus.UNPROCESSABLE_ENTITY, "INTERVIEW_002", "선택한 질문이 질문 묶음과 일치하지 않습니다."),
+    INTERVIEW_SESSION_ALREADY_EXISTS(HttpStatus.CONFLICT, "INTERVIEW_003", "해당 질문 묶음에 진행 중인 면접 세션이 있습니다."),
+    INTERVIEW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_004", "면접 세션을 찾을 수 없습니다."),
+    SESSION_QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_005", "면접 세션 질문을 찾을 수 없습니다."),
+    SESSION_NOT_EDITABLE(HttpStatus.CONFLICT, "INTERVIEW_006", "완료 또는 취소된 세션은 변경할 수 없습니다."),
+    SESSION_CANNOT_BE_CANCELED(HttpStatus.CONFLICT, "INTERVIEW_007", "답변을 제출한 세션은 취소할 수 없습니다."),
+    SESSION_CANNOT_BE_COMPLETED(HttpStatus.CONFLICT, "INTERVIEW_008", "완료 조건을 충족하지 못한 세션입니다."),
+    ANSWER_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "INTERVIEW_009", "이미 확정된 답변입니다."),
+    FOLLOW_UP_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "INTERVIEW_010", "추가 꼬리질문을 생성할 수 없습니다."),
+    WEAKNESS_NOT_AVAILABLE(HttpStatus.CONFLICT, "INTERVIEW_011", "약점 보완에 사용할 미해결 약점이 없습니다."),
+    ANSWER_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_012", "답변 기준 메시지를 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
