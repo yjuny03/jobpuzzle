@@ -42,17 +42,17 @@ public class DocumentController {
     private final DocumentService documentService;
     private final DocumentExtractionService documentExtractionService;
 
-    // 파일 자료 등록
-    // POST /api/documents (multipart: file, documentType, displayName, keepOriginal)
+    // 파일 자료 등록 (이미지는 여러 장을 한 번에 등록 가능)
+    // POST /api/documents (multipart: files, documentType, displayName, keepOriginal)
     @PostMapping(value = "/api/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
-            @RequestPart("file") MultipartFile file,
+            @RequestPart("files") List<MultipartFile> files,
             @RequestParam("documentType") UserDocumentType documentType,
             @RequestParam("displayName") String displayName,
             @RequestParam(value = "keepOriginal", defaultValue = "false") boolean keepOriginal,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        DocumentUploadRequest request = new DocumentUploadRequest(documentType, file, displayName, keepOriginal);
+        DocumentUploadRequest request = new DocumentUploadRequest(documentType, files, displayName, keepOriginal);
         DocumentResponse response = documentService.uploadDocument(userDetails.getUser().getUserId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
