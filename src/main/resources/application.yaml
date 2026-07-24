@@ -61,8 +61,7 @@ spring:
             enable: true
         starttls:
           enable: false
-<<<<<<< HEAD
-=======
+
 app:
   ai:
     running-timeout-seconds: 600
@@ -77,4 +76,3 @@ app:
   ocr:
     google-vision:
       credentials-path: ./credentials/google-vision-service-account.json
->>>>>>> a991e8fbdb7bc2627e62e2487b8adeac5c6e63b1
