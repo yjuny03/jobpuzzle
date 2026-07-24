@@ -87,7 +87,7 @@ public class DocumentExtractionAsyncRunner {
 
         String text = content.toString().trim();
         if (emptyPageCount == result.pageCount()) {
-            return ExtractionOutcome.failed("모든 페이지에서 텍스트를 추출하지 못했습니다.");
+            return ExtractionOutcome.failed("모든 페이지에서 텍스트를 추출하지 못했습니다.", ocrApplied);
         }
         if (emptyPageCount > 0) {
             return ExtractionOutcome.partial(text, result.pageCount(), ocrApplied,
@@ -109,7 +109,7 @@ public class DocumentExtractionAsyncRunner {
 
         String text = ocrEngine.recognize(image);
         if (text == null || text.isBlank()) {
-            return ExtractionOutcome.failed("이미지에서 텍스트를 인식하지 못했습니다.");
+            return ExtractionOutcome.failed("이미지에서 텍스트를 인식하지 못했습니다.", true);
         }
         return ExtractionOutcome.success(text, null, true);
     }
@@ -158,6 +158,10 @@ public class DocumentExtractionAsyncRunner {
 
         static ExtractionOutcome failed(String reason) {
             return new ExtractionOutcome(DocumentExtractionStatus.FAILED, null, null, false, reason);
+        }
+
+        static ExtractionOutcome failed(String reason, boolean ocrApplied) {
+            return new ExtractionOutcome(DocumentExtractionStatus.FAILED, null, null, ocrApplied, reason);
         }
     }
 }

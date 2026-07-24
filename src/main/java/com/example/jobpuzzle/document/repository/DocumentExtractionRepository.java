@@ -3,12 +3,15 @@ package com.example.jobpuzzle.document.repository;
 import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.DocumentVersionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface DocumentExtractionRepository extends JpaRepository<DocumentExtraction, Long> {
-    
+
     List<DocumentExtraction> findByDocument_DocumentIdOrderByExtractionIdDesc(Long documentId);
 
     Optional<DocumentExtraction> findTopByDocument_DocumentIdAndVersionStatusOrderByExtractionIdDesc(
@@ -23,4 +26,11 @@ public interface DocumentExtractionRepository extends JpaRepository<DocumentExtr
     Optional<DocumentExtraction> findByExtractionIdAndDocument_User_UserId(Long extractionId, Long userId);
 
     List<DocumentExtraction> findByExtractionIdInAndDocument_User_UserId(List<Long> extractionIds, Long userId);
+
+    // base_extraction_id가 같은 테이블의 다른 행을 가리키므로, 회원 탈퇴로 일괄 삭제하기 전에 먼저 끊어둠
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE DocumentExtraction e SET e.baseExtraction = null WHERE e.document.user.userId = :userId")
+    void clearBaseExtractionByUserId(@Param("userId") Long userId);
+
+    void deleteByDocument_User_UserId(Long userId);
 }

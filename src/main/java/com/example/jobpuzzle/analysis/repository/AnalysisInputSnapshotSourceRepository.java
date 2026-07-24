@@ -8,4 +8,6 @@ import java.util.List;
 public interface AnalysisInputSnapshotSourceRepository extends JpaRepository<AnalysisInputSnapshotSource, Long> {
 
     List<AnalysisInputSnapshotSource> findBySnapshot_SnapshotIdOrderBySnapshotSourceIdAsc(Long snapshotId);
+
+    void deleteBySnapshot_User_UserId(Long userId);
 }

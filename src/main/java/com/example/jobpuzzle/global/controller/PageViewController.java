@@ -10,8 +10,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 @Controller
 public class PageViewController {
 
-    @GetMapping("/{page:index|dashboard|my-data|job-analysis|interview|interview-result|reports|settings}.html")
+    @GetMapping("/{page:index|dashboard|my-data|job-analysis|interview|interview-result|reports|settings|job-category-setup}.html")
     public String page(@PathVariable String page) {
         return page;
+    }
+
+    @GetMapping("/analysis/{analysisCaseId}")
+    public String analysisResult(@PathVariable Long analysisCaseId) {
+        return "analysis";
     }
 }

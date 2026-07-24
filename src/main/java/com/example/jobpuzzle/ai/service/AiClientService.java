@@ -1,10 +1,9 @@
 package com.example.jobpuzzle.ai.service;
 
 import com.example.jobpuzzle.ai.client.AiClient;
-import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
-import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
+import com.example.jobpuzzle.ai.log.AiProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -21,12 +20,26 @@ public class AiClientService {
         this.aiClient = aiClient;
     }
 
-    public JobPostingAnalysisResult analyzeJobPosting(String prompt){
+    // Provider의 원시 JSON 응답을 호출 계층에 그대로 전달한다.
+    public String analyzeJobPosting(String prompt){
         return aiClient.analyzeJobPosting(prompt);
     }
 
-    public CandidateMaterialAnalysisResult analyzeCandidateMaterial(String prompt) {
+    public String analyzeCandidateMaterial(String prompt) {
         return aiClient.analyzeCandidateMaterial(prompt);
+    }
+
+    // JSON-05 Provider 원시 JSON을 후속 파싱·검증 계층으로 전달한다.
+    public String generateCustomizedAnalysis(String renderedPrompt) {
+        return aiClient.generateCustomizedAnalysis(renderedPrompt);
+    }
+
+    public AiProvider getProvider() {
+        return aiClient.getProvider();
+    }
+
+    public String getModel() {
+        return aiClient.getModel();
     }
 
     public QuestionGenerationResult generateQuestions(String prompt) {

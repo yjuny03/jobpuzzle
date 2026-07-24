@@ -19,7 +19,7 @@
       <h1 class="auth-card__title">회원가입</h1>
       <p class="auth-card__subtitle">몇 가지 정보만 입력하면 바로 시작할 수 있어요</p>
 
-      <div class="auth-error" id="join-error"></div>
+      <div class="auth-error auth-toast" id="join-error"></div>
 
       <form class="auth-form" id="join-form" novalidate>
         <div class="auth-field">
@@ -52,11 +52,13 @@
         <div class="auth-field">
           <label class="field-label" for="name">이름</label>
           <input class="text-input" type="text" id="name" name="name" autocomplete="name" required>
+          <span class="field-hint" id="name-hint"></span>
         </div>
 
         <div class="auth-field">
           <label class="field-label" for="password">비밀번호</label>
           <input class="text-input" type="password" id="password" name="password" autocomplete="new-password" required>
+          <span class="field-hint" id="password-hint"></span>
         </div>
 
         <div class="auth-field">

@@ -5,6 +5,8 @@ import com.example.jobpuzzle.analysis.dto.AnalysisCaseJobCategoryUpdateRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseResponse;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceAddRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceResponse;
+import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
+import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.entity.AnalysisCase;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseSource;
@@ -27,8 +29,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +46,9 @@ public class AnalysisCaseService {
             UserDocumentType.RESUME, UserDocumentType.COVER_LETTER,
             UserDocumentType.PORTFOLIO, UserDocumentType.EXPERIENCE_NOTE
     );
+
+    // DocumentExtractionAsyncRunner가 content에 심어두는 "[N페이지]\n" 마커. document-flow.js의 splitPages와 동일 규칙
+    private static final Pattern PAGE_MARKER_PATTERN = Pattern.compile("\\[(\\d+)페이지]\\n");
 
     private final AnalysisCaseRepository analysisCaseRepository;
     private final AnalysisCaseSourceRepository analysisCaseSourceRepository;
@@ -158,6 +168,64 @@ public class AnalysisCaseService {
         List<AnalysisInputSnapshotSource> sources = analysisInputSnapshotSourceRepository
                 .findBySnapshot_SnapshotIdOrderBySnapshotSourceIdAsc(snapshot.getSnapshotId());
         return AnalysisInputSnapshotResponse.of(snapshot, sources);
+    }
+
+    // JSON-03: AI 실행 직전에만 조립하는 서버 내부 컨텍스트. 공개 스냅샷 응답과 분리된 별도 DTO이며
+    // 아직 마스킹은 적용하지 않고 원문을 그대로 담는다(1단계, 마스킹은 후속 작업)
+    public AnalysisInputSnapshotContext getAnalysisContext(Long userId, Long analysisCaseId) {
+        AnalysisInputSnapshot snapshot = analysisInputSnapshotRepository
+                .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND));
+        List<AnalysisInputSnapshotSource> sources = analysisInputSnapshotSourceRepository
+                .findBySnapshot_SnapshotIdOrderBySnapshotSourceIdAsc(snapshot.getSnapshotId());
+
+        AtomicInteger segmentCounter = new AtomicInteger(1);
+        List<AnalysisInputSnapshotContextSource> contextSources = sources.stream()
+                .map(source -> buildContextSource(source, segmentCounter))
+                .toList();
+
+        return AnalysisInputSnapshotContext.of(snapshot, contextSources);
+    }
+
+    private AnalysisInputSnapshotContextSource buildContextSource(AnalysisInputSnapshotSource source, AtomicInteger segmentCounter) {
+        DocumentExtraction extraction = source.getExtraction();
+        String analysisText = splitPages(extraction.getContent()).stream()
+                .map(page -> buildMarkerBlock(extraction, page, segmentCounter.getAndIncrement()))
+                .collect(Collectors.joining("\n\n"));
+        return AnalysisInputSnapshotContextSource.from(source, analysisText);
+    }
+
+    // 세그먼트는 페이지 단위로 나눈다. 마스킹 없이 원문 그대로 담고(1단계), 세그먼트 번호는
+    // 스냅샷 전체 조립 1회 안에서 소스 구분 없이 이어서 증가한다
+    private String buildMarkerBlock(DocumentExtraction extraction, PageText page, int segmentNumber) {
+        String marker = "[SOURCE extractionId=%d documentId=%d][PAGE=%d][SEGMENT=seg-%03d]".formatted(
+                extraction.getExtractionId(), extraction.getDocument().getDocumentId(),
+                page.pageNumber(), segmentNumber
+        );
+        return marker + "\n" + page.text();
+    }
+
+    // DocumentExtractionAsyncRunner가 심어둔 "[N페이지]\n" 마커 기준으로 페이지 단위로 쪼갠다.
+    // 마커가 없으면(예: 직접 입력한 TEXT 자료) 전체를 1페이지로 취급한다
+    private List<PageText> splitPages(String content) {
+        if (content == null || content.isBlank()) {
+            return List.of(new PageText(1, content == null ? "" : content));
+        }
+        List<MatchResult> matches = PAGE_MARKER_PATTERN.matcher(content).results().toList();
+        if (matches.isEmpty()) {
+            return List.of(new PageText(1, content.trim()));
+        }
+        List<PageText> pages = new ArrayList<>();
+        for (int i = 0; i < matches.size(); i++) {
+            MatchResult match = matches.get(i);
+            int start = match.end();
+            int end = (i + 1 < matches.size()) ? matches.get(i + 1).start() : content.length();
+            pages.add(new PageText(Integer.parseInt(match.group(1)), content.substring(start, end).trim()));
+        }
+        return pages;
+    }
+
+    private record PageText(int pageNumber, String text) {
     }
 
     private void validateSourceComposition(List<AnalysisCaseSource> sources) {

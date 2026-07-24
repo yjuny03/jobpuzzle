@@ -5,7 +5,7 @@ import lombok.Getter;
 
 import java.util.Map;
 
-// 카카오가 응답
+// 카카오/구글이 응답
 @Getter
 public class OAuthAttributes {
 
@@ -38,6 +38,17 @@ public class OAuthAttributes {
                 String.valueOf(attributes.get("id")),
                 (String) kakaoAccount.get("email"),
                 (String) profile.get("nickname")
+        );
+    }
+
+    public static OAuthAttributes ofGoogle(String userNameAttributeName, Map<String, Object> attributes) {
+        return new OAuthAttributes(
+                attributes,
+                userNameAttributeName,
+                "google",
+                String.valueOf(attributes.get("sub")),
+                (String) attributes.get("email"),
+                (String) attributes.get("name")
         );
     }
 

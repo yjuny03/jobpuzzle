@@ -8,9 +8,18 @@
     el.classList.add(ok ? 'field-hint--ok' : 'field-hint--error');
   }
 
+  var TOAST_DURATION_MS = 2500;
+  var errorToastTimer = null;
+
   function showError(el, message) {
     el.textContent = message;
     el.classList.add('is-visible');
+    if (errorToastTimer) {
+      clearTimeout(errorToastTimer);
+    }
+    errorToastTimer = setTimeout(function () {
+      hideError(el);
+    }, TOAST_DURATION_MS);
   }
 
   function hideError(el) {
@@ -39,9 +48,15 @@
     var loginIdHint = document.getElementById('loginId-hint');
     var emailInput = document.getElementById('email');
     var emailHint = document.getElementById('email-hint');
+    var nameInput = document.getElementById('name');
+    var nameHint = document.getElementById('name-hint');
     var passwordInput = document.getElementById('password');
+    var passwordHint = document.getElementById('password-hint');
     var passwordCheckInput = document.getElementById('passwordCheck');
     var passwordCheckHint = document.getElementById('passwordCheck-hint');
+
+    var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/;
 
     var mainCategorySelect = document.getElementById('mainCategory');
     var subCategorySelect = document.getElementById('subCategory');
@@ -200,6 +215,10 @@
         setHint(emailHint, '이메일을 입력해주세요.', false);
         return;
       }
+      if (!EMAIL_PATTERN.test(email)) {
+        setHint(emailHint, '올바른 이메일 형식이 아닙니다.', false);
+        return;
+      }
 
       emailVerified = false;
       emailCodeInput.value = '';
@@ -274,10 +293,107 @@
         });
     });
 
+    // 아이디/이메일 중복확인은 버튼 클릭으로만 하고, 그 외 형식 검증은
+    // 입력칸 밖을 클릭(focusout)할 때와 제출 시 둘 다 씀
+    function validateLoginId() {
+      var value = loginIdInput.value.trim();
+      if (!value) {
+        setHint(loginIdHint, '아이디를 입력해주세요.', false);
+        return false;
+      }
+      if (value.length < 4 || value.length > 50) {
+        setHint(loginIdHint, '아이디는 4~50자로 입력해주세요.', false);
+        return false;
+      }
+      if (!loginIdChecked) {
+        setHint(loginIdHint, '아이디 중복확인을 먼저 진행해주세요.', false);
+        return false;
+      }
+      return true;
+    }
+
+    function validateEmail() {
+      var value = emailInput.value.trim();
+      if (!value) {
+        setHint(emailHint, '이메일을 입력해주세요.', false);
+        return false;
+      }
+      if (!EMAIL_PATTERN.test(value)) {
+        setHint(emailHint, '올바른 이메일 형식이 아닙니다.', false);
+        return false;
+      }
+      if (!emailVerified) {
+        setHint(emailHint, '이메일 인증을 먼저 완료해주세요.', false);
+        return false;
+      }
+      return true;
+    }
+
+    function validateName() {
+      var value = nameInput.value.trim();
+      if (!value) {
+        setHint(nameHint, '이름을 입력해주세요.', false);
+        return false;
+      }
+      nameHint.textContent = '';
+      return true;
+    }
+
+    function validatePassword() {
+      var value = passwordInput.value;
+      if (!value) {
+        setHint(passwordHint, '비밀번호를 입력해주세요.', false);
+        return false;
+      }
+      if (!PASSWORD_PATTERN.test(value)) {
+        setHint(passwordHint, '비밀번호는 영문, 숫자를 포함해 8~20자로 입력해주세요.', false);
+        return false;
+      }
+      setHint(passwordHint, '사용 가능한 비밀번호입니다.', true);
+
+      if (passwordCheckInput.value) {
+        setHint(passwordCheckHint,
+          passwordInput.value === passwordCheckInput.value ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.',
+          passwordInput.value === passwordCheckInput.value);
+      }
+      return true;
+    }
+
+    function validatePasswordCheck() {
+      var value = passwordCheckInput.value;
+      if (!value) {
+        setHint(passwordCheckHint, '비밀번호 확인을 입력해주세요.', false);
+        return false;
+      }
+      var match = value === passwordInput.value;
+      setHint(passwordCheckHint, match ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.', match);
+      return match;
+    }
+
+    function validateJobCategory() {
+      if (!selectedJobCategoryId) {
+        setHint(jobCategoryHint, '관심 직무를 선택해주세요.', false);
+        return false;
+      }
+      jobCategoryHint.textContent = '';
+      return true;
+    }
+
+    loginIdInput.addEventListener('focusout', validateLoginId);
+    emailInput.addEventListener('focusout', validateEmail);
+    nameInput.addEventListener('focusout', validateName);
+    passwordInput.addEventListener('focusout', validatePassword);
+    passwordCheckInput.addEventListener('focusout', validatePasswordCheck);
+    careerLevelSelect.addEventListener('focusout', validateJobCategory);
+
     document.getElementById('check-id-btn').addEventListener('click', function () {
       var loginId = loginIdInput.value.trim();
       if (!loginId) {
         setHint(loginIdHint, '아이디를 입력해주세요.', false);
+        return;
+      }
+      if (loginId.length < 4 || loginId.length > 50) {
+        setHint(loginIdHint, '아이디는 4~50자로 입력해주세요.', false);
         return;
       }
       fetch('/api/user/check-id?loginId=' + encodeURIComponent(loginId))
@@ -296,22 +412,21 @@
       e.preventDefault();
       hideError(errorEl);
 
-      if (passwordInput.value !== passwordCheckInput.value) {
-        setHint(passwordCheckHint, '비밀번호가 일치하지 않습니다.', false);
-        return;
-      }
-      passwordCheckHint.textContent = '';
+      // 위에서부터 순서대로 검증해서, 맨 처음 걸린 항목으로 스크롤/포커스 이동
+      var fields = [
+        { valid: validateLoginId(), el: loginIdInput, hint: loginIdHint },
+        { valid: validateEmail(), el: emailInput, hint: emailHint },
+        { valid: validateName(), el: nameInput, hint: nameHint },
+        { valid: validatePassword(), el: passwordInput, hint: passwordHint },
+        { valid: validatePasswordCheck(), el: passwordCheckInput, hint: passwordCheckHint },
+        { valid: validateJobCategory(), el: careerLevelSelect, hint: jobCategoryHint }
+      ];
+      var firstInvalid = fields.find(function (field) { return !field.valid; });
 
-      if (!loginIdChecked) {
-        showError(errorEl, '아이디 중복확인을 먼저 진행해주세요.');
-        return;
-      }
-      if (!emailVerified) {
-        showError(errorEl, '이메일 인증을 먼저 완료해주세요.');
-        return;
-      }
-      if (!selectedJobCategoryId) {
-        showError(errorEl, '관심 직무를 선택해주세요.');
+      if (firstInvalid) {
+        firstInvalid.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstInvalid.el.focus();
+        showError(errorEl, firstInvalid.hint.textContent || '입력한 내용을 다시 확인해주세요.');
         return;
       }
 
