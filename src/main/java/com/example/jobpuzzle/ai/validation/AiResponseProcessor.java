@@ -154,7 +154,10 @@ public class AiResponseProcessor {
                 else if (character == '"') quoted = false;
                 continue;
             }
-            if (character == '"') { quoted = true; continue; }
+            if (character == '"') {
+                quoted = true;
+                continue;
+            }
             if (character == '{') {
                 if (depth++ == 0) start = index;
             } else if (character == '}' && depth > 0 && --depth == 0) {
@@ -191,7 +194,10 @@ public class AiResponseProcessor {
     }
 
     private void validateCoverLetter(CandidateMaterialAnalysisResult.CoverLetter coverLetter, boolean selected, List<AnalysisSourceMarkerParser.SourceMarker> markers) {
-        if (!selected) { requireAbsent("coverLetter", coverLetter); return; }
+        if (!selected) {
+            requireAbsent("coverLetter", coverLetter);
+            return;
+        }
         if (coverLetter == null) throw validation("coverLetter is required");
         validateSummary(coverLetter.getMotivation(), markers, "coverLetter.motivation");
         validateSummary(coverLetter.getValues(), markers, "coverLetter.values");
@@ -201,7 +207,10 @@ public class AiResponseProcessor {
     }
 
     private void validatePortfolio(CandidateMaterialAnalysisResult.Portfolio portfolio, boolean selected, List<AnalysisSourceMarkerParser.SourceMarker> markers) {
-        if (!selected) { requireAbsent("portfolio", portfolio); return; }
+        if (!selected) {
+            requireAbsent("portfolio", portfolio);
+            return;
+        }
         if (portfolio == null) throw validation("portfolio is required");
         requireList("portfolio.projects", portfolio.getProjects());
         unique("projectId", portfolio.getProjects(), CandidateMaterialAnalysisResult.Project::getProjectId);
@@ -219,7 +228,10 @@ public class AiResponseProcessor {
     }
 
     private void validateExperienceNote(CandidateMaterialAnalysisResult.ExperienceNote note, boolean selected, List<AnalysisSourceMarkerParser.SourceMarker> markers) {
-        if (!selected) { requireAbsent("experienceNote", note); return; }
+        if (!selected) {
+            requireAbsent("experienceNote", note);
+            return;
+        }
         if (note == null) throw validation("experienceNote is required");
         requireList("experienceNote.starCandidates", note.getStarCandidates());
         unique("candidateId", note.getStarCandidates(), CandidateMaterialAnalysisResult.StarCandidate::getCandidateId);
@@ -254,7 +266,8 @@ public class AiResponseProcessor {
                     || ref.getEvidenceText() == null || ref.getEvidenceText().isBlank()) {
                 invalidSource(field, "missing required reference field");
             }
-            if (!allowedTypes.contains(ref.getDocumentType())) invalidSource(field, "documentType is not allowed: " + ref.getDocumentType());
+            if (!allowedTypes.contains(ref.getDocumentType()))
+                invalidSource(field, "documentType is not allowed: " + ref.getDocumentType());
             AnalysisSourceMarkerParser.SourceMarker marker = markers.stream()
                     .filter(value -> value.extractionId().equals(ref.getExtractionId()))
                     .filter(value -> value.documentId().equals(ref.getDocumentId()))
@@ -262,17 +275,21 @@ public class AiResponseProcessor {
                     .filter(value -> java.util.Objects.equals(value.pageNumber(), ref.getPageNumber()))
                     .filter(value -> java.util.Objects.equals(value.segmentId(), ref.getSegmentId()))
                     .findFirst().orElse(null);
-            if (marker == null) invalidSource(field, "unknown marker extractionId=" + ref.getExtractionId() + ", segmentId=" + ref.getSegmentId());
-            if (!marker.segmentText().contains(ref.getEvidenceText())) invalidSource(field, "evidenceText is not in segmentId=" + ref.getSegmentId());
+            if (marker == null)
+                invalidSource(field, "unknown marker extractionId=" + ref.getExtractionId() + ", segmentId=" + ref.getSegmentId());
+            if (!marker.segmentText().contains(ref.getEvidenceText()))
+                invalidSource(field, "evidenceText is not in segmentId=" + ref.getSegmentId());
         }
     }
 
     private void validateMissingEvidence(List<?> missingEvidence, String field) {
         for (Object item : missingEvidence) {
             if (item instanceof JobPostingAnalysisResult.MissingEvidence value) {
-                requireText(field + ".item", value.getItem()); requireText(field + ".reason", value.getReason());
+                requireText(field + ".item", value.getItem());
+                requireText(field + ".reason", value.getReason());
             } else if (item instanceof CandidateMaterialAnalysisResult.MissingEvidence value) {
-                requireText(field + ".item", value.getItem()); requireText(field + ".reason", value.getReason());
+                requireText(field + ".item", value.getItem());
+                requireText(field + ".reason", value.getReason());
             }
         }
     }
@@ -293,10 +310,27 @@ public class AiResponseProcessor {
         return result;
     }
 
-    private void requireList(String field, List<?> values) { if (values == null) throw validation(field + " must not be null"); }
-    private void requireText(String field, String value) { if (value == null || value.isBlank()) throw validation(field + " must not be blank"); }
-    private void requireAbsent(String field, Object value) { if (value != null) throw validation(field + " exists without selected document type"); }
-    private AiProcessingException parseFailure(String message) { return new AiProcessingException(AiCallLogErrorType.RESPONSE_PARSE_FAILED, message); }
-    private AiProcessingException validation(String message) { return new AiProcessingException(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, message); }
-    private void invalidSource(String field, String detail) { throw new AiProcessingException(AiCallLogErrorType.SOURCE_REFERENCE_INVALID, field + ": " + detail); }
+    private void requireList(String field, List<?> values) {
+        if (values == null) throw validation(field + " must not be null");
+    }
+
+    private void requireText(String field, String value) {
+        if (value == null || value.isBlank()) throw validation(field + " must not be blank");
+    }
+
+    private void requireAbsent(String field, Object value) {
+        if (value != null) throw validation(field + " exists without selected document type");
+    }
+
+    private AiProcessingException parseFailure(String message) {
+        return new AiProcessingException(AiCallLogErrorType.RESPONSE_PARSE_FAILED, message);
+    }
+
+    private AiProcessingException validation(String message) {
+        return new AiProcessingException(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, message);
+    }
+
+    private void invalidSource(String field, String detail) {
+        throw new AiProcessingException(AiCallLogErrorType.SOURCE_REFERENCE_INVALID, field + ": " + detail);
+    }
 }

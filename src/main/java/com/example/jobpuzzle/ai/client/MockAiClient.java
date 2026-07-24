@@ -46,9 +46,44 @@ public class MockAiClient implements AiClient {
         List<JobPostingAnalysisResult.Item> tasks = markers.isEmpty() ? List.of() : List.of(
                 JobPostingAnalysisResult.Item.builder().itemId("task-001").text(excerpt(markers.get(0))).sourceRefs(List.of(reference(markers.get(0)))).build()
         );
+
+        AnalysisSourceMarkerParser.SourceMarker postingMarker = markers.stream()
+                .filter(marker -> marker.documentType()
+                        == com.example.jobpuzzle.document.entity.UserDocumentType.JOB_POSTING)
+                .findFirst()
+                .orElse(null);
+
+        List<JobPostingAnalysisResult.Requirement> requirements =
+                postingMarker == null
+                        ? List.of()
+                        : List.of(
+                        JobPostingAnalysisResult.Requirement.builder()
+                                .requirementId("requirement-001")
+                                .text("Java 및 Spring Boot 기반 백엔드 개발 경험")
+                                .sourceRefs(List.of(reference(postingMarker)))
+                                .build()
+                );
+
+        List<JobPostingAnalysisResult.Requirement> preferred =
+                postingMarker == null
+                        ? List.of()
+                        : List.of(
+                        JobPostingAnalysisResult.Requirement.builder()
+                                .requirementId("preferred-001")
+                                .text("테스트 코드 작성 및 배포 경험")
+                                .sourceRefs(List.of(reference(postingMarker)))
+                                .build()
+                );
+
         return json(JobPostingAnalysisResult.builder()
-                .mainTasks(tasks).requirements(List.of()).preferred(List.of()).companyValues(List.of())
-                .coreCompetencies(List.of()).conflicts(List.of()).missingEvidence(List.of()).build());
+                .mainTasks(tasks)
+                .requirements(requirements)
+                .preferred(preferred)
+                .companyValues(List.of())
+                .coreCompetencies(List.of())
+                .conflicts(List.of())
+                .missingEvidence(List.of())
+                .build());
     }
 
     // 선택된 지원자 자료 marker가 있을 때만 해당 문서 유형의 구조화 항목을 만든다.
@@ -165,11 +200,15 @@ public class MockAiClient implements AiClient {
             result.getResume().getResults().forEach(value -> refs.addAll(value.getSourceRefs()));
         }
         if (result.getCoverLetter() != null) {
-            addSummaryRefs(refs, result.getCoverLetter().getMotivation()); addSummaryRefs(refs, result.getCoverLetter().getValues());
-            result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummaryRefs(refs, value)); addSummaryRefs(refs, result.getCoverLetter().getJobConnection());
+            addSummaryRefs(refs, result.getCoverLetter().getMotivation());
+            addSummaryRefs(refs, result.getCoverLetter().getValues());
+            result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummaryRefs(refs, value));
+            addSummaryRefs(refs, result.getCoverLetter().getJobConnection());
         }
-        if (result.getPortfolio() != null) result.getPortfolio().getProjects().forEach(value -> refs.addAll(value.getSourceRefs()));
-        if (result.getExperienceNote() != null) result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
+        if (result.getPortfolio() != null)
+            result.getPortfolio().getProjects().forEach(value -> refs.addAll(value.getSourceRefs()));
+        if (result.getExperienceNote() != null)
+            result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
         return refs;
     }
 
@@ -178,17 +217,24 @@ public class MockAiClient implements AiClient {
     }
 
     private <T> T readSection(String prompt, String name, Class<T> type) {
-        try { return objectMapper.readValue(section(prompt, name), type); }
-        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+        try {
+            return objectMapper.readValue(section(prompt, name), type);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid mock input section: " + name);
+        }
     }
 
     private JsonNode readSectionTree(String prompt, String name) {
-        try { return objectMapper.readTree(section(prompt, name)); }
-        catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid mock input section: " + name); }
+        try {
+            return objectMapper.readTree(section(prompt, name));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid mock input section: " + name);
+        }
     }
 
     private String section(String prompt, String name) {
-        String start = "<" + name + ">"; String end = "</" + name + ">";
+        String start = "<" + name + ">";
+        String end = "</" + name + ">";
         int opening = findTagOutsideJsonString(prompt, start, 0);
         if (opening < 0) throw new IllegalArgumentException("missing mock input opening tag: " + name);
         if (findTagOutsideJsonString(prompt, end, 0) >= 0 && findTagOutsideJsonString(prompt, end, 0) < opening) {
@@ -217,13 +263,18 @@ public class MockAiClient implements AiClient {
                 else if (character == '"') quoted = false;
                 continue;
             }
-            if (character == '"') { quoted = true; continue; }
+            if (character == '"') {
+                quoted = true;
+                continue;
+            }
             if (index >= fromIndex && value.startsWith(tag, index)) return index;
         }
         return -1;
     }
 
-    private record RequirementInput(String requirementId, RequirementType requirementType, String requirement, List<SourceReference> sourceRefs) { }
+    private record RequirementInput(String requirementId, RequirementType requirementType, String requirement,
+                                    List<SourceReference> sourceRefs) {
+    }
 
     private <T> T markerOf(List<AnalysisSourceMarkerParser.SourceMarker> markers, com.example.jobpuzzle.document.entity.UserDocumentType type,
                            java.util.function.Function<AnalysisSourceMarkerParser.SourceMarker, T> mapper) {
@@ -325,18 +376,18 @@ public class MockAiClient implements AiClient {
                 .evidenceSummary(
                         FinalReportResult.EvidenceSummary.builder()
                                 .requirementConnections(List.of(
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("Spring Boot 기반 백엔드 개발 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
-                                            .build(),
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("RDB 설계 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.MEDIUM)
-                                            .build(),
-                                    FinalReportResult.RequirementConnections.builder()
-                                            .requirement("AWS 인프라 운영 경험")
-                                            .matchLevel(MatchAnalysisResultMatchLevel.NONE)
-                                            .build()
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("Spring Boot 기반 백엔드 개발 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.HIGH)
+                                                .build(),
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("RDB 설계 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.MEDIUM)
+                                                .build(),
+                                        FinalReportResult.RequirementConnections.builder()
+                                                .requirement("AWS 인프라 운영 경험")
+                                                .matchLevel(MatchAnalysisResultMatchLevel.NONE)
+                                                .build()
                                 ))
                                 .usedGuide(FinalReportResult.UsedGuide.builder()
                                         .guideId(12L)
@@ -344,8 +395,8 @@ public class MockAiClient implements AiClient {
                                         .build()
                                 )
                                 .missingEvidence(List.of(
-                                    "AWS 인프라 운영 경험 근거 없음",
-                                    "테스트 코드 작성 경험 근거 없음"
+                                        "AWS 인프라 운영 경험 근거 없음",
+                                        "테스트 코드 작성 경험 근거 없음"
                                 ))
                                 .build())
                 .weaknessTagSummaries(List.of(
@@ -381,8 +432,8 @@ public class MockAiClient implements AiClient {
                                         "정량적 성과(응답시간, 처리량 등) 수치 추가"
                                 )).build())
                 .learningDirections(List.of(
-                        "AWS 배포 · 운영 실습 (EC2, S3 등) 후 포트폴리오에 사용 서비스 · 과정 · 문제해결 내용 추가",
-                        "문제 해결 경험을 정량적 성과 중심으로 서술하는 연습"
+                                "AWS 배포 · 운영 실습 (EC2, S3 등) 후 포트폴리오에 사용 서비스 · 과정 · 문제해결 내용 추가",
+                                "문제 해결 경험을 정량적 성과 중심으로 서술하는 연습"
                         )
                 )
                 .build();
