@@ -1,4 +1,168 @@
 package com.example.jobpuzzle.analysis.service;
-import com.example.jobpuzzle.analysis.dto.CompanyFitQuestionSetResponse; import com.example.jobpuzzle.analysis.entity.*; import com.example.jobpuzzle.analysis.repository.*; import com.example.jobpuzzle.guide.entity.*; import com.example.jobpuzzle.guide.repository.*; import com.example.jobpuzzle.interview.entity.*; import com.example.jobpuzzle.interview.repository.*; import com.example.jobpuzzle.global.error.*; import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.util.*;
-@Service @RequiredArgsConstructor public class CompanyFitQuestionSetQueryService { private final AnalysisCaseRepository cases; private final AnalysisInputSnapshotRepository snapshots; private final ReadinessResultRepository readiness; private final QuestionSetRepository sets; private final InterviewQuestionRepository questions; private final GuideContextResultRepository guides;
- @Transactional(readOnly=true) public CompanyFitQuestionSetResponse getCompanyFitQuestionSet(Long userId,Long caseId){AnalysisCase c=cases.findByAnalysisCaseIdAndUser_UserId(caseId,userId).orElseThrow(()->new CustomException(ErrorCode.ANALYSIS_CASE_NOT_FOUND));if(c.getStatus()!=AnalysisCaseStatus.COMPLETED)throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);AnalysisInputSnapshot s=snapshots.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(caseId,userId).orElseThrow(()->new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND));ReadinessResult r=readiness.findBySnapshot_SnapshotId(s.getSnapshotId()).orElseThrow(()->new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT));GuideContextResult g=guides.findByPurposeAndInputReferenceTypeAndInputReferenceId(GuideContextPurpose.CUSTOMIZED_SYNTHESIS,GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,String.valueOf(s.getSnapshotId())).orElseThrow(()->new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT));QuestionSet set=sets.findBySnapshot_SnapshotIdAndInterviewMode(s.getSnapshotId(),InterviewSessionMode.COMPANY_FIT).orElse(null);if(r.isCanGenerateQuestions()==(set==null)||(set!=null&&!s.getSnapshotId().equals(set.getSnapshot().getSnapshotId())))throw new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);List<InterviewQuestion> q=set==null?List.of():questions.findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(set.getQuestionSetId());if((r.isCanGenerateQuestions()&&(q.isEmpty()||q.size()>10))||q.stream().anyMatch(x->x.getReviewStatus()!=InterviewQuestionReviewStatus.PASS||x.getQuestionSet()!=set||(x.getRelatedMatch()!=null&&!s.getSnapshotId().equals(x.getRelatedMatch().getSnapshot().getSnapshotId()))))throw new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);return CompanyFitQuestionSetResponse.builder().analysisCaseId(caseId).snapshotId(s.getSnapshotId()).questionSetId(set==null?null:set.getQuestionSetId()).mode(set==null?InterviewSessionMode.COMPANY_FIT.name():set.getInterviewMode().name()).readinessStatus(r.getStatus().name()).canGenerateQuestions(r.isCanGenerateQuestions()).guideId(g.getGuide()==null?null:g.getGuide().getGuideId()).guideVersion(g.getGuideVersion()).guideMatchType(g.getMatchType().name()).questions(q.stream().map(x->CompanyFitQuestionSetResponse.Question.builder().questionId(x.getQuestionId()).displayOrder(x.getDisplayOrder()).questionType(x.getQuestionType().name()).question(x.getQuestion()).intent(x.getIntent()).evaluationFocus(x.getEvaluationFocus()).relatedMatchId(x.getRelatedMatch()==null?null:x.getRelatedMatch().getMatchId()).relatedRequirementId(x.getRelatedRequirementId()).sourceRefs(x.getSourceRefs()).build()).toList()).build();}}
+
+import com.example.jobpuzzle.analysis.dto.CompanyFitQuestionSetResponse;
+import com.example.jobpuzzle.analysis.entity.AnalysisCase;
+import com.example.jobpuzzle.analysis.entity.AnalysisCaseStatus;
+import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.ReadinessResult;
+import com.example.jobpuzzle.analysis.repository.AnalysisCaseRepository;
+import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
+import com.example.jobpuzzle.analysis.repository.ReadinessResultRepository;
+import com.example.jobpuzzle.global.error.CustomException;
+import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.entity.GuideContextInputReferenceType;
+import com.example.jobpuzzle.guide.entity.GuideContextPurpose;
+import com.example.jobpuzzle.guide.entity.GuideContextResult;
+import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
+import com.example.jobpuzzle.interview.entity.InterviewQuestion;
+import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
+import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
+import com.example.jobpuzzle.interview.entity.QuestionSet;
+import com.example.jobpuzzle.interview.repository.InterviewQuestionRepository;
+import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Objects;
+
+@Service
+@RequiredArgsConstructor
+public class CompanyFitQuestionSetQueryService {
+
+    private final AnalysisCaseRepository analysisCaseRepository;
+    private final AnalysisInputSnapshotRepository snapshotRepository;
+    private final ReadinessResultRepository readinessResultRepository;
+    private final QuestionSetRepository questionSetRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
+    private final GuideContextResultRepository guideContextResultRepository;
+
+    /**
+     * 분석 팀이 제공하는 COMPANY_FIT 인수인계 경계.
+     * interview 서비스는 이 메서드로 분석 완료·소유권·JSON-05 무결성을 먼저 검증한다.
+     */
+    @Transactional(readOnly = true)
+    public CompanyFitQuestionSetResponse getCompanyFitQuestionSet(Long userId, Long analysisCaseId) {
+        AnalysisCase analysisCase = analysisCaseRepository
+                .findByAnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ANALYSIS_CASE_NOT_FOUND));
+        if (analysisCase.getStatus() != AnalysisCaseStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);
+        }
+
+        AnalysisInputSnapshot snapshot = snapshotRepository
+                .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND));
+        ReadinessResult readiness = readinessResultRepository
+                .findBySnapshot_SnapshotId(snapshot.getSnapshotId())
+                .orElseThrow(this::integrityConflict);
+        GuideContextResult guideContext = guideContextResultRepository
+                .findByPurposeAndInputReferenceTypeAndInputReferenceId(
+                        GuideContextPurpose.CUSTOMIZED_SYNTHESIS,
+                        GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,
+                        String.valueOf(snapshot.getSnapshotId())
+                )
+                .orElseThrow(this::integrityConflict);
+
+        QuestionSet questionSet = questionSetRepository
+                .findBySnapshot_SnapshotIdAndInterviewMode(
+                        snapshot.getSnapshotId(),
+                        InterviewSessionMode.COMPANY_FIT
+                )
+                .orElse(null);
+        validateQuestionSetPresence(readiness, snapshot, questionSet);
+
+        List<InterviewQuestion> questions = questionSet == null
+                ? List.of()
+                : interviewQuestionRepository
+                        .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
+                                questionSet.getQuestionSetId()
+                        );
+        validateQuestions(readiness, snapshot, questionSet, questions);
+
+        return CompanyFitQuestionSetResponse.builder()
+                .analysisCaseId(analysisCaseId)
+                .snapshotId(snapshot.getSnapshotId())
+                .questionSetId(questionSet == null ? null : questionSet.getQuestionSetId())
+                .mode(questionSet == null
+                        ? InterviewSessionMode.COMPANY_FIT.name()
+                        : questionSet.getInterviewMode().name())
+                .readinessStatus(readiness.getStatus().name())
+                .canGenerateQuestions(readiness.isCanGenerateQuestions())
+                .guideId(guideContext.getGuide() == null
+                        ? null
+                        : guideContext.getGuide().getGuideId())
+                .guideVersion(guideContext.getGuideVersion())
+                .guideMatchType(guideContext.getMatchType().name())
+                .questions(questions.stream()
+                        .map(this::toQuestionResponse)
+                        .toList())
+                .build();
+    }
+
+    private void validateQuestionSetPresence(
+            ReadinessResult readiness,
+            AnalysisInputSnapshot snapshot,
+            QuestionSet questionSet
+    ) {
+        boolean questionSetExists = questionSet != null;
+        if (readiness.isCanGenerateQuestions() != questionSetExists) {
+            throw integrityConflict();
+        }
+        if (questionSetExists
+                && !Objects.equals(
+                        snapshot.getSnapshotId(),
+                        questionSet.getSnapshot().getSnapshotId()
+                )) {
+            throw integrityConflict();
+        }
+    }
+
+    private void validateQuestions(
+            ReadinessResult readiness,
+            AnalysisInputSnapshot snapshot,
+            QuestionSet questionSet,
+            List<InterviewQuestion> questions
+    ) {
+        if (readiness.isCanGenerateQuestions()
+                && (questions.isEmpty() || questions.size() > 10)) {
+            throw integrityConflict();
+        }
+        boolean invalid = questions.stream().anyMatch(question ->
+                question.getReviewStatus() != InterviewQuestionReviewStatus.PASS
+                        || !Objects.equals(
+                                questionSet.getQuestionSetId(),
+                                question.getQuestionSet().getQuestionSetId()
+                        )
+                        || (question.getRelatedMatch() != null
+                        && !Objects.equals(
+                                snapshot.getSnapshotId(),
+                                question.getRelatedMatch().getSnapshot().getSnapshotId()
+                        ))
+        );
+        if (invalid) {
+            throw integrityConflict();
+        }
+    }
+
+    private CompanyFitQuestionSetResponse.Question toQuestionResponse(InterviewQuestion question) {
+        return CompanyFitQuestionSetResponse.Question.builder()
+                .questionId(question.getQuestionId())
+                .displayOrder(question.getDisplayOrder())
+                .questionType(question.getQuestionType().name())
+                .question(question.getQuestion())
+                .intent(question.getIntent())
+                .evaluationFocus(question.getEvaluationFocus())
+                .relatedMatchId(question.getRelatedMatch() == null
+                        ? null
+                        : question.getRelatedMatch().getMatchId())
+                .relatedRequirementId(question.getRelatedRequirementId())
+                .sourceRefs(question.getSourceRefs())
+                .build();
+    }
+
+    private CustomException integrityConflict() {
+        return new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
+    }
+}
