@@ -29,6 +29,7 @@ import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
+import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -735,13 +736,20 @@ public class MockAiClient implements AiClient {
                 .scoreLabel("세션 종합 기준 충족도")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
+                                .intentMatch(81)
                                 .requirementConnection(75)
                                 .specificity(70)
                                 .ownRole(85)
                                 .problemSolving(68)
-                                .resultExpression(62).build())
+                                .resultExpression(62)
+                                .guideAlignment(72)
+                                .deliveryClarity(82).build())
                 .basisSummary(
                         FinalReportResult.BasisSummary.builder()
+                                .jobCategory("IT·개발 / 백엔드")
+                                .careerLevel(JobCategoryCareerLevel.NEW)
+                                .evaluationPassThreshold(70)
+                                .originEvaluationIds(List.of())
                                 .requirementConnections(List.of(
                                         FinalReportResult.RequirementConnections.builder()
                                                 .requirement("Spring Boot 기반 백엔드 개발 경험")

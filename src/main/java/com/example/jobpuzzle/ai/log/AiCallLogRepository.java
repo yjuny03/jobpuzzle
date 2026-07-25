@@ -28,12 +28,13 @@ public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
             String inputReferenceId,
             AiCallLogStatus status
     );
+
     Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdAndStatusOrderByAiCallLogIdDesc(
             AiInputReferenceType inputReferenceType, String inputReferenceId, AiCallLogStatus status);
 
-    Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
-            AiInputReferenceType inputReferenceType, String inputReferenceId);
-
     Optional<AiCallLog> findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
             AiExecutionStage executionStage, AiInputReferenceType inputReferenceType, String inputReferenceId);
+
+    Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+            AiInputReferenceType inputReferenceType, String inputReferenceId);
 }
