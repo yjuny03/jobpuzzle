@@ -368,13 +368,13 @@ public class MockAiClient implements AiClient {
                 .scoreLabel("세션 종합 기준 충족도")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
-                                .companyRequirementFit(75)
-                                .experienceSpecificity(70)
-                                .roleClarity(85)
+                                .requirementConnection(75)
+                                .specificity(70)
+                                .ownRole(85)
                                 .problemSolving(68)
                                 .resultExpression(62).build())
-                .evidenceSummary(
-                        FinalReportResult.EvidenceSummary.builder()
+                .basisSummary(
+                        FinalReportResult.BasisSummary.builder()
                                 .requirementConnections(List.of(
                                         FinalReportResult.RequirementConnections.builder()
                                                 .requirement("Spring Boot 기반 백엔드 개발 경험")
@@ -399,14 +399,14 @@ public class MockAiClient implements AiClient {
                                         "테스트 코드 작성 경험 근거 없음"
                                 ))
                                 .build())
-                .weaknessTagSummaries(List.of(
+                .weaknessTagSummary(List.of(
                         FinalReportResult.WeaknessTagSummary.builder()
                                 .tag("RESULT_EXPRESSION_WEAK")
                                 .count(4).build(),
                         FinalReportResult.WeaknessTagSummary.builder()
                                 .tag("PROBLEM_SOLVING_WEAK")
                                 .count(2).build()))
-                .nextPracticeRecommendations(List.of(
+                .nextPracticeRecommendation(List.of(
                         FinalReportResult.NextPracticeRecommendation.builder()
                                 .questionType(InterviewQuestionType.EXPERIENCE)
                                 .reason("성과 표현 부족이 누적 확인됨").build(),
@@ -431,7 +431,7 @@ public class MockAiClient implements AiClient {
                                         "트래픽 증가 대응 경험을 STAR 구조(상황-과제-행동-결과)로 재정리",
                                         "정량적 성과(응답시간, 처리량 등) 수치 추가"
                                 )).build())
-                .learningDirections(List.of(
+                .learningDirection(List.of(
                                 "AWS 배포 · 운영 실습 (EC2, S3 등) 후 포트폴리오에 사용 서비스 · 과정 · 문제해결 내용 추가",
                                 "문제 해결 경험을 정량적 성과 중심으로 서술하는 연습"
                         )

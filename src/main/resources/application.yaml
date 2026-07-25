@@ -63,6 +63,11 @@ spring:
 app:
   ai:
     running-timeout-seconds: 600
+    provider: MOCK
+    anthropic:
+      api-key:
+      model: claude-sonnet-5
+      max-tokens: 8000
 
   data-initializer:
     enabled: false

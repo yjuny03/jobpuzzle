@@ -63,7 +63,12 @@ public enum ErrorCode {
 
     // guide
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
-    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다.");
+    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다."),
+
+    // interview / report
+    INTERVIEW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "존재하지 않는 면접 세션입니다."),
+    INTERVIEW_SESSION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "REPORT_002", "완료되지 않은 세션은 최종 리포트를 생성할 수 없습니다."),
+    FINAL_REPORT_NOT_GENERATABLE(HttpStatus.BAD_REQUEST, "REPORT_003", "평가에 성공한 답변이 없어 최종 리포트를 생성할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
