@@ -21,9 +21,13 @@ import org.springframework.web.client.RestClientResponseException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Component
 public class AnthropicClient implements AiClient {
+
+    private static final int PROVIDER_ERROR_DETAIL_LIMIT = 500;
+    private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
 
     private final AiGenerationProperties properties;
     private final RestClient restClient;
@@ -105,12 +109,14 @@ public class AnthropicClient implements AiClient {
                     .retrieve()
                     .body(String.class);
         } catch (RestClientResponseException exception) {
-            throw failure(httpErrorType(exception.getStatusCode().value()), "Anthropic request failed");
+            // Provider 원문은 저장하지 않는다. 재현에 필요한 상태·안전한 error 필드·request-id만 AiCallLog에 남긴다.
+            throw failure(httpErrorType(exception.getStatusCode().value()), providerFailureMessage(exception));
         } catch (ResourceAccessException exception) {
             throw failure(isTimeout(exception) ? AiCallLogErrorType.TIMEOUT : AiCallLogErrorType.PROVIDER_ERROR,
-                    isTimeout(exception) ? "Anthropic request timed out" : "Anthropic request failed");
+                    transportFailureMessage(exception));
         } catch (RuntimeException exception) {
-            throw failure(AiCallLogErrorType.PROVIDER_ERROR, "Anthropic request failed");
+            // RestClient 구현체별로 transport 예외가 ResourceAccessException이 아닐 수 있다. 원문 메시지는 남기지 않는다.
+            throw failure(AiCallLogErrorType.PROVIDER_ERROR, unexpectedFailureMessage(exception));
         }
 
         if (rawEnvelope == null || rawEnvelope.isBlank()) {
@@ -147,6 +153,51 @@ public class AnthropicClient implements AiClient {
         return AiCallLogErrorType.PROVIDER_ERROR;
     }
 
+    private String providerFailureMessage(RestClientResponseException exception) {
+        String requestId = exception.getResponseHeaders() == null ? null
+                : exception.getResponseHeaders().getFirst("request-id");
+        SafeErrorEnvelope envelope = null;
+        try {
+            envelope = objectMapper.readValue(exception.getResponseBodyAsString(), SafeErrorEnvelope.class);
+        } catch (JsonProcessingException ignored) {
+            // JSON이 아닌 오류 본문은 기록하지 않는다. provider 원문에는 인증값이나 입력값이 포함될 수 있다.
+        }
+        String type = sanitize(envelope == null || envelope.error() == null ? null : envelope.error().type());
+        String message = sanitize(envelope == null || envelope.error() == null ? null : envelope.error().message());
+        String safeRequestId = requestId != null && REQUEST_ID.matcher(requestId).matches() ? requestId : null;
+
+        StringBuilder detail = new StringBuilder("Anthropic request failed; httpStatus=")
+                .append(exception.getStatusCode().value());
+        if (type != null) detail.append("; providerType=").append(type);
+        if (message != null) detail.append("; providerMessage=").append(message);
+        if (safeRequestId != null) detail.append("; requestId=").append(safeRequestId);
+        return detail.toString();
+    }
+
+    private String sanitize(String value) {
+        if (value == null || value.isBlank()) return null;
+        String safe = value.replaceAll("[\\r\\n\\t]", " ").trim();
+        String apiKey = properties.getAnthropic().getApiKey();
+        if (apiKey != null && !apiKey.isBlank()) safe = safe.replace(apiKey, "[REDACTED]");
+        return safe.isBlank() ? null : safe.substring(0, Math.min(safe.length(), PROVIDER_ERROR_DETAIL_LIMIT));
+    }
+
+    private String transportFailureMessage(ResourceAccessException exception) {
+        // 네트워크 예외의 원문 메시지는 프록시·인증 정보를 포함할 수 있어 저장하지 않는다.
+        Throwable cause = exception.getCause();
+        String causeType = cause == null ? null : cause.getClass().getSimpleName();
+        return causeType == null || causeType.isBlank()
+                ? "Anthropic transport request failed; exception=" + exception.getClass().getSimpleName()
+                : "Anthropic transport request failed; exception=" + exception.getClass().getSimpleName()
+                + "; cause=" + causeType;
+    }
+
+    private String unexpectedFailureMessage(RuntimeException exception) {
+        Throwable cause = exception.getCause();
+        String detail = "Anthropic request failed; exception=" + exception.getClass().getSimpleName();
+        return cause == null ? detail : detail + "; cause=" + cause.getClass().getSimpleName();
+    }
+
     private boolean isTimeout(Throwable value) {
         Throwable current = value;
         while (current != null) {
@@ -162,6 +213,10 @@ public class AnthropicClient implements AiClient {
 
     private record Request(String model, @JsonProperty("max_tokens") int maxTokens, List<Message> messages) { }
     private record Message(String role, String content) { }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record SafeErrorEnvelope(SafeError error) { }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record SafeError(String type, String message) { }
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record Response(List<ContentBlock> content) { }
 

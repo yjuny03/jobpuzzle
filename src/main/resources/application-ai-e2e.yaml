@@ -13,3 +13,7 @@ app:
         JOB_POSTING_ANALYSIS: anthropic
         CANDIDATE_MATERIAL_ANALYSIS: mock
         CUSTOMIZED_SYNTHESIS: mock
+      anthropic:
+        max-output-tokens:
+          # 실제 JSON-01 응답이 4,096 토큰에서 잘리는 것을 확인해, E2E에서만 충분한 출력 상한을 준다.
+          json01: 8192

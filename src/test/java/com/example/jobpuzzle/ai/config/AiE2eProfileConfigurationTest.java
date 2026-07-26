@@ -36,5 +36,6 @@ class AiE2eProfileConfigurationTest {
         assertThat(properties.providerFor(AiExecutionStage.JOB_POSTING_ANALYSIS)).isEqualTo(AiProvider.ANTHROPIC);
         assertThat(properties.providerFor(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)).isEqualTo(AiProvider.MOCK);
         assertThat(properties.providerFor(AiExecutionStage.CUSTOMIZED_SYNTHESIS)).isEqualTo(AiProvider.MOCK);
+        assertThat(properties.getAnthropic().getMaxOutputTokens().getJson01()).isEqualTo(8_192);
     }
 }

@@ -18,6 +18,12 @@ class PromptTemplateDeploymentArtifactTest {
     }
 
     @Test
+    void json01V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-01-v1.1.sql", "PT-JOB-001"))
+                .isEqualTo(prompt("json-01-v1.1.txt"));
+    }
+
+    @Test
     void json02SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
         // 배포 SQL에 담긴 JSON-02 본문이 리소스 정본과 달라지지 않게 검증한다.
         assertThat(sqlLiteral("insert-json-02-v1.0.sql", "PT-CAND-001"))

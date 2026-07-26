@@ -114,7 +114,7 @@ public class AiResponseProcessor {
             throw parseFailure("JSON-05 empty response");
         }
         try {
-            return strictObjectMapper.readValue(extractSingleObject(rawJson), CustomizedAnalysisGenerationResult.class);
+            return strictObjectMapper.readValue(extractSingleObject(rawJson, "JSON-05"), CustomizedAnalysisGenerationResult.class);
         } catch (JsonProcessingException exception) {
             throw parseFailure("JSON-05 parse failed: " + exception.getClass().getSimpleName());
         }
@@ -131,13 +131,34 @@ public class AiResponseProcessor {
             normalized = block.group(1).trim();
         }
         try {
-            return strictObjectMapper.readValue(normalized, type);
+            // JSON-01·02도 JSON-05와 같이 단일 객체만 추출한다. 설명문은 허용하지만 복수 객체·잘린 객체는 복구하지 않는다.
+            return strictObjectMapper.readValue(extractSingleObject(normalized, contractName), type);
         } catch (JsonProcessingException exception) {
-            throw parseFailure(contractName + " parse failed: " + exception.getClass().getSimpleName());
+            // 원문 응답은 저장하지 않는다. 잘림·형식 오류를 구분할 수 있는 응답 형태와 parser 위치만 남긴다.
+            throw parseFailure(contractName + " parse failed: " + parseDiagnostic(normalized, exception));
         }
     }
 
-    private String extractSingleObject(String rawJson) {
+    private String parseDiagnostic(String normalized, JsonProcessingException exception) {
+        long offset = exception.getLocation() == null ? -1 : exception.getLocation().getCharOffset();
+        return exception.getClass().getSimpleName()
+                + "; chars=" + normalized.length()
+                + "; first=" + characterKind(normalized.charAt(0))
+                + "; last=" + characterKind(normalized.charAt(normalized.length() - 1))
+                + "; offset=" + offset;
+    }
+
+    private String characterKind(char value) {
+        if (value == '{') return "OBJECT_OPEN";
+        if (value == '}') return "OBJECT_CLOSE";
+        if (value == '[') return "ARRAY_OPEN";
+        if (value == ']') return "ARRAY_CLOSE";
+        if (value == '"') return "QUOTE";
+        if (Character.isWhitespace(value)) return "WHITESPACE";
+        return "OTHER";
+    }
+
+    private String extractSingleObject(String rawJson, String contractName) {
         String normalized = rawJson.trim();
         Matcher block = JSON_CODE_BLOCK.matcher(normalized);
         if (block.matches()) normalized = block.group(1).trim();
@@ -165,7 +186,11 @@ public class AiResponseProcessor {
             }
         }
         if (depth != 0 || objects.size() != 1) {
-            throw parseFailure("JSON-05 must contain exactly one JSON object");
+            // 원문은 남기지 않고, 완결 객체 부재가 잘림인지 복수 응답인지 구분할 수 있는 형태만 기록한다.
+            throw parseFailure(contractName + " must contain exactly one JSON object; chars=" + normalized.length()
+                    + "; completedObjects=" + objects.size() + "; openDepth=" + depth
+                    + "; first=" + characterKind(normalized.charAt(0))
+                    + "; last=" + characterKind(normalized.charAt(normalized.length() - 1)));
         }
         return objects.get(0);
     }

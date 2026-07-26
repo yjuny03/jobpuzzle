@@ -10,6 +10,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -112,6 +114,29 @@ class AnthropicClientTest {
     }
 
     @Test
+    void recordsOnlySafeProviderDiagnosticFields() {
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .header("request-id", "req_safe_123")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"error":{"type":"invalid_request_error","message":"request body is invalid"},
+                                "untrusted":"%s"}
+                                """.formatted(DUMMY_KEY)));
+
+        assertThatThrownBy(() -> client.analyzeJobPosting("prompt"))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getErrorType()).isEqualTo(AiCallLogErrorType.PROVIDER_ERROR);
+                    assertThat(value.getMessage()).contains("httpStatus=400", "providerType=invalid_request_error",
+                            "providerMessage=request body is invalid", "requestId=req_safe_123");
+                    assertThat(value.getMessage()).doesNotContain(DUMMY_KEY);
+                });
+        server.verify();
+    }
+
+    @Test
     void mapsReadTimeoutToTimeoutWithoutRealNetworkCall() {
         ClientHttpRequestFactory timeoutFactory = (uri, method) -> {
             throw new SocketTimeoutException("dummy timeout");
@@ -119,7 +144,36 @@ class AnthropicClientTest {
         AnthropicClient timeoutClient = new AnthropicClient(properties,
                 RestClient.builder().baseUrl(BASE_URL).requestFactory(timeoutFactory).build(), new ObjectMapper());
 
-        assertFailure(() -> timeoutClient.analyzeJobPosting("prompt"), AiCallLogErrorType.TIMEOUT);
+        assertThatThrownBy(() -> timeoutClient.analyzeJobPosting("prompt"))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getErrorType()).isEqualTo(AiCallLogErrorType.TIMEOUT);
+                    assertThat(value.getMessage()).contains("exception=ResourceAccessException", "cause=SocketTimeoutException");
+                    assertThat(value.getMessage()).doesNotContain(DUMMY_KEY);
+                });
+    }
+
+    @Test
+    void recordsOnlyExceptionClassForUnexpectedTransportRuntimeFailure() {
+        ClientHttpRequestFactory failureFactory = (uri, method) -> new ClientHttpRequest() {
+            @Override public org.springframework.http.HttpMethod getMethod() { return method; }
+            @Override public java.net.URI getURI() { return uri; }
+            @Override public org.springframework.http.HttpHeaders getHeaders() { return new org.springframework.http.HttpHeaders(); }
+            @Override public java.util.Map<String, Object> getAttributes() { return java.util.Map.of(); }
+            @Override public java.io.OutputStream getBody() { return java.io.OutputStream.nullOutputStream(); }
+            @Override public ClientHttpResponse execute() { throw new IllegalStateException("must not be logged"); }
+        };
+        AnthropicClient failureClient = new AnthropicClient(properties,
+                RestClient.builder().baseUrl(BASE_URL).requestFactory(failureFactory).build(), new ObjectMapper());
+
+        assertThatThrownBy(() -> failureClient.analyzeJobPosting("prompt"))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getMessage()).contains("exception=UnsupportedOperationException");
+                    assertThat(value.getMessage()).doesNotContain("must not be logged");
+                });
     }
 
     private void expectMessage(String model, int maxTokens, String prompt) {
