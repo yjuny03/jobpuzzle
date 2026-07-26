@@ -167,10 +167,10 @@ public class AiClientService {
         return selection.client().finalReport(prompt);
     }
     public AiProvider getProvider() {
-        return mockAiClient.getProvider();
+        return resolve(AiExecutionStage.FINAL_REPORT).provider();
     }
 
     public String getModel() {
-        return mockAiClient.getModel();
+        return resolve(AiExecutionStage.FINAL_REPORT).model();
     }
 }

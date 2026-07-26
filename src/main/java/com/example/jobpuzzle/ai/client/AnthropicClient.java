@@ -28,6 +28,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -37,6 +38,7 @@ public class AnthropicClient implements AiClient {
     private static final int PROVIDER_ERROR_DETAIL_LIMIT = 500;
     private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
     private static final Pattern SAFE_ENVELOPE_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,100}");
+    private static final Pattern JSON_CODE_BLOCK = Pattern.compile("^```(?:json)?\\s*\\n([\\s\\S]*)\\n?```$");
 
     private final AiGenerationProperties properties;
     private final RestClient restClient;
@@ -374,6 +376,23 @@ public class AnthropicClient implements AiClient {
                            @JsonProperty("output_config") OutputConfig outputConfig) { }
     private record OutputConfig(Format format) { }
     private record Format(String type, com.fasterxml.jackson.databind.JsonNode schema) { }
+    // finalReport()처럼 typed 반환 메서드용 - message()가 돌려준 텍스트를 JSON으로 파싱
+    // Provider가 앞뒤에 설명 문장이나 ```json 코드블록을 붙이는 경우를 대비해 코드블록만 제거함
+    private <T> T parseJson(String text, Class<T> type) {
+        String normalized = stripCodeFence(text.trim());
+        try {
+            return objectMapper.readValue(normalized, type);
+        } catch (JsonProcessingException exception) {
+            throw failure(AiCallLogErrorType.JSON_PARSE_FAIL, "Claude 응답 JSON 파싱 실패: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    private String stripCodeFence(String text) {
+        Matcher matcher = JSON_CODE_BLOCK.matcher(text);
+        return matcher.matches() ? matcher.group(1).trim() : text;
+    }
+
+    private record Request(String model, @JsonProperty("max_tokens") int maxTokens, List<Message> messages) { }
     private record Message(String role, String content) { }
     private record Thinking(String type) { }
     @JsonIgnoreProperties(ignoreUnknown = true)
