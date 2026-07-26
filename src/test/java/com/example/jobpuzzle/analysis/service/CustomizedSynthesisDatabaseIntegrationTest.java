@@ -18,7 +18,11 @@ import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository
 import com.example.jobpuzzle.analysis.repository.ReadinessResultRepository;
 import com.example.jobpuzzle.guide.entity.GuideContextResult;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
+import com.example.jobpuzzle.guide.entity.GuideScopeType;
+import com.example.jobpuzzle.guide.entity.JobGuideDocument;
+import com.example.jobpuzzle.guide.entity.JobGuideDocumentSourceType;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
+import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
@@ -68,22 +72,23 @@ class CustomizedSynthesisDatabaseIntegrationTest {
     @Autowired private PromptTemplateRepository promptTemplateRepository;
     @Autowired private AiCallLogRepository aiCallLogRepository;
     @Autowired private GuideContextResultRepository guideContextResultRepository;
+    @Autowired private JobGuideDocumentRepository guideDocumentRepository;
     @Autowired private CustomizedSynthesisResultWriter resultWriter;
     @Autowired private ReadinessResultRepository readinessResultRepository;
     @Autowired private QuestionSetRepository questionSetRepository;
 
     @Test
-    void persistsNormalLimitedResultInMariaDbWithoutQuestionSet() {
+    void persistsNormalLimitedResultInMariaDbWithAnActiveGuideContext() {
         Fixture fixture = fixture();
         resultWriter.write(fixture.snapshot().getSnapshotId(), fixture.runningLog().getAiCallLogId(), fixture.guideContext(),
                 com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult.builder()
                         .readiness(com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult.Readiness.builder()
-                                .status(ReadinessResultStatus.GUIDE_LACK).canGenerateQuestions(false)
-                                .reason("guide unavailable").limitations(java.util.List.of("GUIDE_LACK")).build())
+                                .status(ReadinessResultStatus.POSTING_LACK).canGenerateQuestions(false)
+                                .reason("posting requirements unavailable").limitations(java.util.List.of("POSTING_LACK")).build())
                         .requirementMatches(java.util.List.of()).questions(java.util.List.of()).tasks(java.util.List.of()).build());
 
         ReadinessResult stored = readinessResultRepository.findBySnapshot_SnapshotId(fixture.snapshot().getSnapshotId()).orElseThrow();
-        assertThat(stored.getStatus()).isEqualTo(ReadinessResultStatus.GUIDE_LACK);
+        assertThat(stored.getStatus()).isEqualTo(ReadinessResultStatus.POSTING_LACK);
         assertThat(stored.isCanGenerateQuestions()).isFalse();
         assertThat(questionSetRepository.existsBySnapshot_SnapshotIdAndInterviewMode(fixture.snapshot().getSnapshotId(),
                 com.example.jobpuzzle.interview.entity.InterviewSessionMode.COMPANY_FIT)).isFalse();
@@ -107,8 +112,16 @@ class CustomizedSynthesisDatabaseIntegrationTest {
                 AiInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshot.getSnapshotId()), "fingerprint-" + suffix, prompt, null, null);
         log.start();
         log = aiCallLogRepository.saveAndFlush(log);
+        // 결과 저장기 테스트도 NONE fallback 대신 실제 ACTIVE 가이드 context만 사용한다.
+        JobGuideDocument guide = JobGuideDocument.builder().guideCode("GUIDE-" + suffix).scopeType(GuideScopeType.CATEGORY)
+                .jobCategory(category).title("DB Test Guide").sourceType(JobGuideDocumentSourceType.DIRECT_INPUT)
+                .version("v1.0").createdBy(user).applicableScope("DB test scope")
+                .evaluationFocus(java.util.List.of("evidence")).evidenceRules(java.util.List.of("source"))
+                .questionDirection(java.util.List.of("question")).avoidQuestions(java.util.List.of("avoid")).build();
+        guide.activate();
+        guide = guideDocumentRepository.saveAndFlush(guide);
         GuideContextResult guideContext = guideContextResultRepository.saveAndFlush(
-                GuideContextResult.create(user, String.valueOf(snapshot.getSnapshotId()), category, null, GuideMatchType.NONE));
+                GuideContextResult.create(user, String.valueOf(snapshot.getSnapshotId()), category, guide, GuideMatchType.EXACT));
         return new Fixture(analysisCase, snapshot, log, guideContext);
     }
 

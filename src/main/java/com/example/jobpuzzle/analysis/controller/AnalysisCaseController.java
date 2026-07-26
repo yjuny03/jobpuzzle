@@ -7,6 +7,7 @@ import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceAddRequest;
 import com.example.jobpuzzle.analysis.dto.AnalysisCaseSourceResponse;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.service.AnalysisCaseService;
+import com.example.jobpuzzle.analysis.rag.service.AnalysisVectorIndexService;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalysisCaseController {
 
     private final AnalysisCaseService analysisCaseService;
+    private final AnalysisVectorIndexService vectorIndexService;
 
     // 분석 작업 생성 (jobCategoryId 없으면 회원 기본 관심 직무 사용)
     // POST /api/analysis-cases { jobCategoryId? }
@@ -105,6 +107,12 @@ public class AnalysisCaseController {
         AnalysisInputSnapshotResponse response =
                 analysisCaseService.confirmInput(userDetails.getUser().getUserId(), analysisCaseId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @PostMapping("/api/analysis-cases/{analysisCaseId}/index")
+    public ResponseEntity<ApiResponse<Void>> index(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        vectorIndexService.index(userDetails.getUser().getUserId(), analysisCaseId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // 확정된 분석 입력 스냅샷 읽기 전용 조회

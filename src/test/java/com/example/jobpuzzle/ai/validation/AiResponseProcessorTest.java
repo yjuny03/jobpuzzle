@@ -38,8 +38,32 @@ class AiResponseProcessorTest {
     }
 
     @Test
+    void parsesSingleJsonObjectSurroundedByProviderExplanation() {
+        String response = "분석 결과는 아래 JSON입니다.\n" + validJobJson("10", "20", "JOB_POSTING", "1", "seg-001", "검증 가능한 공고 근거")
+                + "\n이 객체만 사용하세요.";
+
+        JobPostingAnalysisResult result = processor.parseJobPosting(response, List.of(jobPosting));
+
+        assertThat(result.getMainTasks()).hasSize(1);
+    }
+
+    @Test
+    void rejectsMultipleJsonObjectsInsteadOfSelectingOneArbitrarily() {
+        String valid = validJobJson("10", "20", "JOB_POSTING", "1", "seg-001", "검증 가능한 공고 근거");
+
+        assertFailure(() -> processor.parseJobPosting(valid + "\n" + valid, List.of(jobPosting)), AiCallLogErrorType.RESPONSE_PARSE_FAILED);
+    }
+
+    @Test
     void rejectsMalformedJsonAndUnknownField() {
-        assertFailure(() -> processor.parseJobPosting("{", List.of(jobPosting)), AiCallLogErrorType.RESPONSE_PARSE_FAILED);
+        assertThatThrownBy(() -> processor.parseJobPosting("{", List.of(jobPosting)))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getErrorType()).isEqualTo(AiCallLogErrorType.RESPONSE_PARSE_FAILED);
+                    assertThat(value.getMessage()).contains("JSON-01 must contain exactly one JSON object",
+                            "chars=1", "completedObjects=0", "openDepth=1", "first=OBJECT_OPEN", "last=OBJECT_OPEN");
+                });
         assertFailure(() -> processor.parseJobPosting(validJobJson("10", "20", "JOB_POSTING", "1", "seg-001", "검증 가능한 공고 근거")
                 .replace("{", "{\"unexpected\":true,"), List.of(jobPosting)), AiCallLogErrorType.RESPONSE_PARSE_FAILED);
         assertFailure(() -> processor.parseJobPosting(validJobJson("10", "20", "UNKNOWN_TYPE", "1", "seg-001", "검증 가능한 공고 근거"), List.of(jobPosting)), AiCallLogErrorType.RESPONSE_PARSE_FAILED);

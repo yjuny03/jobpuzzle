@@ -8,6 +8,7 @@ import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
 import com.example.jobpuzzle.analysis.entity.RequirementType;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import org.springframework.stereotype.Component;
@@ -26,17 +27,17 @@ public class CustomizedAnalysisResponseValidator {
         requireList("questions", result.getQuestions());
         requireList("tasks", result.getTasks());
         Map<String, RequirementInput> inputs = requirements(context.jobPostingAnalysis());
-        List<SourceReference> candidateRefs = candidateRefs(context.candidateMaterialAnalysis());
-        validateReadiness(context.guideContext(), inputs, candidateRefs, result.getReadiness());
+        Map<String, List<SourceReference>> candidateRefs = candidateRefs(context.retrievedEvidence());
+        validateReadiness(context.guideContext(), inputs, allCandidateRefs(candidateRefs), result.getReadiness());
         Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches = validateMatches(inputs, candidateRefs, result.getRequirementMatches());
-        validateQuestions(result.getReadiness().isCanGenerateQuestions(), matches, inputs.keySet(), inputs, candidateRefs, result.getQuestions());
+        validateQuestions(result.getReadiness().isCanGenerateQuestions(), matches, inputs.keySet(), inputs, allCandidateRefs(candidateRefs), result.getQuestions());
         validateTasks(matches, result.getTasks());
         return result;
     }
 
     // JSON-01의 REQUIRED/PREFERRED 요구사항이 JSON-05에 정확히 한 번씩 대응되는지 확인한다.
     private Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> validateMatches(
-            Map<String, RequirementInput> inputs, List<SourceReference> candidateRefs,
+            Map<String, RequirementInput> inputs, Map<String, List<SourceReference>> candidateRefs,
             List<CustomizedAnalysisGenerationResult.RequirementMatch> matches) {
         Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> byRequirement = new LinkedHashMap<>();
         Set<String> matchIds = new HashSet<>();
@@ -52,7 +53,7 @@ public class CustomizedAnalysisResponseValidator {
             requireText("reason", match.getReason());
             if (match.getMatchLevel() == null) fail("matchLevel is required");
             validateReferences(match.getPostingSourceRefs(), input.sourceRefs(), "postingSourceRefs", true);
-            validateCandidateEvidence(match, candidateRefs);
+            validateCandidateEvidence(match, candidateRefs.getOrDefault(match.getRequirementId(), List.of()));
             boolean high = match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH;
             if (high && !blank(match.getMissingPoint())) fail("HIGH missingPoint must be blank");
             if (!high) requireText("missingPoint", match.getMissingPoint());
@@ -178,18 +179,25 @@ public class CustomizedAnalysisResponseValidator {
         if (values.put(value.getRequirementId(), new RequirementInput(type, value.getText(), value.getSourceRefs())) != null) fail("duplicate JSON-01 requirementId");
     }
 
-    private List<SourceReference> candidateRefs(CandidateMaterialAnalysisResult result) {
-        if (result == null) fail("JSON-02 is required");
-        List<SourceReference> refs = new ArrayList<>();
-        if (result.getResume() != null) { add(refs, result.getResume().getExperiences(), CandidateMaterialAnalysisResult.Experience::getSourceRefs); add(refs, result.getResume().getSkills(), CandidateMaterialAnalysisResult.Skill::getSourceRefs); add(refs, result.getResume().getRoles(), CandidateMaterialAnalysisResult.Role::getSourceRefs); add(refs, result.getResume().getResults(), CandidateMaterialAnalysisResult.Result::getSourceRefs); }
-        if (result.getCoverLetter() != null) { addSummary(refs, result.getCoverLetter().getMotivation()); addSummary(refs, result.getCoverLetter().getValues()); result.getCoverLetter().getExperienceNarratives().forEach(value -> addSummary(refs, value)); addSummary(refs, result.getCoverLetter().getJobConnection()); }
-        if (result.getPortfolio() != null) add(refs, result.getPortfolio().getProjects(), CandidateMaterialAnalysisResult.Project::getSourceRefs);
-        if (result.getExperienceNote() != null) add(refs, result.getExperienceNote().getStarCandidates(), CandidateMaterialAnalysisResult.StarCandidate::getSourceRefs);
+    // retrieval-selected chunk만 requirement별 candidateSourceRefs의 허용 근거로 변환한다.
+    private Map<String, List<SourceReference>> candidateRefs(RetrievedEvidenceContextDto evidence) {
+        if (evidence == null || evidence.requirements() == null) fail("retrieved evidence is required");
+        Map<String, List<SourceReference>> refs = new HashMap<>();
+        for (RetrievedEvidenceContextDto.RequirementEvidence requirement : evidence.requirements()) {
+            if (requirement == null || blank(requirement.requirementId()) || requirement.chunks() == null
+                    || refs.containsKey(requirement.requirementId())) fail("invalid retrieved evidence");
+            List<SourceReference> values = requirement.chunks().stream().map(chunk -> SourceReference.builder()
+                    .extractionId(chunk.extractionId()).documentId(chunk.documentId()).documentType(chunk.documentType())
+                    .pageNumber(chunk.pageStart()).segmentId(null).evidenceText(chunk.content()).build()).toList();
+            refs.put(requirement.requirementId(), values);
+        }
         return refs;
     }
 
-    private <T> void add(List<SourceReference> target, List<T> values, Function<T, List<SourceReference>> refs) { if (values != null) values.forEach(value -> { if (refs.apply(value) != null) target.addAll(refs.apply(value)); }); }
-    private void addSummary(List<SourceReference> target, CandidateMaterialAnalysisResult.SummaryEvidence value) { if (value != null && value.getSourceRefs() != null) target.addAll(value.getSourceRefs()); }
+    // readiness와 질문은 전체 retrieval 근거를 보되 requirement match는 개별 범위를 유지한다.
+    private List<SourceReference> allCandidateRefs(Map<String, List<SourceReference>> values) {
+        return values.values().stream().flatMap(Collection::stream).toList();
+    }
     private boolean sameIdentity(SourceReference left, SourceReference right) { return Objects.equals(left.getExtractionId(), right.getExtractionId()) && Objects.equals(left.getDocumentId(), right.getDocumentId()) && left.getDocumentType() == right.getDocumentType() && Objects.equals(left.getPageNumber(), right.getPageNumber()) && Objects.equals(left.getSegmentId(), right.getSegmentId()); }
     private String normalize(String value) { return value == null ? "" : value.replaceAll("\\s+", " ").trim(); }
     private boolean blank(String value) { return value == null || value.isBlank(); }
