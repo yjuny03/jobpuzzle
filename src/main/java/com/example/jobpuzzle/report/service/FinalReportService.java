@@ -27,6 +27,7 @@ import com.example.jobpuzzle.interview.repository.InterviewMessageRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionQuestionRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
+import com.example.jobpuzzle.report.dto.FinalReportResponse;
 import com.example.jobpuzzle.report.entity.FinalReport;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestion;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestionTargetType;
@@ -107,8 +108,157 @@ public class FinalReportService {
         }
     }
 
-    public void getFinalReport() {
-        // TODO: 클래스 정의서 기준으로 구현
+    // 저장된 리포트가 있으면 그대로 반환
+    // 없으면 생성 가능 조건을 확인한 뒤 그 자리에서 생성해서 반환
+    public FinalReportResponse getFinalReport(Long userId, Long sessionId) {
+        InterviewSession session = interviewSessionRepository.findBySessionIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+
+        Optional<FinalReport> report = finalReportRepository.findBySession_SessionId(sessionId);
+        if (report.isEmpty()) {
+            generateIfPossible(session);
+            report = finalReportRepository.findBySession_SessionId(sessionId);
+            if (report.isEmpty()) {
+                throw new CustomException(ErrorCode.FINAL_REPORT_GENERATION_FAILED);
+            }
+        }
+        return toResponse(report.get());
+    }
+
+    private void generateIfPossible(InterviewSession session) {
+        if (session.getStatus() != InterviewSessionStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.INTERVIEW_SESSION_NOT_COMPLETED);
+        }
+
+        Optional<AiCallLog> latest = aiCallLogRepository
+                .findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+                        AiExecutionStage.FINAL_REPORT, AiInputReferenceType.INTERVIEW_SESSION,
+                        String.valueOf(session.getSessionId()));
+        if (latest.isPresent()) {
+            AiCallLogStatus latestStatus = latest.get().getStatus();
+            if (latestStatus == AiCallLogStatus.PENDING || latestStatus == AiCallLogStatus.RUNNING) {
+                throw new CustomException(ErrorCode.FINAL_REPORT_GENERATION_IN_PROGRESS);
+            }
+        }
+
+        generateFinalReport(session.getSessionId());
+    }
+
+    private FinalReportResponse toResponse(FinalReport report) {
+        List<ImprovementSuggestion> suggestions = improvementSuggestionRepository
+                .findByReportIdOrderByTargetTypeAscDisplayOrderAsc(report.getReportId());
+
+        return FinalReportResponse.builder()
+                .sessionId(report.getSession().getSessionId())
+                .interviewMode(report.getInterviewMode().name())
+                .totalQuestionCount(report.getTotalQuestionCount())
+                .submittedQuestionCount(report.getSubmittedQuestionCount())
+                .evaluatedQuestionCount(report.getEvaluatedQuestionCount())
+                .evaluationFailedQuestionCount(report.getEvaluationFailedQuestionCount())
+                .skippedQuestionCount(report.getSkippedQuestionCount())
+                .completionRate(report.getCompletionRate())
+                .overallScore(report.getOverallScore())
+                .scoreLabel(report.getScoreLabel())
+                .categoryScores(toResponseCategoryScores(report.getCategoryScores()))
+                .basisSummary(toResponseBasisSummary(report.getBasisSummary()))
+                .weaknessTagSummary(toResponseWeaknessTagSummaries(report.getWeaknessTagSummary()))
+                .nextPracticeRecommendation(toResponseNextPracticeRecommendations(report.getNextPracticeRecommendation()))
+                .improvementSuggestion(toResponseImprovementSuggestion(suggestions))
+                .learningDirection(report.getLearningDirection())
+                .build();
+    }
+
+    private FinalReportResponse.CategoryScores toResponseCategoryScores(
+            FinalReport.CategoryScores source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReportResponse.CategoryScores.builder()
+                .intentMatch(source.getIntentMatch())
+                .specificity(source.getSpecificity())
+                .ownRole(source.getOwnRole())
+                .problemSolving(source.getProblemSolving())
+                .resultExpression(source.getResultExpression())
+                .requirementConnection(source.getRequirementConnection())
+                .guideAlignment(source.getGuideAlignment())
+                .deliveryClarity(source.getDeliveryClarity())
+                .build();
+    }
+
+    private FinalReportResponse.BasisSummary toResponseBasisSummary(
+            FinalReport.BasisSummary source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReportResponse.BasisSummary.builder()
+                .jobCategory(source.getJobCategory())
+                .careerLevel(source.getCareerLevel() == null ? null : source.getCareerLevel().name())
+                .evaluationPassThreshold(source.getEvaluationPassThreshold())
+                .usedGuide(source.getUsedGuide() == null ? null
+                        : FinalReportResponse.UsedGuide.builder()
+                        .guideId(source.getUsedGuide().getGuideId())
+                        .version(source.getUsedGuide().getVersion())
+                        .build())
+                .requirementConnections(source.getRequirementConnections() == null ? null
+                        : source.getRequirementConnections().stream()
+                        .map(connection -> FinalReportResponse.RequirementConnection.builder()
+                                .requirement(connection.getRequirement())
+                                .matchLevel(connection.getMatchLevel() == null ? null : connection.getMatchLevel().name())
+                                .build())
+                        .toList())
+                .missingEvidence(source.getMissingEvidence())
+                .targetWeaknessTag(source.getTargetWeaknessTag())
+                .targetDimension(source.getTargetDimension())
+                .originEvaluationIds(source.getOriginEvaluationIds())
+                .build();
+    }
+
+    private List<FinalReportResponse.WeaknessTagSummary> toResponseWeaknessTagSummaries(
+            List<FinalReport.WeaknessTagSummary> source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return source.stream()
+                .map(tag -> FinalReportResponse.WeaknessTagSummary.builder()
+                        .tag(tag.getTag())
+                        .count(tag.getCount())
+                        .build())
+                .toList();
+    }
+
+    private List<FinalReportResponse.NextPracticeRecommendation> toResponseNextPracticeRecommendations(
+            List<FinalReport.NextPracticeRecommendation> source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return source.stream()
+                .map(recommendation -> FinalReportResponse.NextPracticeRecommendation.builder()
+                        .questionType(recommendation.getQuestionType() == null ? null : recommendation.getQuestionType().name())
+                        .reason(recommendation.getReason())
+                        .build())
+                .toList();
+    }
+
+    private FinalReportResponse.ImprovementSuggestion toResponseImprovementSuggestion(
+            List<ImprovementSuggestion> suggestions
+    ) {
+        return FinalReportResponse.ImprovementSuggestion.builder()
+                .resume(textsOf(suggestions, ImprovementSuggestionTargetType.RESUME))
+                .coverLetter(textsOf(suggestions, ImprovementSuggestionTargetType.COVER_LETTER))
+                .portfolio(textsOf(suggestions, ImprovementSuggestionTargetType.PORTFOLIO))
+                .experienceNote(textsOf(suggestions, ImprovementSuggestionTargetType.EXPERIENCE_NOTE))
+                .build();
+    }
+
+    private List<String> textsOf(List<ImprovementSuggestion> suggestions, ImprovementSuggestionTargetType targetType) {
+        return suggestions.stream()
+                .filter(suggestion -> suggestion.getTargetType() == targetType)
+                .map(ImprovementSuggestion::getSuggestionText)
+                .toList();
     }
 
     public void getReadinessScore() {

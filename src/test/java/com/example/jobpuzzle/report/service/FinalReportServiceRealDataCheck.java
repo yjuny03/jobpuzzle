@@ -25,6 +25,7 @@ import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
+import com.example.jobpuzzle.report.dto.FinalReportResponse;
 import com.example.jobpuzzle.report.entity.FinalReport;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestion;
 import com.example.jobpuzzle.report.repository.FinalReportRepository;
@@ -251,6 +252,51 @@ class FinalReportServiceRealDataCheck {
                 .isEqualTo(ErrorCode.FINAL_REPORT_NOT_GENERATABLE);
 
         assertThat(finalReportRepository.existsBySession_SessionId(sessionId)).isFalse();
+    }
+
+    // 저장된 리포트가 없으면 GET 호출 자체가 그 자리에서 생성해서 돌려주고, 두 번째 호출부터는 재생성 없이 재사용
+    @Test
+    void getFinalReportLazilyGeneratesThenReusesReport() {
+        Setup setup = setup();
+        String suffix = setup.suffix();
+
+        InterviewSession session = InterviewSession.builder()
+                .userId(setup.user().getUserId())
+                .questionSetId(1L)
+                .mode(InterviewSessionMode.COMPANY_FIT)
+                .jobCategoryId(setup.category().getJobCategoryId())
+                .build();
+        session.complete();
+        session = interviewSessionRepository.save(session);
+        Long sessionId = session.getSessionId();
+
+        InterviewSessionQuestion question = seedQuestion(sessionId, 1L, 1);
+        InterviewMessage answer = seedAnswer(question.getSessionQuestionId(), "원 질문에 대한 답변입니다.");
+        seedEvaluation(answer.getMessageId(), question.getSessionQuestionId(), suffix);
+
+        assertThat(finalReportRepository.existsBySession_SessionId(sessionId)).isFalse();
+
+        FinalReportResponse first = finalReportService.getFinalReport(setup.user().getUserId(), sessionId);
+        assertThat(first.getSessionId()).isEqualTo(sessionId);
+        assertThat(first.getInterviewMode()).isEqualTo("COMPANY_FIT");
+        assertThat(first.getTotalQuestionCount()).isEqualTo(1);
+        assertThat(first.getEvaluatedQuestionCount()).isEqualTo(1);
+        assertThat(first.getBasisSummary()).isNotNull();
+        assertThat(first.getBasisSummary().getJobCategory()).contains("TEST");
+        assertThat(first.getImprovementSuggestion()).isNotNull();
+
+        Long reportIdAfterFirstCall = finalReportRepository.findBySession_SessionId(sessionId).orElseThrow().getReportId();
+
+        FinalReportResponse second = finalReportService.getFinalReport(setup.user().getUserId(), sessionId);
+        assertThat(second.getSessionId()).isEqualTo(sessionId);
+        Long reportIdAfterSecondCall = finalReportRepository.findBySession_SessionId(sessionId).orElseThrow().getReportId();
+        assertThat(reportIdAfterSecondCall).isEqualTo(reportIdAfterFirstCall);
+
+        // 소유자가 아닌 userId로 조회하면 세션이 없는 것처럼 처리
+        assertThatThrownBy(() -> finalReportService.getFinalReport(setup.user().getUserId() + 999_999L, sessionId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
     }
 
     private Setup setup() {
