@@ -39,10 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class FinalReportService {
@@ -368,7 +365,7 @@ public class FinalReportService {
     }
 
     private FinalReport.CategoryScores toCategoryScores(
-            java.util.Map<String, Integer> source
+            Map<String, Integer> source
     ) {
         if (source == null) {
             return FinalReport.CategoryScores.builder().build();
