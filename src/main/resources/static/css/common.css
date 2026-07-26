@@ -216,6 +216,16 @@ button {
     color: #84c8ff;
 }
 
+.site-header.header--dark .auth-guest .btn--ghost {
+    color: #f5f9ff;
+}
+
+.site-header.header--dark .auth-guest .btn--ghost:hover,
+.site-header.header--dark .auth-guest .btn--ghost:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, .1);
+}
+
 .site-header.header--dark .user-chip {
     color: #f5f9ff;
     background: rgba(255, 255, 255, .07);
