@@ -1,6 +1,8 @@
 package com.example.jobpuzzle.analysis.entity;
 
 import com.example.jobpuzzle.global.common.BaseEntity;
+import com.example.jobpuzzle.global.error.CustomException;
+import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.user.entity.User;
 import jakarta.persistence.Column;
@@ -62,11 +64,21 @@ public class AnalysisCase extends BaseEntity {
         this.status = AnalysisCaseStatus.INPUT_CONFIRMED;
     }
 
-    // 초기 분석이 시작됐음을 표시하며, 이후 전체 파이프라인 완료 전까지 진행 상태를 유지한다.
-    public void startAnalyzing() {
-        if (this.status == AnalysisCaseStatus.INPUT_CONFIRMED) {
+    // 최초 실행 또는 실패 재시도에서 분석 작업을 실행 상태로 전이한다.
+    public void startOrRestartAnalysis() {
+        if (this.status == AnalysisCaseStatus.INPUT_CONFIRMED || this.status == AnalysisCaseStatus.FAILED) {
             this.status = AnalysisCaseStatus.ANALYZING;
+            return;
         }
+        throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);
+    }
+
+    // 실행 중 복구할 수 없는 실패를 재시도 가능한 실패 상태로 확정한다.
+    public void failAnalysis() {
+        if (this.status != AnalysisCaseStatus.ANALYZING) {
+            throw new CustomException(ErrorCode.ANALYSIS_CASE_NOT_READY);
+        }
+        this.status = AnalysisCaseStatus.FAILED;
     }
 
     // 모든 JSON-05 결과가 원자적으로 저장된 경우에만 분석 작업을 완료한다.

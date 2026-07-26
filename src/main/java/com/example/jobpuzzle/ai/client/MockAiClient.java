@@ -14,6 +14,7 @@ import com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
 import com.example.jobpuzzle.analysis.entity.RequirementType;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Component
@@ -121,30 +123,34 @@ public class MockAiClient implements AiClient {
     @Override
     public String generateCustomizedAnalysis(String renderedPrompt) {
         JobPostingAnalysisResult jobPosting = readSection(renderedPrompt, "JOB_POSTING_ANALYSIS", JobPostingAnalysisResult.class);
-        CandidateMaterialAnalysisResult candidate = readSection(renderedPrompt, "CANDIDATE_MATERIAL_ANALYSIS", CandidateMaterialAnalysisResult.class);
+        readSection(renderedPrompt, "CANDIDATE_MATERIAL_ANALYSIS", CandidateMaterialAnalysisResult.class);
         JsonNode guide = readSectionTree(renderedPrompt, "GUIDE_CONTEXT");
-        List<SourceReference> candidateRefs = candidateSourceRefs(candidate);
+        RetrievedEvidenceContextDto evidence = readSection(renderedPrompt, "RETRIEVED_EVIDENCE", RetrievedEvidenceContextDto.class);
+        Map<String, List<SourceReference>> candidateRefs = retrievedCandidateSourceRefs(evidence);
         List<RequirementInput> requirements = requirements(jobPosting);
-        ReadinessResultStatus status = readiness(requirements, candidateRefs, guide.path("matchType").asText());
+        ReadinessResultStatus status = readiness(requirements, candidateRefs.values().stream().flatMap(List::stream).toList(), guide.path("matchType").asText());
         boolean canGenerateQuestions = status == ReadinessResultStatus.SUFFICIENT || status == ReadinessResultStatus.PARTIAL;
 
         List<CustomizedAnalysisGenerationResult.RequirementMatch> matches = new java.util.ArrayList<>();
         for (RequirementInput input : requirements) {
-            boolean hasCandidateEvidence = !candidateRefs.isEmpty();
+            List<SourceReference> requirementRefs = candidateRefs.getOrDefault(input.requirementId(), List.of());
+            boolean hasCandidateEvidence = !requirementRefs.isEmpty();
             MatchAnalysisResultMatchLevel matchLevel = hasCandidateEvidence ? MatchAnalysisResultMatchLevel.HIGH : MatchAnalysisResultMatchLevel.NONE;
             matches.add(CustomizedAnalysisGenerationResult.RequirementMatch.builder()
                     .matchId("match-" + input.requirementId())
                     .requirementId(input.requirementId()).requirementType(input.requirementType()).requirement(input.requirement())
                     .postingSourceRefs(input.sourceRefs())
-                    .candidateEvidence(hasCandidateEvidence ? candidateRefs.get(0).getEvidenceText() : null)
-                    .candidateSourceRefs(hasCandidateEvidence ? List.of(candidateRefs.get(0)) : List.of())
+                    .candidateEvidence(hasCandidateEvidence ? requirementRefs.get(0).getEvidenceText() : null)
+                    .candidateSourceRefs(hasCandidateEvidence ? List.of(requirementRefs.get(0)) : List.of())
                     .matchLevel(matchLevel).reason(hasCandidateEvidence ? "입력 지원자 근거와 연결됨" : "입력 지원자 근거를 찾지 못함")
                     .missingPoint(matchLevel == MatchAnalysisResultMatchLevel.HIGH ? null : "지원자 경험 근거 보완 필요")
                     .build());
         }
 
-        List<CustomizedAnalysisGenerationResult.Question> questions = canGenerateQuestions && !matches.isEmpty()
-                ? List.of(question(matches.get(0), candidateRefs.get(0))) : List.of();
+        CustomizedAnalysisGenerationResult.RequirementMatch firstMatched = matches.stream()
+                .filter(match -> match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH).findFirst().orElse(null);
+        List<CustomizedAnalysisGenerationResult.Question> questions = canGenerateQuestions && firstMatched != null
+                ? List.of(question(firstMatched, candidateRefs.get(firstMatched.getRequirementId()).get(0))) : List.of();
         List<CustomizedAnalysisGenerationResult.Task> tasks = matches.stream()
                 .filter(match -> match.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH)
                 .map(this::task).toList();
@@ -210,6 +216,18 @@ public class MockAiClient implements AiClient {
         if (result.getExperienceNote() != null)
             result.getExperienceNote().getStarCandidates().forEach(value -> refs.addAll(value.getSourceRefs()));
         return refs;
+    }
+
+    // retrievedEvidenceJson의 requirement별 selected chunk만 JSON-05 candidate 근거로 echo한다.
+    private Map<String, List<SourceReference>> retrievedCandidateSourceRefs(RetrievedEvidenceContextDto evidence) {
+        if (evidence == null || evidence.requirements() == null) throw new IllegalArgumentException("missing mock retrieved evidence");
+        Map<String, List<SourceReference>> values = new java.util.LinkedHashMap<>();
+        for (RetrievedEvidenceContextDto.RequirementEvidence requirement : evidence.requirements()) {
+            values.put(requirement.requirementId(), requirement.chunks().stream().map(chunk -> SourceReference.builder()
+                    .extractionId(chunk.extractionId()).documentId(chunk.documentId()).documentType(chunk.documentType())
+                    .pageNumber(chunk.pageStart()).segmentId(null).evidenceText(chunk.content()).build()).toList());
+        }
+        return values;
     }
 
     private void addSummaryRefs(List<SourceReference> refs, CandidateMaterialAnalysisResult.SummaryEvidence value) {

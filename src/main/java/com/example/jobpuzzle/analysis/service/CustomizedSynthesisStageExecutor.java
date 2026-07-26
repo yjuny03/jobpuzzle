@@ -8,8 +8,12 @@ import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRenderer;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.service.AiClientService;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
+import com.example.jobpuzzle.ai.service.GenerationInputLimitValidator;
 import com.example.jobpuzzle.ai.validation.*;
 import com.example.jobpuzzle.analysis.entity.*;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContext;
+import com.example.jobpuzzle.analysis.rag.service.RetrievalContextService;
 import com.example.jobpuzzle.analysis.repository.*;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
@@ -50,11 +54,13 @@ public class CustomizedSynthesisStageExecutor {
     private final AiCallLogRepository aiCallLogRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiClientService aiClientService;
+    private final GenerationInputLimitValidator inputLimitValidator;
     private final PromptTemplateRenderer promptTemplateRenderer;
     private final AiResponseProcessor aiResponseProcessor;
     private final CustomizedAnalysisResponseValidator responseValidator;
     private final CustomizedAnalysisInputMapper inputMapper;
     private final CustomizedSynthesisResultWriter resultWriter;
+    private final RetrievalContextService retrievalContextService;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final long runningTimeoutSeconds;
@@ -69,6 +75,7 @@ public class CustomizedSynthesisStageExecutor {
                                             AiClientService aiClientService, PromptTemplateRenderer promptTemplateRenderer,
                                             AiResponseProcessor aiResponseProcessor, CustomizedAnalysisResponseValidator responseValidator,
                                             CustomizedAnalysisInputMapper inputMapper, CustomizedSynthesisResultWriter resultWriter, ObjectMapper objectMapper,
+                                            RetrievalContextService retrievalContextService, GenerationInputLimitValidator inputLimitValidator,
                                             @Value("${app.ai.running-timeout-seconds}") long runningTimeoutSeconds,
                                             PlatformTransactionManager transactionManager) {
         this.snapshotRepository = snapshotRepository;
@@ -84,11 +91,13 @@ public class CustomizedSynthesisStageExecutor {
         this.aiCallLogRepository = aiCallLogRepository;
         this.promptTemplateRepository = promptTemplateRepository;
         this.aiClientService = aiClientService;
+        this.inputLimitValidator = inputLimitValidator;
         this.promptTemplateRenderer = promptTemplateRenderer;
         this.aiResponseProcessor = aiResponseProcessor;
         this.responseValidator = responseValidator;
         this.inputMapper = inputMapper;
         this.resultWriter = resultWriter;
+        this.retrievalContextService = retrievalContextService;
         this.objectMapper = objectMapper;
         this.runningTimeoutSeconds = runningTimeoutSeconds;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -98,13 +107,21 @@ public class CustomizedSynthesisStageExecutor {
     // 선점은 짧게 끝내고 Provider 호출과 검증은 DB 락 밖에서 수행한다.
     public void execute(Long snapshotId) {
         Lease lease = acquire(snapshotId);
-        if (lease == null) return;
+        // 기존 완결 결과 또는 이미 선점된 실행은 현재 호출에서 중복 실행하지 않는다.
+        if (lease == null) {
+            return;
+        }
         try {
+            inputLimitValidator.validateCustomizedRetrieval(lease.retrievedEvidence().evidence());
             String prompt = promptTemplateRenderer.renderCustomizedAnalysis(lease.promptTemplate(), lease.mainCategory(), lease.subCategory(),
-                    lease.careerLevel(), lease.jobPosting(), lease.candidate(), lease.guideDto());
+                    lease.careerLevel(), lease.jobPosting(), lease.candidate(), lease.guideDto(), lease.retrievedEvidence().evidence());
+            inputLimitValidator.validateRenderedPrompt(lease.selection(), prompt);
             executeWithPrompt(lease, prompt);
         } catch (RuntimeException exception) {
+            // 하위 실행 단계가 이미 실패 log와 CustomException을 확정한 경우 중복 기록하지 않는다.
+            if (exception instanceof CustomException customException) throw customException;
             recordFailure(lease.aiCallLogId(), errorType(exception), exception);
+            throw toApiException(errorType(exception), exception);
         }
     }
 
@@ -112,17 +129,21 @@ public class CustomizedSynthesisStageExecutor {
     private void executeWithPrompt(Lease lease, String prompt) {
         String rawResponse;
         try {
-            rawResponse = aiClientService.generateCustomizedAnalysis(prompt);
+            rawResponse = aiClientService.generateCustomizedAnalysis(lease.selection(), prompt);
         } catch (RuntimeException exception) {
-            recordFailure(lease.aiCallLogId(), AiCallLogErrorType.PROVIDER_ERROR, exception);
-            return;
+            // Provider가 전달한 typed AI 오류는 log와 API 메시지에서 그대로 구분한다.
+            AiCallLogErrorType errorType = errorType(exception);
+            recordFailure(lease.aiCallLogId(), errorType, exception);
+            throw toApiException(errorType, exception);
         }
         try {
             CustomizedAnalysisGenerationResult result = aiResponseProcessor.parseCustomizedAnalysis(rawResponse);
-            responseValidator.validate(new CustomizedAnalysisValidationContext(lease.jobPosting(), lease.candidate(), lease.guideDto()), result);
+            responseValidator.validate(new CustomizedAnalysisValidationContext(lease.jobPosting(), lease.candidate(), lease.guideDto(),
+                    lease.retrievedEvidence().evidence()), result);
             persistResult(lease, result);
         } catch (RuntimeException exception) {
             recordFailure(lease.aiCallLogId(), errorType(exception), exception);
+            throw toApiException(errorType(exception), exception);
         }
     }
 
@@ -132,6 +153,7 @@ public class CustomizedSynthesisStageExecutor {
             resultWriter.write(lease.snapshotId(), lease.aiCallLogId(), lease.guideContext(), result);
         } catch (RuntimeException exception) {
             recordFailure(lease.aiCallLogId(), AiCallLogErrorType.RESULT_PERSIST_FAILED, exception);
+            throw toApiException(AiCallLogErrorType.RESULT_PERSIST_FAILED, exception);
         }
     }
 
@@ -159,9 +181,13 @@ public class CustomizedSynthesisStageExecutor {
             JobPostingAnalysisResult jobDto = inputMapper.jobPosting(jobPosting);
             CandidateMaterialAnalysisResult candidateDto = inputMapper.candidate(candidate);
             GuideContextResultDto guideDto = GuideContextResultDto.from(guide, guideContextChunkRepository.findByGuideContextResult_GuideContextResultIdOrderByDisplayOrderAsc(guide.getGuideContextResultId()));
-            AiProvider provider = aiClientService.getProvider();
-            String model = aiClientService.getModel();
-            String fingerprint = fingerprint(provider, model, template, guide, jobDto, candidateDto, guideDto);
+            // 검색 실행과 JSON-05 실행을 분리해 재시도 시 저장된 동일 근거를 재사용한다.
+            RetrievedEvidenceContext retrievedEvidence = retrievalContextService
+                    .getCandidateEvidenceContext(snapshot.getUser().getUserId(), snapshotId);
+            GenerationClientSelection selection = aiClientService.resolve(AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+            AiProvider provider = selection.provider();
+            String model = selection.model();
+            String fingerprint = fingerprint(provider, model, template, guide, jobDto, candidateDto, guideDto, retrievedEvidence.fingerprintMaterial());
             AiCallLog latest = aiCallLogRepository.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdAndInputFingerprintOrderByAiCallLogIdDesc(
                     AiExecutionStage.CUSTOMIZED_SYNTHESIS, AiInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshotId), fingerprint).orElse(null);
             if (latest != null && stale(latest))
@@ -172,8 +198,8 @@ public class CustomizedSynthesisStageExecutor {
                     String.valueOf(snapshotId), fingerprint, template, guide.getGuide(), latest != null && latest.getStatus() == AiCallLogStatus.FAILED ? latest : null);
             log.start();
             aiCallLogRepository.saveAndFlush(log);
-            return new Lease(snapshotId, log.getAiCallLogId(), template, jobDto, candidateDto, guide, guideDto,
-                    snapshot.getJobCategory().getMainCategory(), snapshot.getJobCategory().getSubCategory(), snapshot.getJobCategory().getCareerLevel().name());
+            return new Lease(snapshotId, log.getAiCallLogId(), template, jobDto, candidateDto, guide, guideDto, retrievedEvidence,
+                    snapshot.getJobCategory().getMainCategory(), snapshot.getJobCategory().getSubCategory(), snapshot.getJobCategory().getCareerLevel().name(), selection);
         });
     }
 
@@ -268,9 +294,11 @@ public class CustomizedSynthesisStageExecutor {
                 && log.getStartedAt() != null && log.getStartedAt().plusSeconds(runningTimeoutSeconds).isBefore(LocalDateTime.now());
     }
 
-    private String fingerprint(AiProvider provider, String model, PromptTemplate template, GuideContextResult guide, Object job, Object candidate, Object guideDto) {
+    // retrieval 근거가 바뀌면 동일 JSON-05 결과를 재사용하지 않도록 fingerprint에 반영한다.
+    private String fingerprint(AiProvider provider, String model, PromptTemplate template, GuideContextResult guide, Object job,
+                               Object candidate, Object guideDto, String retrievalFingerprintMaterial) {
         try {
-            String value = AiExecutionStage.CUSTOMIZED_SYNTHESIS + "|" + provider + "|" + model + "|" + template.getPromptTemplateId() + "|" + template.getVersion() + "|" + (guide.getGuide() == null ? "null" : guide.getGuide().getGuideId()) + "|" + guide.getGuideVersion() + "|" + objectMapper.writeValueAsString(job) + "|" + objectMapper.writeValueAsString(candidate) + "|" + objectMapper.writeValueAsString(guideDto);
+            String value = AiExecutionStage.CUSTOMIZED_SYNTHESIS + "|" + provider + "|" + model + "|" + template.getPromptTemplateId() + "|" + template.getVersion() + "|" + (guide.getGuide() == null ? "null" : guide.getGuide().getGuideId()) + "|" + guide.getGuideVersion() + "|" + objectMapper.writeValueAsString(job) + "|" + objectMapper.writeValueAsString(candidate) + "|" + objectMapper.writeValueAsString(guideDto) + "|" + retrievalFingerprintMaterial;
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8)));
         } catch (JsonProcessingException | NoSuchAlgorithmException exception) {
             throw new IllegalStateException("cannot create JSON-05 fingerprint", exception);
@@ -281,14 +309,24 @@ public class CustomizedSynthesisStageExecutor {
         return exception instanceof AiProcessingException value ? value.getErrorType() : AiCallLogErrorType.PROVIDER_ERROR;
     }
 
+    // 이미 계약된 CustomException은 보존하고 AI 실행 오류만 안전한 AI_001 응답으로 변환한다.
+    private CustomException toApiException(AiCallLogErrorType errorType, RuntimeException exception) {
+        if (exception instanceof CustomException customException) return customException;
+        return new CustomException(ErrorCode.AI_RESPONSE_INVALID, safeMessage(errorType, exception));
+    }
+
     private String safeMessage(AiCallLogErrorType errorType, RuntimeException exception) {
         return switch (errorType) {
+            case RATE_LIMIT -> "AI provider rate limit exceeded";
+            case TIMEOUT -> "AI provider request timed out";
+            case COST_LIMIT -> "AI provider cost limit exceeded";
             case PROVIDER_ERROR -> "AI provider request failed";
             case RESULT_PERSIST_FAILED -> "Customized analysis result persistence failed";
             case PROMPT_RENDER_FAILED -> "Prompt rendering failed";
             case RESPONSE_PARSE_FAILED -> "AI response parsing failed";
             case RESPONSE_VALIDATION_FAILED -> "AI response validation failed";
             case SOURCE_REFERENCE_INVALID -> "AI source reference validation failed";
+            case INPUT_LIMIT_EXCEEDED -> "AI input exceeds the configured limit";
             case STALE_RUNNING -> "AI execution timed out";
             default -> "Customized analysis execution failed";
         };
@@ -300,7 +338,7 @@ public class CustomizedSynthesisStageExecutor {
 
     private record Lease(Long snapshotId, Long aiCallLogId, PromptTemplate promptTemplate,
                          JobPostingAnalysisResult jobPosting, CandidateMaterialAnalysisResult candidate,
-                         GuideContextResult guideContext, GuideContextResultDto guideDto, String mainCategory,
-                         String subCategory, String careerLevel) {
+                         GuideContextResult guideContext, GuideContextResultDto guideDto, RetrievedEvidenceContext retrievedEvidence, String mainCategory,
+                         String subCategory, String careerLevel, GenerationClientSelection selection) {
     }
 }

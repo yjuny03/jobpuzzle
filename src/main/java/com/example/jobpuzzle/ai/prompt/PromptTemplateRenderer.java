@@ -5,6 +5,7 @@ import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.ai.validation.AiProcessingException;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
@@ -40,7 +41,7 @@ public class PromptTemplateRenderer {
     public String renderCustomizedAnalysis(PromptTemplate template, String mainCategory, String subCategory, String careerLevel,
                                            JobPostingAnalysisResult jobPostingAnalysis,
                                            CandidateMaterialAnalysisResult candidateMaterialAnalysis,
-                                           GuideContextResultDto guideContext) {
+                                           GuideContextResultDto guideContext, RetrievedEvidenceContextDto retrievedEvidence) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("mainCategory", required("mainCategory", mainCategory));
         values.put("subCategory", required("subCategory", subCategory));
@@ -48,6 +49,8 @@ public class PromptTemplateRenderer {
         values.put("jobPostingAnalysisJson", json("jobPostingAnalysisJson", jobPostingAnalysis));
         values.put("candidateMaterialAnalysisJson", json("candidateMaterialAnalysisJson", candidateMaterialAnalysis));
         values.put("guideContextJson", json("guideContextJson", guideContext));
+        // 고정 retrieval DTO를 JSON으로만 렌더링해 entity 내부 값이 prompt에 섞이지 않게 한다.
+        values.put("retrievedEvidenceJson", json("retrievedEvidenceJson", retrievedEvidence));
         return render(template, values);
     }
 

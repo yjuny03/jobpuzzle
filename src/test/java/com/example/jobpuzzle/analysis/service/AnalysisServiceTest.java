@@ -6,6 +6,8 @@ import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
 import com.example.jobpuzzle.analysis.entity.AnalysisCase;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseStatus;
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.rag.service.RequirementRetrievalService;
+import com.example.jobpuzzle.analysis.rag.service.AnalysisVectorIndexService;
 import com.example.jobpuzzle.analysis.repository.AnalysisCaseRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
@@ -30,8 +32,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,11 +52,17 @@ class AnalysisServiceTest {
     @Mock
     private AnalysisCaseService analysisCaseService;
     @Mock
+    private AnalysisCaseStatusTransitionService statusTransitionService;
+    @Mock
     private InitialAnalysisStageExecutor initialAnalysisStageExecutor;
     @Mock
     private AnalysisInputSnapshotRepository analysisInputSnapshotRepository;
     @Mock
     private GuideContextService guideContextService;
+    @Mock
+    private RequirementRetrievalService requirementRetrievalService;
+    @Mock
+    private AnalysisVectorIndexService vectorIndexService;
     @Mock
     private CustomizedSynthesisStageExecutor customizedSynthesisStageExecutor;
     @Mock
@@ -73,6 +84,7 @@ class AnalysisServiceTest {
         when(analysisCaseRepository.findByAnalysisCaseIdAndUser_UserId(ANALYSIS_CASE_ID, USER_ID))
                 .thenReturn(Optional.of(analysisCase));
         when(analysisCaseService.getAnalysisContext(USER_ID, ANALYSIS_CASE_ID)).thenReturn(context);
+        when(statusTransitionService.startOrRestart(USER_ID, ANALYSIS_CASE_ID)).thenReturn(true);
 
         jobPosting = source(UserDocumentType.JOB_POSTING, "공고", "[SOURCE job] 공고 본문");
         companyInfo = source(UserDocumentType.COMPANY_INFO, "회사", "[SOURCE company] 회사 본문");
@@ -125,7 +137,7 @@ class AnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("맞춤 분석은 초기 분석 후 같은 snapshot의 가이드와 JSON-05 실행기를 순서대로 사용한다")
+    @DisplayName("맞춤 분석은 초기 분석 후 같은 snapshot의 가이드·candidate retrieval·JSON-05를 순서대로 실행한다")
     void coordinatesCustomizedAnalysisFromTheOwnedSnapshot() {
         AnalysisInputSnapshot snapshot = org.mockito.Mockito.mock(AnalysisInputSnapshot.class);
         when(snapshot.getSnapshotId()).thenReturn(200L);
@@ -134,8 +146,106 @@ class AnalysisServiceTest {
 
         analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID);
 
-        verify(guideContextService).getOrCreateCustomizedSynthesisGuideContext(USER_ID, 200L);
-        verify(customizedSynthesisStageExecutor).execute(200L);
+        org.mockito.InOrder order = inOrder(guideContextService, requirementRetrievalService, customizedSynthesisStageExecutor);
+        order.verify(guideContextService).getOrCreateCustomizedSynthesisGuideContext(USER_ID, 200L);
+        order.verify(requirementRetrievalService).getOrCreateCandidateRetrievals(USER_ID, 200L, 3);
+        order.verify(customizedSynthesisStageExecutor).execute(200L);
+    }
+
+    @Test
+    @DisplayName("vector 색인이 준비되지 않으면 JSON 단계 전에 FAILED 전이를 요청한다")
+    void stopsPipelineWhenVectorIndexIsNotReady() {
+        CustomException failure = new CustomException(ErrorCode.VECTOR_INDEX_NOT_READY);
+        org.mockito.Mockito.doThrow(failure).when(vectorIndexService).requireReady(USER_ID, ANALYSIS_CASE_ID);
+
+        assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID)).isSameAs(failure);
+
+        verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
+        verify(initialAnalysisStageExecutor, never()).execute(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("retrieval 실패는 case 실패 전이를 확정하고 원래 예외를 다시 전달한다")
+    void marksCaseFailedWhenRetrievalFails() {
+        AnalysisInputSnapshot snapshot = org.mockito.Mockito.mock(AnalysisInputSnapshot.class);
+        when(snapshot.getSnapshotId()).thenReturn(200L);
+        when(analysisInputSnapshotRepository.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(ANALYSIS_CASE_ID, USER_ID))
+                .thenReturn(Optional.of(snapshot));
+        CustomException failure = new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT, "retrieval is missing");
+        org.mockito.Mockito.doThrow(failure).when(requirementRetrievalService)
+                .getOrCreateCandidateRetrievals(USER_ID, 200L, 3);
+
+        assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID))
+                .isSameAs(failure);
+
+        verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
+        verify(customizedSynthesisStageExecutor, never()).execute(anyLong());
+    }
+
+    @Test
+    @DisplayName("활성 가이드가 없으면 case를 FAILED로 전이하고 retrieval과 JSON-05를 호출하지 않는다")
+    void marksCaseFailedWhenActiveGuideIsMissing() {
+        // JSON-04 가이드 부재는 상위 파이프라인의 기존 실패 전이로 처리한다.
+        AnalysisInputSnapshot snapshot = org.mockito.Mockito.mock(AnalysisInputSnapshot.class);
+        when(snapshot.getSnapshotId()).thenReturn(200L);
+        when(analysisInputSnapshotRepository.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(ANALYSIS_CASE_ID, USER_ID))
+                .thenReturn(Optional.of(snapshot));
+        org.mockito.Mockito.doThrow(new CustomException(ErrorCode.GUIDE_ACTIVE_NOT_FOUND))
+                .when(guideContextService).getOrCreateCustomizedSynthesisGuideContext(USER_ID, 200L);
+
+        assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(error -> ((CustomException) error).getErrorCode())
+                .isEqualTo(ErrorCode.GUIDE_ACTIVE_NOT_FOUND);
+
+        verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
+        verify(requirementRetrievalService, never()).getOrCreateCandidateRetrievals(anyLong(), anyLong(), anyInt());
+        verify(customizedSynthesisStageExecutor, never()).execute(anyLong());
+    }
+
+    @Test
+    @DisplayName("초기 AI 단계가 실패하면 이후 단계로 진행하지 않고 case 실패 전이를 요청한다")
+    void stopsPipelineWhenInitialAiStageFails() {
+        org.mockito.Mockito.doThrow(new CustomException(ErrorCode.AI_RESPONSE_INVALID, "AI provider request failed"))
+                .when(initialAnalysisStageExecutor).execute(eq(AiExecutionStage.JOB_POSTING_ANALYSIS), any(), any(), any());
+
+        assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(error -> ((CustomException) error).getErrorCode())
+                .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
+
+        verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
+        verify(requirementRetrievalService, never()).getOrCreateCandidateRetrievals(anyLong(), anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("JSON-05 실행 실패는 완료 처리 없이 case 실패 전이를 요청한다")
+    void marksCaseFailedWhenJson05Fails() {
+        AnalysisInputSnapshot snapshot = org.mockito.Mockito.mock(AnalysisInputSnapshot.class);
+        when(snapshot.getSnapshotId()).thenReturn(200L);
+        when(analysisInputSnapshotRepository.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(ANALYSIS_CASE_ID, USER_ID))
+                .thenReturn(Optional.of(snapshot));
+        org.mockito.Mockito.doThrow(new CustomException(ErrorCode.AI_RESPONSE_INVALID, "AI response validation failed"))
+                .when(customizedSynthesisStageExecutor).execute(200L);
+
+        assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(error -> ((CustomException) error).getErrorCode())
+                .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
+
+        verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
+    }
+
+    @Test
+    @DisplayName("이미 ANALYZING인 동시 요청은 새 파이프라인 단계를 실행하지 않는다")
+    void leavesConcurrentRunningRequestUntouched() {
+        when(statusTransitionService.startOrRestart(USER_ID, ANALYSIS_CASE_ID)).thenReturn(false);
+
+        analysisService.runCustomizedAnalysis(USER_ID, ANALYSIS_CASE_ID);
+
+        verify(initialAnalysisStageExecutor, never()).execute(any(), any(), any(), any());
+        verify(requirementRetrievalService, never()).getOrCreateCandidateRetrievals(anyLong(), anyLong(), anyInt());
+        verify(customizedSynthesisStageExecutor, never()).execute(anyLong());
     }
 
     private AnalysisInputSnapshotContextSource source(UserDocumentType type, String displayName, String analysisText) {

@@ -102,6 +102,7 @@ public class GuideContextResult extends BaseTimeEntity {
         result.fallbackApplied = matchType != GuideMatchType.EXACT && matchType != GuideMatchType.NONE;
         result.insufficient = matchType == GuideMatchType.NONE;
         if (guide == null) {
+            // NONE context는 서비스 정책상 저장하지 않으므로 호출자에게 불완전 객체를 노출하지 않는다.
             result.insufficientReason = "선택한 직무·경력 또는 공통 범위의 ACTIVE 가이드가 없습니다.";
             return result;
         }

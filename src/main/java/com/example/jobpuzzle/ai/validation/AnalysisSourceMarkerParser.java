@@ -19,6 +19,10 @@ public class AnalysisSourceMarkerParser {
     private static final Pattern DOCUMENT_SECTION = Pattern.compile(
             "^\\[(JOB_POSTING|COMPANY_INFO|RESUME|COVER_LETTER|PORTFOLIO|EXPERIENCE_NOTE)]$"
     );
+    // 문서 입력 뒤의 프롬프트 계약 섹션은 marker의 원문 범위가 아니다.
+    private static final Pattern PROMPT_SECTION = Pattern.compile(
+            "^\\[(JOB_CONTEXT|[A-Z_]+_INPUT|SOURCE_REFERENCE_RULES|OUTPUT_CONTRACT|JSON_SHAPE)]$"
+    );
 
     // 컨텍스트별 analysisText를 읽어 문서 유형이 확정된 marker 목록을 만든다.
     public List<SourceMarker> parseSources(List<AnalysisInputSnapshotContextSource> sources) {
@@ -41,6 +45,12 @@ public class AnalysisSourceMarkerParser {
                 markers.addAll(parse(currentType, currentBlock.toString()));
                 currentBlock.setLength(0);
                 currentType = UserDocumentType.valueOf(section.group(1));
+            } else if (PROMPT_SECTION.matcher(line.trim()).matches()) {
+                // [JOB_POSTING_INPUT], [OUTPUT_CONTRACT] 등에서 현재 문서 블록을 닫는다.
+                // 그렇지 않으면 Mock의 evidenceText에 프롬프트 규칙까지 포함될 수 있다.
+                markers.addAll(parse(currentType, currentBlock.toString()));
+                currentBlock.setLength(0);
+                currentType = null;
             } else if (currentType != null) {
                 currentBlock.append(line).append("\n");
             }

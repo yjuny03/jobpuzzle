@@ -7,10 +7,15 @@ import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRenderer;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.service.AiClientService;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
+import com.example.jobpuzzle.ai.service.GenerationInputLimitValidator;
 import com.example.jobpuzzle.ai.validation.AiResponseProcessor;
 import com.example.jobpuzzle.ai.validation.CustomizedAnalysisResponseValidator;
 import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
 import com.example.jobpuzzle.analysis.entity.*;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContext;
+import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
+import com.example.jobpuzzle.analysis.rag.service.RetrievalContextService;
 import com.example.jobpuzzle.analysis.repository.*;
 import com.example.jobpuzzle.guide.entity.GuideContextResult;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
@@ -20,6 +25,7 @@ import com.example.jobpuzzle.interview.repository.InterviewQuestionRepository;
 import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
+import com.example.jobpuzzle.user.entity.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,11 +65,13 @@ class CustomizedSynthesisStageExecutorTest {
     @Mock private AiCallLogRepository aiCallLogRepository;
     @Mock private PromptTemplateRepository promptTemplateRepository;
     @Mock private AiClientService aiClientService;
+    @Mock private GenerationInputLimitValidator inputLimitValidator;
     @Mock private PromptTemplateRenderer promptTemplateRenderer;
     @Mock private AiResponseProcessor aiResponseProcessor;
     @Mock private CustomizedAnalysisResponseValidator validator;
     @Mock private CustomizedAnalysisInputMapper inputMapper;
     @Mock private CustomizedSynthesisResultWriter resultWriter;
+    @Mock private RetrievalContextService retrievalContextService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AnalysisInputSnapshot snapshot;
     @Mock private JobPostingAnalysis jobPosting;
@@ -78,7 +86,7 @@ class CustomizedSynthesisStageExecutorTest {
                 guideContextRepository, guideContextChunkRepository, readinessRepository, matchRepository,
                 actionPlanRepository, questionSetRepository, questionRepository, aiCallLogRepository,
                 promptTemplateRepository, aiClientService, promptTemplateRenderer, aiResponseProcessor, validator,
-                inputMapper, resultWriter, new ObjectMapper(), 600L, transactionManager);
+                inputMapper, resultWriter, new ObjectMapper(), retrievalContextService, inputLimitValidator, 600L, transactionManager);
         when(transactionManager.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
 
         JobCategory category = JobCategory.builder().mainCategory("IT").subCategory("BACKEND")
@@ -87,6 +95,9 @@ class CustomizedSynthesisStageExecutorTest {
         ReflectionTestUtils.setField(analysisCase, "status", AnalysisCaseStatus.ANALYZING);
         when(snapshot.getAnalysisCase()).thenReturn(analysisCase);
         when(snapshot.getJobCategory()).thenReturn(category);
+        User owner = mock(User.class);
+        when(owner.getUserId()).thenReturn(10L);
+        when(snapshot.getUser()).thenReturn(owner);
         when(snapshotRepository.findWithLockBySnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(snapshot));
         when(jobPostingRepository.findBySnapshot_SnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(jobPosting));
         when(candidateRepository.findBySnapshot_SnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(candidate));
@@ -115,8 +126,10 @@ class CustomizedSynthesisStageExecutorTest {
         PromptTemplate synthesisPrompt = prompt("JSON-05", 2L);
         when(promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05"))
                 .thenReturn(Optional.of(synthesisPrompt));
-        when(aiClientService.getProvider()).thenReturn(AiProvider.MOCK);
-        when(aiClientService.getModel()).thenReturn("mock-v1");
+        when(aiClientService.resolve(any())).thenAnswer(invocation -> new GenerationClientSelection(
+                invocation.getArgument(0), mock(com.example.jobpuzzle.ai.client.AiClient.class), AiProvider.MOCK, "mock-v1", 4096));
+        when(retrievalContextService.getCandidateEvidenceContext(anyLong(), eq(SNAPSHOT_ID)))
+                .thenReturn(new RetrievedEvidenceContext(new RetrievedEvidenceContextDto(List.of()), "empty-retrieval"));
         when(aiCallLogRepository.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdAndInputFingerprintOrderByAiCallLogIdDesc(
                 any(), any(), anyString(), anyString())).thenReturn(Optional.empty());
         when(aiCallLogRepository.saveAndFlush(any(AiCallLog.class))).thenAnswer(invocation -> {
@@ -129,12 +142,15 @@ class CustomizedSynthesisStageExecutorTest {
 
     @Test
     void providerFailureLeavesNoResultAndMarksOnlyTheClaimedLogFailed() {
-        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any()))
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
                 .thenReturn("rendered prompt");
-        when(aiClientService.generateCustomizedAnalysis("rendered prompt"))
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
                 .thenThrow(new IllegalStateException("provider unavailable"));
 
-        executor.execute(SNAPSHOT_ID);
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
 
         verify(resultWriter, never()).write(anyLong(), anyLong(), any(), any());
         assertThat(runningLog.getStatus()).isEqualTo(AiCallLogStatus.FAILED);
@@ -151,7 +167,7 @@ class CustomizedSynthesisStageExecutorTest {
 
         executor.execute(SNAPSHOT_ID);
 
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
         verify(resultWriter, never()).write(anyLong(), anyLong(), any(), any());
     }
 
@@ -163,7 +179,7 @@ class CustomizedSynthesisStageExecutorTest {
 
         executor.execute(SNAPSHOT_ID);
 
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
         verify(aiCallLogRepository, never()).saveAndFlush(any(AiCallLog.class));
     }
 
@@ -177,7 +193,7 @@ class CustomizedSynthesisStageExecutorTest {
 
         executor.execute(SNAPSHOT_ID);
 
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
         verify(aiCallLogRepository, never()).saveAndFlush(any(AiCallLog.class));
     }
 
@@ -190,7 +206,7 @@ class CustomizedSynthesisStageExecutorTest {
 
         executor.execute(SNAPSHOT_ID);
 
-        verify(aiClientService).generateCustomizedAnalysis("rendered prompt");
+        verify(aiClientService).generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt"));
         verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), any());
     }
 
@@ -207,7 +223,7 @@ class CustomizedSynthesisStageExecutorTest {
 
         assertThat(stale.getStatus()).isEqualTo(AiCallLogStatus.FAILED);
         assertThat(stale.getErrorType()).isEqualTo(AiCallLogErrorType.STALE_RUNNING);
-        verify(aiClientService).generateCustomizedAnalysis("rendered prompt");
+        verify(aiClientService).generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt"));
     }
 
     @Test
@@ -221,7 +237,7 @@ class CustomizedSynthesisStageExecutorTest {
                 .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
                 .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
                 .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
     }
 
     @Test
@@ -237,7 +253,7 @@ class CustomizedSynthesisStageExecutorTest {
                 .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
                 .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
         assertThat(succeeded.getStatus()).isEqualTo(AiCallLogStatus.SUCCEEDED);
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
         verify(aiCallLogRepository, never()).saveAndFlush(any(AiCallLog.class));
     }
 
@@ -306,7 +322,10 @@ class CustomizedSynthesisStageExecutorTest {
         doThrow(new IllegalStateException("resume evidenceText: private candidate material"))
                 .when(resultWriter).write(anyLong(), anyLong(), any(), any());
 
-        executor.execute(SNAPSHOT_ID);
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getMessage())
+                .isEqualTo("Customized analysis result persistence failed");
 
         assertThat(runningLog.getStatus()).isEqualTo(AiCallLogStatus.FAILED);
         assertThat(runningLog.getErrorType()).isEqualTo(AiCallLogErrorType.RESULT_PERSIST_FAILED);
@@ -315,9 +334,9 @@ class CustomizedSynthesisStageExecutorTest {
     }
 
     private void prepareSuccessfulExecution() {
-        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any()))
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
                 .thenReturn("rendered prompt");
-        when(aiClientService.generateCustomizedAnalysis("rendered prompt")).thenReturn("{}");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt"))).thenReturn("{}");
         when(aiResponseProcessor.parseCustomizedAnalysis("{}")).thenReturn(mock(CustomizedAnalysisGenerationResult.class));
     }
 
@@ -326,7 +345,7 @@ class CustomizedSynthesisStageExecutorTest {
                 .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
                 .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
                 .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
-        verify(aiClientService, never()).generateCustomizedAnalysis(anyString());
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(GenerationClientSelection.class), anyString());
     }
 
     private JobPostingAnalysisResult postingWithRequirement() {

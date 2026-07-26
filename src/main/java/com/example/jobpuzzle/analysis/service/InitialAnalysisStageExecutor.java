@@ -13,6 +13,8 @@ import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRenderer;
 import com.example.jobpuzzle.ai.service.AiClientService;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
+import com.example.jobpuzzle.ai.service.GenerationInputLimitValidator;
 import com.example.jobpuzzle.ai.validation.AiProcessingException;
 import com.example.jobpuzzle.ai.validation.AiResponseProcessor;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
@@ -49,6 +51,7 @@ public class InitialAnalysisStageExecutor {
     private final AiCallLogRepository aiCallLogRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiClientService aiClientService;
+    private final GenerationInputLimitValidator inputLimitValidator;
     private final PromptTemplateRenderer promptTemplateRenderer;
     private final AiResponseProcessor aiResponseProcessor;
     private final TransactionTemplate transactionTemplate;
@@ -61,6 +64,7 @@ public class InitialAnalysisStageExecutor {
             AiCallLogRepository aiCallLogRepository,
             PromptTemplateRepository promptTemplateRepository,
             AiClientService aiClientService,
+            GenerationInputLimitValidator inputLimitValidator,
             PromptTemplateRenderer promptTemplateRenderer,
             AiResponseProcessor aiResponseProcessor,
             @Value("${app.ai.running-timeout-seconds}") long runningTimeoutSeconds,
@@ -72,6 +76,7 @@ public class InitialAnalysisStageExecutor {
         this.aiCallLogRepository = aiCallLogRepository;
         this.promptTemplateRepository = promptTemplateRepository;
         this.aiClientService = aiClientService;
+        this.inputLimitValidator = inputLimitValidator;
         this.promptTemplateRenderer = promptTemplateRenderer;
         this.aiResponseProcessor = aiResponseProcessor;
         this.runningTimeoutSeconds = runningTimeoutSeconds;
@@ -88,6 +93,7 @@ public class InitialAnalysisStageExecutor {
     ) {
         StageLease lease = acquire(executionStage, context, primarySources, supplementarySources);
         if (lease == null) {
+            // 기존 성공 결과 또는 이미 선점된 실행은 현재 호출에서 중복 실행하지 않는다.
             return;
         }
 
@@ -96,21 +102,24 @@ public class InitialAnalysisStageExecutor {
             String prompt = promptTemplateRenderer.render(
                     lease.executionStage(), lease.promptTemplate(), lease.context(), lease.primarySources(), lease.supplementarySources()
             );
+            inputLimitValidator.validateRenderedPrompt(lease.selection(), prompt);
             // DB 락을 해제한 뒤에만 Provider 원시 JSON을 호출하고 파싱·검증한다.
             if (executionStage == AiExecutionStage.JOB_POSTING_ANALYSIS) {
                 JobPostingAnalysisResult result = aiResponseProcessor.parseJobPosting(
-                        aiClientService.analyzeJobPosting(prompt), allSources(lease)
+                        aiClientService.analyzeJobPosting(lease.selection(), prompt), allSources(lease)
                 );
                 saveJobPostingSuccess(lease, result);
             } else {
                 CandidateMaterialAnalysisResult result = aiResponseProcessor.parseCandidateMaterial(
-                        aiClientService.analyzeCandidateMaterial(prompt), lease.primarySources()
+                        aiClientService.analyzeCandidateMaterial(lease.selection(), prompt), lease.primarySources()
                 );
                 saveCandidateMaterialSuccess(lease, result);
             }
         } catch (RuntimeException exception) {
-            // 호출 또는 결과 저장 실패를 별도 트랜잭션에서 로그로 종결한다.
-            recordFailure(lease.aiCallLogId(), exception);
+            // 호출 또는 결과 저장 실패를 별도 트랜잭션에서 로그로 종결한 뒤 안전한 API 예외로 전달한다.
+            AiCallLogErrorType errorType = errorType(exception);
+            recordFailure(lease.aiCallLogId(), errorType, exception);
+            throw toApiException(errorType, exception);
         }
     }
 
@@ -129,8 +138,9 @@ public class InitialAnalysisStageExecutor {
                 return null;
             }
 
-            AiProvider provider = aiClientService.getProvider();
-            String model = aiClientService.getModel();
+            GenerationClientSelection selection = aiClientService.resolve(executionStage);
+            AiProvider provider = selection.provider();
+            String model = selection.model();
             String inputReferenceId = String.valueOf(snapshot.getSnapshotId());
             String fingerprint = fingerprint(executionStage, provider, model, promptTemplate,
                     promptTemplateRenderer.fingerprintMaterial(executionStage, promptTemplate, context, primarySources, supplementarySources));
@@ -165,9 +175,8 @@ public class InitialAnalysisStageExecutor {
             );
             log.start();
             aiCallLogRepository.saveAndFlush(log);
-            snapshot.getAnalysisCase().startAnalyzing();
             return new StageLease(snapshot.getSnapshotId(), log.getAiCallLogId(), executionStage, promptTemplate,
-                    context, primarySources, supplementarySources);
+                    context, primarySources, supplementarySources, selection);
         });
     }
 
@@ -208,15 +217,38 @@ public class InitialAnalysisStageExecutor {
     }
 
     // 실패 원인은 RUNNING 로그에만 기록해 이미 성공한 실행을 덮어쓰지 않는다.
-    private void recordFailure(Long aiCallLogId, RuntimeException exception) {
+    private void recordFailure(Long aiCallLogId, AiCallLogErrorType errorType, RuntimeException exception) {
         transactionTemplate.executeWithoutResult(status -> {
             AiCallLog log = findLog(aiCallLogId);
             if (log.getStatus() == AiCallLogStatus.RUNNING) {
-                AiCallLogErrorType errorType = exception instanceof AiProcessingException processingException
-                        ? processingException.getErrorType() : AiCallLogErrorType.PROVIDER_ERROR;
                 log.fail(errorType, summarize(exception));
             }
         });
+    }
+
+    // 이미 계약된 CustomException은 보존하고 AI 실행 오류만 안전한 AI_001 응답으로 변환한다.
+    private CustomException toApiException(AiCallLogErrorType errorType, RuntimeException exception) {
+        if (exception instanceof CustomException customException) return customException;
+        return new CustomException(ErrorCode.AI_RESPONSE_INVALID, clientMessage(errorType));
+    }
+
+    private AiCallLogErrorType errorType(RuntimeException exception) {
+        return exception instanceof AiProcessingException processingException
+                ? processingException.getErrorType() : AiCallLogErrorType.PROVIDER_ERROR;
+    }
+
+    private String clientMessage(AiCallLogErrorType errorType) {
+        return switch (errorType) {
+            case RATE_LIMIT -> "AI provider rate limit exceeded";
+            case TIMEOUT -> "AI provider request timed out";
+            case COST_LIMIT -> "AI provider cost limit exceeded";
+            case RESPONSE_PARSE_FAILED -> "AI response parsing failed";
+            case RESPONSE_VALIDATION_FAILED -> "AI response validation failed";
+            case SOURCE_REFERENCE_INVALID -> "AI source reference validation failed";
+            case PROMPT_RENDER_FAILED -> "AI prompt rendering failed";
+            case INPUT_LIMIT_EXCEEDED -> "AI input exceeds the configured limit";
+            default -> "AI provider request failed";
+        };
     }
 
     private AnalysisInputSnapshot findSnapshotWithLock(Long snapshotId) {
@@ -296,7 +328,8 @@ public class InitialAnalysisStageExecutor {
             PromptTemplate promptTemplate,
             AnalysisInputSnapshotContext context,
             List<AnalysisInputSnapshotContextSource> primarySources,
-            List<AnalysisInputSnapshotContextSource> supplementarySources
+            List<AnalysisInputSnapshotContextSource> supplementarySources,
+            GenerationClientSelection selection
     ) {
     }
 }

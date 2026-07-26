@@ -13,6 +13,8 @@ import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRenderer;
 import com.example.jobpuzzle.ai.service.AiClientService;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
+import com.example.jobpuzzle.ai.service.GenerationInputLimitValidator;
 import com.example.jobpuzzle.ai.validation.AiResponseProcessor;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
@@ -23,6 +25,7 @@ import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository
 import com.example.jobpuzzle.analysis.repository.CandidateMaterialAnalysisRepository;
 import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
+import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +51,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -69,6 +73,7 @@ class InitialAnalysisStageExecutorTest {
     @Mock private AiCallLogRepository aiCallLogRepository;
     @Mock private PromptTemplateRepository promptTemplateRepository;
     @Mock private AiClientService aiClientService;
+    @Mock private GenerationInputLimitValidator inputLimitValidator;
     @Mock private PromptTemplateRenderer promptTemplateRenderer;
     @Mock private AiResponseProcessor aiResponseProcessor;
     @Mock private PlatformTransactionManager transactionManager;
@@ -89,6 +94,7 @@ class InitialAnalysisStageExecutorTest {
                 aiCallLogRepository,
                 promptTemplateRepository,
                 aiClientService,
+                inputLimitValidator,
                 promptTemplateRenderer,
                 aiResponseProcessor,
                 600L,
@@ -104,8 +110,8 @@ class InitialAnalysisStageExecutorTest {
         when(context.getMainCategory()).thenReturn("IT·개발");
         when(context.getSubCategory()).thenReturn("백엔드");
         when(context.getCareerLevel()).thenReturn(JobCategoryCareerLevel.NEW);
-        when(aiClientService.getProvider()).thenReturn(AiProvider.MOCK);
-        when(aiClientService.getModel()).thenReturn("mock-fixed-sample");
+        when(aiClientService.resolve(any())).thenAnswer(invocation -> new GenerationClientSelection(
+                invocation.getArgument(0), org.mockito.Mockito.mock(com.example.jobpuzzle.ai.client.AiClient.class), AiProvider.MOCK, "mock-fixed-sample", 4096));
         when(promptTemplateRenderer.fingerprintMaterial(any(), any(), any(), any(), any())).thenReturn("fingerprint-material");
         when(promptTemplateRenderer.render(any(), any(), any(), any(), any())).thenReturn("rendered prompt");
         when(aiResponseProcessor.parseJobPosting(anyString(), any())).thenReturn(JobPostingAnalysisResult.builder()
@@ -143,11 +149,14 @@ class InitialAnalysisStageExecutorTest {
     @Test
     @DisplayName("JSON-01 성공 후 JSON-02 실패는 별도 트랜잭션 로그로 기록되어 JSON-01을 보존한다")
     void preservesJobPostingResultWhenCandidateMaterialFails() {
-        when(aiClientService.analyzeJobPosting(anyString())).thenReturn("{}");
-        when(aiClientService.analyzeCandidateMaterial(anyString())).thenThrow(new IllegalStateException("candidate provider failure"));
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenReturn("{}");
+        when(aiClientService.analyzeCandidateMaterial(any(GenerationClientSelection.class), anyString())).thenThrow(new IllegalStateException("candidate provider failure"));
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
-        executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of());
+        assertThatThrownBy(() -> executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of()))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
 
         verify(jobPostingAnalysisRepository).saveAndFlush(any());
         verify(candidateMaterialAnalysisRepository, never()).saveAndFlush(any());
@@ -160,9 +169,25 @@ class InitialAnalysisStageExecutorTest {
     }
 
     @Test
+    @DisplayName("typed provider rate limit은 AI_001과 안전한 quota 메시지로 전달하고 log 유형을 보존한다")
+    void preservesRateLimitTypeForApiAndAiCallLog() {
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenThrow(new com.example.jobpuzzle.ai.validation.AiProcessingException(
+                AiCallLogErrorType.RATE_LIMIT, "provider quota detail"));
+
+        CustomException exception = catchThrowableOfType(
+                () -> executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of()),
+                CustomException.class);
+        assertThat(exception.getErrorCode()).isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
+        assertThat(exception.getMessage()).isEqualTo("AI provider rate limit exceeded");
+
+        assertThat(savedLogs).hasSize(1);
+        assertThat(savedLogs.get(0).getErrorType()).isEqualTo(AiCallLogErrorType.RATE_LIMIT);
+    }
+
+    @Test
     @DisplayName("FAILED 단계는 새 RUNNING 로그를 만들고 재시도한다")
     void retriesFailedStageOnly() {
-        when(aiClientService.analyzeCandidateMaterial(anyString()))
+        when(aiClientService.analyzeCandidateMaterial(any(GenerationClientSelection.class), anyString()))
                 .thenThrow(new IllegalStateException("first failure"))
                 .thenReturn("{}");
         when(aiCallLogRepository.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdAndInputFingerprintOrderByAiCallLogIdDesc(
@@ -172,10 +197,11 @@ class InitialAnalysisStageExecutorTest {
                 anyString()))
                 .thenAnswer(invocation -> savedLogs.isEmpty() ? Optional.empty() : Optional.of(savedLogs.get(savedLogs.size() - 1)));
 
-        executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of());
+        assertThatThrownBy(() -> executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of()))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class);
         executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of());
 
-        verify(aiClientService, org.mockito.Mockito.times(2)).analyzeCandidateMaterial(anyString());
+        verify(aiClientService, org.mockito.Mockito.times(2)).analyzeCandidateMaterial(any(GenerationClientSelection.class), anyString());
         verify(candidateMaterialAnalysisRepository).saveAndFlush(any());
         assertThat(savedLogs).hasSize(2);
         assertThat(savedLogs.get(0).getStatus()).isEqualTo(AiCallLogStatus.FAILED);
@@ -193,7 +219,7 @@ class InitialAnalysisStageExecutorTest {
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
 
-        verify(aiClientService, never()).analyzeJobPosting(anyString());
+        verify(aiClientService, never()).analyzeJobPosting(any(GenerationClientSelection.class), anyString());
         verify(jobPostingAnalysisRepository, never()).saveAndFlush(any());
         verify(aiCallLogRepository, never()).saveAndFlush(any());
     }
@@ -209,7 +235,7 @@ class InitialAnalysisStageExecutorTest {
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
 
-        verify(aiClientService, never()).analyzeJobPosting(anyString());
+        verify(aiClientService, never()).analyzeJobPosting(any(GenerationClientSelection.class), anyString());
         verify(jobPostingAnalysisRepository, never()).saveAndFlush(any());
     }
 
@@ -222,7 +248,7 @@ class InitialAnalysisStageExecutorTest {
         assertThatThrownBy(() -> executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of()))
                 .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class);
         verify(aiCallLogRepository, never()).saveAndFlush(any());
-        verify(aiClientService, never()).analyzeJobPosting(anyString());
+        verify(aiClientService, never()).analyzeJobPosting(any(GenerationClientSelection.class), anyString());
     }
 
     @Test
@@ -232,7 +258,7 @@ class InitialAnalysisStageExecutorTest {
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
 
-        verify(aiClientService, never()).analyzeJobPosting(anyString());
+        verify(aiClientService, never()).analyzeJobPosting(any(GenerationClientSelection.class), anyString());
         verify(jobPostingAnalysisRepository, never()).saveAndFlush(any());
     }
 
@@ -245,7 +271,7 @@ class InitialAnalysisStageExecutorTest {
                 eq(AiExecutionStage.JOB_POSTING_ANALYSIS), eq(AiInputReferenceType.ANALYSIS_SNAPSHOT),
                 eq(String.valueOf(SNAPSHOT_ID)), anyString()))
                 .thenAnswer(invocation -> savedLogs.isEmpty() ? Optional.empty() : Optional.of(savedLogs.get(0)));
-        when(aiClientService.analyzeJobPosting(anyString())).thenAnswer(invocation -> {
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenAnswer(invocation -> {
             aiStarted.countDown();
             releaseAi.await(3, TimeUnit.SECONDS);
             return "{}";
@@ -263,7 +289,7 @@ class InitialAnalysisStageExecutorTest {
             pool.shutdownNow();
         }
 
-        verify(aiClientService, times(1)).analyzeJobPosting(anyString());
+        verify(aiClientService, times(1)).analyzeJobPosting(any(GenerationClientSelection.class), anyString());
         verify(jobPostingAnalysisRepository, times(1)).saveAndFlush(any());
         assertThat(savedLogs).hasSize(1);
     }
@@ -276,7 +302,7 @@ class InitialAnalysisStageExecutorTest {
         when(aiCallLogRepository.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdAndInputFingerprintOrderByAiCallLogIdDesc(
                 eq(AiExecutionStage.JOB_POSTING_ANALYSIS), eq(AiInputReferenceType.ANALYSIS_SNAPSHOT),
                 eq(String.valueOf(SNAPSHOT_ID)), anyString())).thenReturn(Optional.of(stale));
-        when(aiClientService.analyzeJobPosting(anyString())).thenReturn("{}");
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenReturn("{}");
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
 
@@ -289,13 +315,16 @@ class InitialAnalysisStageExecutorTest {
     @Test
     @DisplayName("응답 파싱·검증 실패는 결과를 저장하지 않고 해당 RUNNING 로그를 FAILED로 기록한다")
     void recordsValidationFailureWithoutSavingResult() {
-        when(aiClientService.analyzeJobPosting(anyString())).thenReturn("not-json");
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenReturn("not-json");
         when(aiResponseProcessor.parseJobPosting(anyString(), any()))
                 .thenThrow(new com.example.jobpuzzle.ai.validation.AiProcessingException(
                         AiCallLogErrorType.RESPONSE_PARSE_FAILED, "JSON-01 parse failed"
                 ));
 
-        executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
+        assertThatThrownBy(() -> executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of()))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getMessage())
+                .isEqualTo("AI response parsing failed");
 
         verify(jobPostingAnalysisRepository, never()).saveAndFlush(any());
         assertThat(savedLogs).hasSize(1);
@@ -306,15 +335,18 @@ class InitialAnalysisStageExecutorTest {
     @Test
     @DisplayName("JSON-01 성공 뒤 JSON-02 검증 실패는 JSON-01 결과를 보존한다")
     void preservesJobPostingResultWhenCandidateValidationFails() {
-        when(aiClientService.analyzeJobPosting(anyString())).thenReturn("{}");
-        when(aiClientService.analyzeCandidateMaterial(anyString())).thenReturn("invalid");
+        when(aiClientService.analyzeJobPosting(any(GenerationClientSelection.class), anyString())).thenReturn("{}");
+        when(aiClientService.analyzeCandidateMaterial(any(GenerationClientSelection.class), anyString())).thenReturn("invalid");
         when(aiResponseProcessor.parseCandidateMaterial(anyString(), any()))
                 .thenThrow(new com.example.jobpuzzle.ai.validation.AiProcessingException(
                         AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, "availableDocumentTypes mismatch"
                 ));
 
         executor.execute(AiExecutionStage.JOB_POSTING_ANALYSIS, context, jobSources, List.of());
-        executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of());
+        assertThatThrownBy(() -> executor.execute(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, context, candidateSources, List.of()))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getMessage())
+                .isEqualTo("AI response validation failed");
 
         verify(jobPostingAnalysisRepository).saveAndFlush(any());
         verify(candidateMaterialAnalysisRepository, never()).saveAndFlush(any());

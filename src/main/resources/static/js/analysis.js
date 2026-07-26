@@ -3,19 +3,27 @@
   'use strict';
   var root = document.getElementById('analysis-root');
   var caseId = (location.pathname.match(/^\/analysis\/(\d+)$/) || [])[1];
-  var state = { disposed: false, statusLoading: false, running: false, resultLoaded: false, result: null, status: null, controller: null };
+  var state = { disposed: false, statusLoading: false, running: false, resultLoaded: false, result: null, status: null, runError: null, controller: null };
   var stageDefs = [
     ['jobPostingAnalysisStatus', '채용공고 분석'], ['candidateMaterialAnalysisStatus', '지원자 자료 분석'],
     ['guideContextStatus', '직무 가이드 적용'], ['customizedAnalysisStatus', '맞춤 분석 생성']
   ];
   var stageLabels = { NOT_STARTED: '분석 대기', RUNNING: '분석 중', SUCCEEDED: '분석 완료', FAILED: '분석 실패' };
-  var errorLabels = { ANALYSIS_002: '분석 작업을 찾을 수 없거나 접근 권한이 없습니다.', ANALYSIS_009: '분석을 시작할 준비가 아직 완료되지 않았습니다.', ANALYSIS_010: '분석 결과를 확인하는 중 무결성 문제가 발생했습니다. 다시 시도해주세요.', AI_001: '분석 결과를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.', AI_002: '현재 분석을 준비할 수 없습니다. 관리자에게 문의해주세요.' };
+  var errorLabels = { ANALYSIS_002: '분석 작업을 찾을 수 없거나 접근 권한이 없습니다.', ANALYSIS_009: '분석을 시작할 준비가 아직 완료되지 않았습니다.', ANALYSIS_010: 'JSON-05 무결성 검증 실패', AI_001: '분석 결과를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.', AI_002: '현재 분석을 준비할 수 없습니다. 관리자에게 문의해주세요.' };
 
   function el(tag, text, className) { var node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; }
   function card(title) { var node = el('section', null, 'card card--pad-lg analysis-card'); node.appendChild(el('h2', title)); return node; }
   function appendDetail(parent, label, value) { if (value == null || value === '' || (Array.isArray(value) && !value.length)) return; var box = el('div', null, 'analysis-detail'); box.appendChild(el('p', label, 'analysis-detail__label')); if (Array.isArray(value)) { var list = el('ul', null, 'analysis-list'); value.forEach(function (x) { if (x != null && x !== '') list.appendChild(el('li', typeof x === 'string' ? x : JSON.stringify(x))); }); box.appendChild(list); } else box.appendChild(el('p', String(value), 'analysis-detail__value')); parent.appendChild(box); }
   function clear() { if (!state.disposed) root.replaceChildren(); }
   function safeError(err) { if (err && err.name === 'AbortError') return ''; if (err && err.code && errorLabels[err.code]) return errorLabels[err.code]; if (err && err.status === 401) return '로그인 후 이용해주세요.'; if (err && err.status === 403) return '이 분석 결과에 접근할 권한이 없습니다.'; if (err && err.message) return err.message; return '네트워크 또는 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'; }
+  // 실행 API 오류를 코드·사용자용 라벨·서버 메시지로 분리해 상태 카드 아래에 표시한다.
+  function renderRunError(err) {
+    var box = el('div', null, 'analysis-message analysis-message--error');
+    appendDetail(box, '오류 코드', err && err.code ? err.code : '확인 불가');
+    appendDetail(box, '오류 유형', safeError(err));
+    appendDetail(box, '서버 메시지', err && err.message ? err.message : '서버에서 오류 메시지를 반환하지 않았습니다.');
+    return box;
+  }
   function request(path, opts) {
     opts = opts || {}; var headers = opts.headers || {}; var init = { method: opts.method || 'GET', credentials: 'same-origin', headers: headers, signal: state.controller && state.controller.signal };
     return fetch('/api/analysis/cases/' + caseId + path, init).then(function (res) { return res.json().catch(function () { return {}; }).then(function (body) { if (!res.ok || !body.success) { var e = new Error((body && body.message) || '요청에 실패했습니다.'); e.code = body && body.code; e.status = res.status; throw e; } return body.data; }); });
@@ -23,8 +31,11 @@
   function message(text, error) { clear(); var box = el('div', null, 'analysis-message' + (error ? ' analysis-message--error' : '')); box.appendChild(el('p', text)); root.appendChild(box); }
   function button(text, onClick, primary, disabled) { var b = el('button', text, primary ? 'btn btn--primary' : 'btn btn--ghost'); b.type = 'button'; b.disabled = !!disabled; b.addEventListener('click', onClick); return b; }
   function renderStages(status) { var section = card('분석 진행 상태'); var stages = el('div', null, 'analysis-stages'); stageDefs.forEach(function (def) { var value = status[def[0]] || 'NOT_STARTED'; var box = el('div', null, 'analysis-stage analysis-stage--' + value); box.appendChild(el('p', def[1], 'analysis-stage__name')); box.appendChild(el('p', stageLabels[value] || '상태 확인 중', 'analysis-stage__status')); stages.appendChild(box); }); section.appendChild(stages); if (status.latestFailureStage || status.latestFailureMessage) { var fail = el('div', null, 'analysis-message analysis-message--error'); appendDetail(fail, '실패 단계', status.latestFailureStage); appendDetail(fail, '실패 유형', status.latestFailureType); appendDetail(fail, '안내', status.latestFailureMessage || '분석 처리 중 문제가 발생했습니다.'); section.appendChild(fail); } return section; }
+  // 현재 단계와 실행 오류를 함께 렌더링해 재조회 동작을 유지한다.
   function renderStatus() {
     clear(); var s = state.status; root.appendChild(renderStages(s)); var actions = el('div', null, 'analysis-actions');
+    // /run 실패 정보는 실행 버튼이 속한 상태 카드 바로 다음에 유지한다.
+    if (state.runError) root.appendChild(renderRunError(state.runError));
     if (s.analysisCaseStatus === 'INPUT_CONFIRMED' || s.analysisCaseStatus === 'FAILED') { root.appendChild(el('p', s.analysisCaseStatus === 'FAILED' ? '이전 분석에 실패했습니다. 자료는 그대로 두고 다시 실행할 수 있습니다.' : '자료가 확정되었습니다. 준비되면 분석을 시작해주세요.', 'analysis-empty')); actions.appendChild(button(s.analysisCaseStatus === 'FAILED' ? '분석 다시 시도' : '분석 시작', runAnalysis, true, state.running)); }
     else if (s.analysisCaseStatus === 'ANALYZING') { root.appendChild(el('p', '분석이 진행 중입니다. 완료되면 결과를 다시 조회해주세요.', 'analysis-empty')); actions.appendChild(button('상태 다시 조회', loadStatus, false, state.statusLoading)); }
     else { root.appendChild(el('p', '현재 분석 상태를 확인해주세요.', 'analysis-empty')); actions.appendChild(button('상태 다시 조회', loadStatus, false, state.statusLoading)); }
@@ -44,6 +55,9 @@
   function renderQuestions(readiness) { var section = card('질문 세트'); root.appendChild(section); request('/question-set').then(function (set) { if (state.disposed) return; if (!set.canGenerateQuestions) { section.appendChild(el('p', '현재 자료로는 질문을 생성하기 어렵습니다.', 'analysis-empty')); appendDetail(section, '사유', readiness.reason); appendDetail(section, '제한 사항', readiness.limitations); return; } var questions = (set.questions || []).slice().sort(function (a, b) { return a.displayOrder - b.displayOrder; }); if (!questions.length) { section.appendChild(el('p', '표시할 질문이 없습니다.', 'analysis-empty')); return; } questions.forEach(function (q) { var box = el('article', null, 'analysis-question'); box.appendChild(el('span', q.displayOrder + '. ' + (q.questionType || ''), 'analysis-badge')); appendDetail(box, '질문', q.question); appendDetail(box, '질문 의도', q.intent); appendDetail(box, '평가 포인트', q.evaluationFocus); section.appendChild(box); }); }).catch(function (err) { if (!state.disposed) section.appendChild(el('p', safeError(err), 'analysis-empty')); }); }
   function loadResult() { if (state.resultLoaded) return Promise.resolve(state.result); return request('/result').then(function (result) { state.resultLoaded = true; state.result = result; renderResult(result); return result; }); }
   function loadStatus() { if (state.statusLoading) return; state.statusLoading = true; message('분석 상태를 확인하고 있습니다.'); request('/status').then(function (status) { if (state.disposed) return; state.status = status; state.statusLoading = false; if (status.analysisCaseStatus === 'COMPLETED') return loadResult(); renderStatus(); }).catch(function (err) { state.statusLoading = false; if (!state.disposed) message(safeError(err), true); }); }
-  function runAnalysis() { if (state.running) return; state.running = true; message('분석을 실행하고 있습니다. 완료될 때까지 잠시 기다려주세요.'); request('/run', { method: 'POST' }).then(function () { state.running = false; state.resultLoaded = false; return loadStatus(); }).catch(function (err) { state.running = false; if (!state.disposed) { message(safeError(err), true); var actions = el('div', null, 'analysis-actions'); actions.appendChild(button('상태 다시 조회', loadStatus)); root.appendChild(actions); } }); }
+  // 분석 실행 결과를 갱신하고 실패하면 서버 오류 정보를 상태 화면에 보존한다.
+  function runAnalysis() { if (state.running) return; state.running = true; state.runError = null; message('분석을 실행하고 있습니다. 완료될 때까지 잠시 기다려주세요.'); request('/run', { method: 'POST' }).then(function () { state.running = false; state.resultLoaded = false; state.runError = null; return loadStatus(); }).catch(function (err) { state.running = false; if (!state.disposed) { // /run 오류 분기에서는 코드와 서버 메시지를 숨기지 않고 상태 카드 아래에 렌더링한다.
+      state.runError = err; renderStatus();
+    } }); }
   if (!caseId || Number(caseId) <= 0) message('유효하지 않은 분석 작업 주소입니다.', true); else { state.controller = new AbortController(); window.addEventListener('pagehide', function () { state.disposed = true; state.controller.abort(); }, { once: true }); loadStatus(); }
 })();
