@@ -5,6 +5,7 @@ import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,10 +15,13 @@ public class AiClientService {
 
     private final AiClient aiClient;
 
+    // app.ai.provider: MOCK(기본값) 또는 ANTHROPIC. 코드 수정 없이 설정만으로 전환
     public AiClientService(
-            @Qualifier("mockAiClient") AiClient aiClient
+            @Qualifier("mockAiClient") AiClient mockAiClient,
+            @Qualifier("anthropicClient") AiClient anthropicClient,
+            @Value("${app.ai.provider:MOCK}") String provider
     ) {
-        this.aiClient = aiClient;
+        this.aiClient = "ANTHROPIC".equalsIgnoreCase(provider) ? anthropicClient : mockAiClient;
     }
 
     // Provider의 원시 JSON 응답을 호출 계층에 그대로 전달한다.
