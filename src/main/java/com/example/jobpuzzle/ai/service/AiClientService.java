@@ -18,6 +18,7 @@ public class AiClientService {
     private final AiClient anthropicClient;
     private final AiGenerationProperties properties;
 
+    // app.ai.provider: MOCK(기본값) 또는 ANTHROPIC. 코드 수정 없이 설정만으로 전환
     public AiClientService(
             @Qualifier("mockAiClient") AiClient mockAiClient,
             @Qualifier("anthropicClient") AiClient anthropicClient,
@@ -79,7 +80,18 @@ public class AiClientService {
         }
     }
 
+    public void logAiCall() {
+        // TODO: 클래스 정의서 기준으로 구현
+    }
+
     // 아래 두 API는 분석 외 모듈의 기존 호출 표면을 보존한다. stage 기반 분석 실행에는 사용하지 않는다.
     public QuestionGenerationResult generateQuestions(String prompt) { return mockAiClient.generateQuestions(prompt); }
     public FinalReportResult finalReport(String prompt) { return mockAiClient.finalReport(prompt); }
+    public AiProvider getProvider() {
+        return mockAiClient.getProvider();
+    }
+
+    public String getModel() {
+        return mockAiClient.getModel();
+    }
 }

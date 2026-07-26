@@ -84,6 +84,11 @@ app:
 
   ai:
     running-timeout-seconds: 600
+    provider: MOCK
+    anthropic:
+      api-key:
+      model: claude-sonnet-5
+      max-tokens: 8000
     # 생성 AI와 RAG embedding은 역할·비용·장애 계약이 달라 별도 설정으로 유지한다.
     generation:
       # 운영 기본은 모든 생성 stage가 같은 provider를 사용한다. stage override는 ai-e2e profile에서만 둔다.
