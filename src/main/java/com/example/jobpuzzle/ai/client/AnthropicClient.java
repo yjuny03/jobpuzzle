@@ -58,6 +58,17 @@ public class AnthropicClient implements AiClient {
         return message(AiExecutionStage.CUSTOMIZED_SYNTHESIS, renderedPrompt);
     }
 
+    // interview 추가: 실제 Claude HTTP 연동 시 이 두 메서드의 반환값만 JSON-11/JSON-09로 교체한다.
+    @Override
+    public String generateBasicQuestions(String renderedPrompt) {
+        return call(renderedPrompt);
+    }
+
+    @Override
+    public String generateWeaknessQuestions(String renderedPrompt) {
+        return call(renderedPrompt);
+    }
+
     @Override
     public QuestionGenerationResult generateQuestions(String prompt) {
         return null;

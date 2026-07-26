@@ -35,9 +35,17 @@ public class CustomizedAnalysisInputMapper {
                 .build();
     }
 
-    private JobPostingAnalysisResult.Item item(JobPostingAnalysis.Item value) { return JobPostingAnalysisResult.Item.builder().itemId(value.getItemId()).text(value.getText()).sourceRefs(refs(value.getSourceRefs())).build(); }
-    private JobPostingAnalysisResult.Requirement requirement(JobPostingAnalysis.Requirement value) { return JobPostingAnalysisResult.Requirement.builder().requirementId(value.getRequirementId()).text(value.getText()).sourceRefs(refs(value.getSourceRefs())).build(); }
-    private JobPostingAnalysisResult.Conflict conflict(JobPostingAnalysis.Conflict value) { return JobPostingAnalysisResult.Conflict.builder().field(value.getField()).postingValue(value.getPostingValue()).companyInfoValue(value.getCompanyInfoValue()).appliedValue(value.getAppliedValue()).sourceRefs(refs(value.getSourceRefs())).build(); }
+    private JobPostingAnalysisResult.Item item(JobPostingAnalysis.Item value) {
+        return JobPostingAnalysisResult.Item.builder().itemId(value.getItemId()).text(value.getText()).sourceRefs(refs(value.getSourceRefs())).build();
+    }
+
+    private JobPostingAnalysisResult.Requirement requirement(JobPostingAnalysis.Requirement value) {
+        return JobPostingAnalysisResult.Requirement.builder().requirementId(value.getRequirementId()).text(value.getText()).sourceRefs(refs(value.getSourceRefs())).build();
+    }
+
+    private JobPostingAnalysisResult.Conflict conflict(JobPostingAnalysis.Conflict value) {
+        return JobPostingAnalysisResult.Conflict.builder().field(value.getField()).postingValue(value.getPostingValue()).companyInfoValue(value.getCompanyInfoValue()).appliedValue(value.getAppliedValue()).sourceRefs(refs(value.getSourceRefs())).build();
+    }
 
     private CandidateMaterialAnalysisResult.Resume resume(CandidateMaterialAnalysis.Resume value) {
         if (value == null) return null;
@@ -53,8 +61,22 @@ public class CustomizedAnalysisInputMapper {
         return CandidateMaterialAnalysisResult.CoverLetter.builder().motivation(summary(value.getMotivation())).values(summary(value.getValues()))
                 .experienceNarratives(value.getExperienceNarratives().stream().map(this::summary).toList()).jobConnection(summary(value.getJobConnection())).build();
     }
-    private CandidateMaterialAnalysisResult.SummaryEvidence summary(CandidateMaterialAnalysis.SummaryEvidence value) { return value == null ? null : CandidateMaterialAnalysisResult.SummaryEvidence.builder().summary(value.getSummary()).sourceRefs(refs(value.getSourceRefs())).build(); }
-    private CandidateMaterialAnalysisResult.Portfolio portfolio(CandidateMaterialAnalysis.Portfolio value) { if (value == null) return null; return CandidateMaterialAnalysisResult.Portfolio.builder().projects(value.getProjects().stream().map(item -> CandidateMaterialAnalysisResult.Project.builder().projectId(item.getProjectId()).projectName(item.getProjectName()).structure(item.getStructure()).role(item.getRole()).contributions(item.getContributions()).techUsageReasons(item.getTechUsageReasons()).problemSolving(item.getProblemSolving()).outputs(item.getOutputs()).sourceRefs(refs(item.getSourceRefs())).build()).toList()).build(); }
-    private CandidateMaterialAnalysisResult.ExperienceNote note(CandidateMaterialAnalysis.ExperienceNote value) { if (value == null) return null; return CandidateMaterialAnalysisResult.ExperienceNote.builder().starCandidates(value.getStarCandidates().stream().map(item -> CandidateMaterialAnalysisResult.StarCandidate.builder().candidateId(item.getCandidateId()).situation(item.getSituation()).task(item.getTask()).action(item.getAction()).result(item.getResult()).missingParts(item.getMissingParts()).sourceRefs(refs(item.getSourceRefs())).build()).toList()).build(); }
-    private List<SourceReference> refs(List<AnalysisSourceReference> values) { return values == null ? List.of() : values.stream().map(value -> SourceReference.builder().extractionId(value.getExtractionId()).documentId(value.getDocumentId()).documentType(value.getDocumentType()).pageNumber(value.getPageNumber()).segmentId(value.getSegmentId()).evidenceText(value.getEvidenceText()).build()).toList(); }
+
+    private CandidateMaterialAnalysisResult.SummaryEvidence summary(CandidateMaterialAnalysis.SummaryEvidence value) {
+        return value == null ? null : CandidateMaterialAnalysisResult.SummaryEvidence.builder().summary(value.getSummary()).sourceRefs(refs(value.getSourceRefs())).build();
+    }
+
+    private CandidateMaterialAnalysisResult.Portfolio portfolio(CandidateMaterialAnalysis.Portfolio value) {
+        if (value == null) return null;
+        return CandidateMaterialAnalysisResult.Portfolio.builder().projects(value.getProjects().stream().map(item -> CandidateMaterialAnalysisResult.Project.builder().projectId(item.getProjectId()).projectName(item.getProjectName()).structure(item.getStructure()).role(item.getRole()).contributions(item.getContributions()).techUsageReasons(item.getTechUsageReasons()).problemSolving(item.getProblemSolving()).outputs(item.getOutputs()).sourceRefs(refs(item.getSourceRefs())).build()).toList()).build();
+    }
+
+    private CandidateMaterialAnalysisResult.ExperienceNote note(CandidateMaterialAnalysis.ExperienceNote value) {
+        if (value == null) return null;
+        return CandidateMaterialAnalysisResult.ExperienceNote.builder().starCandidates(value.getStarCandidates().stream().map(item -> CandidateMaterialAnalysisResult.StarCandidate.builder().candidateId(item.getCandidateId()).situation(item.getSituation()).task(item.getTask()).action(item.getAction()).result(item.getResult()).missingParts(item.getMissingParts()).sourceRefs(refs(item.getSourceRefs())).build()).toList()).build();
+    }
+
+    private List<SourceReference> refs(List<AnalysisSourceReference> values) {
+        return values == null ? List.of() : values.stream().map(value -> SourceReference.builder().extractionId(value.getExtractionId()).documentId(value.getDocumentId()).documentType(value.getDocumentType()).pageNumber(value.getPageNumber()).segmentId(value.getSegmentId()).evidenceText(value.getEvidenceText()).build()).toList();
+    }
 }

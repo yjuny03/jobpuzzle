@@ -376,6 +376,8 @@ public class DataInitializer implements ApplicationRunner {
                 .documentType(documentType)
                 .sourceType(UserDocumentSourceType.TEXT)
                 .displayName(displayName)
+                .filePath(null)
+                .fileName(null)
                 .keepOriginal(false)
                 .build();
     }

@@ -8,4 +8,8 @@ import java.util.Optional;
 public interface PromptTemplateRepository extends JpaRepository<PromptTemplate, Long> {
 
     Optional<PromptTemplate> findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc(String targetJson);
+
+    boolean existsByPromptCodeAndVersion(String promptCode, String version);
+
+    boolean existsByTargetJsonAndIsActiveTrue(String targetJson);
 }
