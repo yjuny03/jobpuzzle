@@ -1,0 +1,15 @@
+# 이 profile은 명시적으로 --spring.profiles.active=ai-e2e 를 지정한 E2E에서만 적용된다.
+# 일반 local·test profile에는 stage별 override가 존재하지 않아 영향이 없다.
+spring:
+  config:
+    activate:
+      on-profile: ai-e2e
+
+app:
+  ai:
+    generation:
+      stage-overrides:
+        # 4-5 JSON-01 Claude E2E의 시작점이다. 4-6·4-7에서 후속 stage를 한 개씩 전환한다.
+        JOB_POSTING_ANALYSIS: anthropic
+        CANDIDATE_MATERIAL_ANALYSIS: mock
+        CUSTOMIZED_SYNTHESIS: mock

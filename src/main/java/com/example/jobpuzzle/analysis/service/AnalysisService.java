@@ -5,6 +5,8 @@ import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
 import com.example.jobpuzzle.analysis.entity.AnalysisCase;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseStatus;
+import com.example.jobpuzzle.analysis.rag.service.RequirementRetrievalService;
+import com.example.jobpuzzle.analysis.rag.service.AnalysisVectorIndexService;
 import com.example.jobpuzzle.analysis.repository.AnalysisCaseRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
@@ -22,6 +24,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AnalysisService {
 
+    private static final int CANDIDATE_RETRIEVAL_TOP_K = 3;
+
     private static final Set<UserDocumentType> CANDIDATE_DOCUMENT_TYPES = Set.of(
             UserDocumentType.RESUME,
             UserDocumentType.COVER_LETTER,
@@ -32,8 +36,11 @@ public class AnalysisService {
     private final AnalysisCaseRepository analysisCaseRepository;
     private final AnalysisInputSnapshotRepository analysisInputSnapshotRepository;
     private final AnalysisCaseService analysisCaseService;
+    private final AnalysisCaseStatusTransitionService statusTransitionService;
     private final InitialAnalysisStageExecutor initialAnalysisStageExecutor;
     private final GuideContextService guideContextService;
+    private final RequirementRetrievalService requirementRetrievalService;
+    private final AnalysisVectorIndexService vectorIndexService;
     private final CustomizedSynthesisStageExecutor customizedSynthesisStageExecutor;
 
     // JSON-03을 한 번 조회해 독립적인 JSON-01·02 실행 단계에 전달한다.
@@ -73,20 +80,28 @@ public class AnalysisService {
         );
     }
 
-    // JSON-01·02와 JSON-04를 준비한 뒤 동일 snapshot의 JSON-05 실행만 조정한다.
+    // JSON-01·02와 JSON-04 뒤에 snapshot 고정 retrieval을 준비한 다음 JSON-05를 실행한다.
     public void runCustomizedAnalysis(Long userId, Long analysisCaseId) {
-        AnalysisCase analysisCase = findOwnedCase(userId, analysisCaseId);
-        if (analysisCase.getStatus() != AnalysisCaseStatus.COMPLETED) {
-            validateRunnableStatus(analysisCase);
-            runInitialAnalysis(userId, analysisCaseId);
+        // 상태 잠금으로 새 실행 소유권을 얻지 못한 동시 요청은 기존 실행을 그대로 둔다.
+        if (!statusTransitionService.startOrRestart(userId, analysisCaseId)) {
+            return;
         }
+        try {
+            vectorIndexService.requireReady(userId, analysisCaseId);
+            runInitialAnalysis(userId, analysisCaseId);
 
-        Long snapshotId = analysisInputSnapshotRepository
-                .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND))
-                .getSnapshotId();
-        guideContextService.getOrCreateCustomizedSynthesisGuideContext(userId, snapshotId);
-        customizedSynthesisStageExecutor.execute(snapshotId);
+            Long snapshotId = analysisInputSnapshotRepository
+                    .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(analysisCaseId, userId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.SNAPSHOT_NOT_FOUND))
+                    .getSnapshotId();
+            guideContextService.getOrCreateCustomizedSynthesisGuideContext(userId, snapshotId);
+            requirementRetrievalService.getOrCreateCandidateRetrievals(userId, snapshotId, CANDIDATE_RETRIEVAL_TOP_K);
+            customizedSynthesisStageExecutor.execute(snapshotId);
+        } catch (RuntimeException exception) {
+            // 단계 실패를 독립 트랜잭션으로 FAILED에 반영한 뒤 원래 오류를 API 계층에 전달한다.
+            statusTransitionService.failIfAnalyzing(userId, analysisCaseId);
+            throw exception;
+        }
     }
 
     private AnalysisCase findOwnedCase(Long userId, Long analysisCaseId) {

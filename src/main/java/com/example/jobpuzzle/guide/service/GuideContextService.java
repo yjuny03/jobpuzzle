@@ -13,7 +13,6 @@ import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,26 +41,26 @@ public class GuideContextService {
         // 기존 JSON-04 결과는 이후 가이드 변경과 무관하게 그대로 재사용한다.
         GuideContextResult existing = findExisting(inputReferenceId);
         if (existing != null) {
+            // 과거 정책이 남긴 NONE context는 정상 결과로 재사용하지 않고 분석을 중단한다.
+            if (existing.getMatchType() == GuideMatchType.NONE) {
+                throw new CustomException(ErrorCode.GUIDE_ACTIVE_NOT_FOUND);
+            }
             return toDto(existing);
         }
 
         // 스냅샷에 고정된 직무·경력만으로 fallback 검색 기준을 만든다.
         JobCategory jobCategory = snapshot.getJobCategory();
         GuideSelection selection = findGuide(jobCategory);
-        try {
-            GuideContextResult result = guideContextResultRepository.saveAndFlush(
-                    GuideContextResult.create(snapshot.getUser(), inputReferenceId, jobCategory,
-                            selection.guide(), selection.matchType()));
-            List<GuideContextChunk> contextChunks = saveChunks(result, selection.guide());
-            return GuideContextResultDto.from(result, contextChunks);
-        } catch (DataIntegrityViolationException exception) {
-            // UNIQUE 경합이면 이미 커밋된 동일 스냅샷 결과를 반환한다.
-            GuideContextResult concurrentResult = findExisting(inputReferenceId);
-            if (concurrentResult != null) {
-                return toDto(concurrentResult);
-            }
-            throw exception;
+        // 활성 가이드가 없으면 JSON-04 결과를 저장하지 않고 상위 파이프라인 실패 처리로 넘긴다.
+        if (selection == null) {
+            throw new CustomException(ErrorCode.GUIDE_ACTIVE_NOT_FOUND);
         }
+        // flush 실패 뒤에는 같은 영속성 컨텍스트를 재조회하지 않고 트랜잭션을 종료시킨다.
+        GuideContextResult result = guideContextResultRepository.saveAndFlush(
+                GuideContextResult.create(snapshot.getUser(), inputReferenceId, jobCategory,
+                        selection.guide(), selection.matchType()));
+        List<GuideContextChunk> contextChunks = saveChunks(result, selection.guide());
+        return GuideContextResultDto.from(result, contextChunks);
     }
 
     private GuideContextResult findExisting(String inputReferenceId) {
@@ -110,8 +109,8 @@ public class GuideContextService {
         if (commonFallback != null) {
             return new GuideSelection(commonFallback, GuideMatchType.FALLBACK_COMMON);
         }
-        // 사용할 ACTIVE 가이드가 없으면 NONE 결과를 스냅샷에 고정한다.
-        return new GuideSelection(null, GuideMatchType.NONE);
+        // 가이드가 없으면 NONE fallback을 만들지 않고 호출자에게 명시적 오류를 전달한다.
+        return null;
     }
 
     // 같은 검색 범위의 ACTIVE 가이드가 여러 건이면 임의 선택하지 않고 데이터 정합 오류로 처리한다.

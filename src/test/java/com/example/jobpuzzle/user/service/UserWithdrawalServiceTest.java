@@ -5,6 +5,7 @@ import com.example.jobpuzzle.analysis.repository.AnalysisCaseRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisCaseSourceRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotSourceRepository;
+import com.example.jobpuzzle.analysis.repository.AnalysisMaterialChunkRepository;
 import com.example.jobpuzzle.analysis.repository.CandidateMaterialAnalysisRepository;
 import com.example.jobpuzzle.analysis.repository.ConfirmedAnalysisSnapshotRepository;
 import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
@@ -21,6 +22,8 @@ import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.interview.repository.InterviewQuestionRepository;
 import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
 import com.example.jobpuzzle.jobposting.repository.JobPostingRepository;
+import com.example.jobpuzzle.analysis.rag.repository.RequirementRetrievalChunkRepository;
+import com.example.jobpuzzle.analysis.rag.repository.RequirementRetrievalResultRepository;
 import com.example.jobpuzzle.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +45,9 @@ class UserWithdrawalServiceTest {
 
     @Mock private AnalysisCaseSourceRepository analysisCaseSourceRepository;
     @Mock private AnalysisInputSnapshotSourceRepository analysisInputSnapshotSourceRepository;
+    @Mock private AnalysisMaterialChunkRepository analysisMaterialChunkRepository;
+    @Mock private RequirementRetrievalChunkRepository requirementRetrievalChunkRepository;
+    @Mock private RequirementRetrievalResultRepository requirementRetrievalResultRepository;
     @Mock private ConfirmedAnalysisSnapshotRepository confirmedAnalysisSnapshotRepository;
     @Mock private AnalysisInputSnapshotRepository analysisInputSnapshotRepository;
     @Mock private JobPostingAnalysisRepository jobPostingAnalysisRepository;
@@ -84,5 +91,22 @@ class UserWithdrawalServiceTest {
         verify(fileStorage, times(3)).delete(anyString());
         verify(userDocumentRepository).deleteByUser_UserId(1L);
         verify(userRepository).deleteById(1L);
+    }
+
+    @Test
+    @DisplayName("탈퇴 시 retrieval과 material chunk를 snapshot보다 먼저 삭제한다")
+    void deleteAllDataAndUser_deletesRetrievalAndMaterialChunksBeforeSnapshot() {
+        when(requirementRetrievalResultRepository.findRetrievalResultIdsByUserId(1L)).thenReturn(List.of(501L));
+        when(userDocumentRepository.findByUser_UserId(1L)).thenReturn(List.of());
+
+        userWithdrawalService.deleteAllDataAndUser(1L);
+
+        var order = inOrder(requirementRetrievalChunkRepository, requirementRetrievalResultRepository,
+                analysisMaterialChunkRepository, analysisInputSnapshotSourceRepository, analysisInputSnapshotRepository);
+        order.verify(requirementRetrievalChunkRepository).deleteByRetrievalResult_RetrievalResultIdIn(List.of(501L));
+        order.verify(requirementRetrievalResultRepository).deleteByUserId(1L);
+        order.verify(analysisMaterialChunkRepository).deleteBySnapshot_User_UserId(1L);
+        order.verify(analysisInputSnapshotSourceRepository).deleteBySnapshot_User_UserId(1L);
+        order.verify(analysisInputSnapshotRepository).deleteByUser_UserId(1L);
     }
 }

@@ -1,8 +1,10 @@
 package com.example.jobpuzzle.ai.service;
 
 import com.example.jobpuzzle.ai.client.AiClient;
+import com.example.jobpuzzle.ai.config.AiGenerationProperties;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
+import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -12,63 +14,72 @@ import org.springframework.stereotype.Service;
 //@Transactional
 public class AiClientService {
 
-    private final AiClient aiClient;
+    private final AiClient mockAiClient;
+    private final AiClient anthropicClient;
+    private final AiGenerationProperties properties;
 
     public AiClientService(
-            @Qualifier("mockAiClient") AiClient aiClient
+            @Qualifier("mockAiClient") AiClient mockAiClient,
+            @Qualifier("anthropicClient") AiClient anthropicClient,
+            AiGenerationProperties properties
     ) {
-        this.aiClient = aiClient;
+        this.mockAiClient = mockAiClient;
+        this.anthropicClient = anthropicClient;
+        this.properties = properties;
+    }
+
+    /** stage별로 한 번 선택한 client/provider/model을 이후 log·호출에서 함께 사용한다. */
+    public GenerationClientSelection resolve(AiExecutionStage stage) {
+        AiProvider provider = properties.providerFor(stage);
+        return switch (provider) {
+            case MOCK -> new GenerationClientSelection(stage, mockAiClient, AiProvider.MOCK,
+                    mockAiClient.getModel(), properties.getAnthropic().getMaxOutputTokens().forStage(stage));
+            case ANTHROPIC -> anthropicSelection(stage);
+        };
     }
 
     // Provider의 원시 JSON 응답을 호출 계층에 그대로 전달한다.
-    public String analyzeJobPosting(String prompt){
-        return aiClient.analyzeJobPosting(prompt);
+    public String analyzeJobPosting(GenerationClientSelection selection, String prompt){
+        requireStage(selection, AiExecutionStage.JOB_POSTING_ANALYSIS);
+        return selection.client().analyzeJobPosting(prompt);
     }
 
-    public String analyzeCandidateMaterial(String prompt) {
-        return aiClient.analyzeCandidateMaterial(prompt);
+    public String analyzeCandidateMaterial(GenerationClientSelection selection, String prompt) {
+        requireStage(selection, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS);
+        return selection.client().analyzeCandidateMaterial(prompt);
     }
 
     // JSON-05 Provider 원시 JSON을 후속 파싱·검증 계층으로 전달한다.
-    public String generateCustomizedAnalysis(String renderedPrompt) {
-        return aiClient.generateCustomizedAnalysis(renderedPrompt);
+    public String generateCustomizedAnalysis(GenerationClientSelection selection, String renderedPrompt) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysis(renderedPrompt);
     }
 
-    public AiProvider getProvider() {
-        return aiClient.getProvider();
+    private GenerationClientSelection anthropicSelection(AiExecutionStage stage) {
+        AiGenerationProperties.Anthropic anthropic = properties.getAnthropic();
+        if (anthropic.getApiKey() == null || anthropic.getApiKey().isBlank()) {
+            throw new IllegalStateException("Anthropic API key is required when Anthropic is selected");
+        }
+        if (anthropic.getModel() == null || anthropic.getModel().isBlank()) {
+            throw new IllegalStateException("Anthropic model is required when Anthropic is selected");
+        }
+        if (anthropic.getApiVersion() == null || anthropic.getApiVersion().isBlank()) {
+            throw new IllegalStateException("Anthropic API version is required when Anthropic is selected");
+        }
+        if (anthropic.getRequestTimeout() == null || anthropic.getRequestTimeout().isNegative() || anthropic.getRequestTimeout().isZero()) {
+            throw new IllegalStateException("Anthropic request timeout must be positive when Anthropic is selected");
+        }
+        return new GenerationClientSelection(stage, anthropicClient, AiProvider.ANTHROPIC,
+                anthropic.getModel(), anthropic.getMaxOutputTokens().forStage(stage));
     }
 
-    public String getModel() {
-        return aiClient.getModel();
+    private void requireStage(GenerationClientSelection selection, AiExecutionStage expected) {
+        if (selection == null || selection.stage() != expected) {
+            throw new IllegalArgumentException("generation client selection stage does not match call");
+        }
     }
 
-    public QuestionGenerationResult generateQuestions(String prompt) {
-        return aiClient.generateQuestions(prompt);
-    }
-
-    public FinalReportResult finalReport(String prompt) { return aiClient.finalReport(prompt);}
-
-    public void callAi() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
-
-    public void saveAiResult() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
-
-    public void validateAiResponse() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
-
-    public void handleAiFailureFallback() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
-
-    public void logAiCall() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
-
-    public void getActivePromptTemplate() {
-        // TODO: 클래스 정의서 기준으로 구현
-    }
+    // 아래 두 API는 분석 외 모듈의 기존 호출 표면을 보존한다. stage 기반 분석 실행에는 사용하지 않는다.
+    public QuestionGenerationResult generateQuestions(String prompt) { return mockAiClient.generateQuestions(prompt); }
+    public FinalReportResult finalReport(String prompt) { return mockAiClient.finalReport(prompt); }
 }

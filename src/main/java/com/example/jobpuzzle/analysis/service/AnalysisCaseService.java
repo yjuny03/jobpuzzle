@@ -57,6 +57,7 @@ public class AnalysisCaseService {
     private final UserRepository userRepository;
     private final JobCategoryRepository jobCategoryRepository;
     private final DocumentExtractionService documentExtractionService;
+    private final AnalysisMaterialChunkService analysisMaterialChunkService;
 
     // jobCategoryId를 안 보내면 회원 기본 관심 직무를 초기값으로 사용
     @Transactional
@@ -154,11 +155,15 @@ public class AnalysisCaseService {
                         .documentType(source.getDocumentType())
                         .build())
                 .toList();
-        analysisInputSnapshotSourceRepository.saveAll(snapshotSources);
+        List<AnalysisInputSnapshotSource> savedSnapshotSources = analysisInputSnapshotSourceRepository.saveAll(snapshotSources);
+
+        // snapshot과 청크를 한 트랜잭션으로 묶어 불완전한 RAG 입력 상태가 남지 않게 한다.
+        savedSnapshotSources.forEach(source -> analysisMaterialChunkService.getOrCreateChunks(
+                source, AnalysisMaterialChunkService.CURRENT_CHUNKING_VERSION));
 
         analysisCase.confirmInput();
 
-        return AnalysisInputSnapshotResponse.of(snapshot, snapshotSources);
+        return AnalysisInputSnapshotResponse.of(snapshot, savedSnapshotSources);
     }
 
     public AnalysisInputSnapshotResponse getSnapshot(Long userId, Long analysisCaseId) {

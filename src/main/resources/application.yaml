@@ -60,9 +60,51 @@ spring:
             enable: true
         starttls:
           enable: false
+
 app:
+  # fake가 기본값이며 real은 OpenAI·Qdrant 환경변수가 모두 제공될 때만 선택한다.
+  rag:
+    mode: ${RAG_MODE:fake}
+
+    embedding:
+      provider: openai
+      model: ${RAG_EMBEDDING_MODEL:text-embedding-3-small}
+      dimension: ${RAG_EMBEDDING_DIMENSION:1536}
+
+    request-timeout: ${RAG_REQUEST_TIMEOUT:10s}
+
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+
+    qdrant:
+      url: ${QDRANT_URL:http://localhost:6333}
+      api-key: ${QDRANT_API_KEY:}
+      collection: ${QDRANT_COLLECTION:analysis-material-chunks-te3small-v1}
+
   ai:
     running-timeout-seconds: 600
+    # 생성 AI와 RAG embedding은 역할·비용·장애 계약이 달라 별도 설정으로 유지한다.
+    generation:
+      # 운영 기본은 모든 생성 stage가 같은 provider를 사용한다. stage override는 ai-e2e profile에서만 둔다.
+      default-provider: ${AI_GENERATION_DEFAULT_PROVIDER:mock}
+      anthropic:
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${ANTHROPIC_MODEL:}
+        base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+        api-version: ${ANTHROPIC_API_VERSION:2023-06-01}
+        request-timeout: ${ANTHROPIC_REQUEST_TIMEOUT:30s}
+        max-output-tokens:
+          json-01: ${ANTHROPIC_JSON01_MAX_OUTPUT_TOKENS:4096}
+          json-02: ${ANTHROPIC_JSON02_MAX_OUTPUT_TOKENS:6144}
+          json-05: ${ANTHROPIC_JSON05_MAX_OUTPUT_TOKENS:8192}
+      input-limits:
+        # fixture 8·9 실측보다 충분히 큰 기본값이다. 초과 입력은 자동 축약하지 않고 Provider 호출 전에 실패한다.
+        json-01-rendered-prompt-chars: ${AI_JSON01_RENDERED_PROMPT_CHARS:40000}
+        json-02-rendered-prompt-chars: ${AI_JSON02_RENDERED_PROMPT_CHARS:50000}
+        json-05-requirement-count: ${AI_JSON05_REQUIREMENT_COUNT:20}
+        json-05-retrieval-chars: ${AI_JSON05_RETRIEVAL_CHARS:36000}
+        json-05-rendered-prompt-chars: ${AI_JSON05_RENDERED_PROMPT_CHARS:64000}
 
   data-initializer:
     enabled: false

@@ -18,6 +18,11 @@ public enum ErrorCode {
 
     //analysis
     JSON05_RESULT_INTEGRITY_CONFLICT(HttpStatus.CONFLICT, "ANALYSIS_010", "JSON-05 result integrity conflict"),
+    VECTOR_INDEX_NOT_READY(HttpStatus.CONFLICT, "ANALYSIS_011", "분석 자료의 vector 색인이 준비되지 않았습니다."),
+    EMBEDDING_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "ANALYSIS_012", "임베딩 제공자 호출에 실패했습니다."),
+    EMBEDDING_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "ANALYSIS_013", "임베딩 제공자 요청 한도를 초과했습니다."),
+    VECTOR_STORE_ERROR(HttpStatus.BAD_GATEWAY, "ANALYSIS_014", "vector 저장소 호출에 실패했습니다."),
+    VECTOR_COLLECTION_INCOMPATIBLE(HttpStatus.CONFLICT, "ANALYSIS_015", "vector collection의 모델 또는 차원 계약이 일치하지 않습니다."),
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
     ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
     ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),
@@ -63,7 +68,8 @@ public enum ErrorCode {
 
     // guide
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
-    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다.");
+    GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다."),
+    GUIDE_ACTIVE_NOT_FOUND(HttpStatus.CONFLICT, "GUIDE_003", "해당 직무에 사용할 활성 분석 가이드가 없습니다.");
 
     private final HttpStatus status;
     private final String code;
