@@ -54,6 +54,9 @@ public enum ErrorCode {
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "DOCUMENT_009", "파일 크기는 10MB를 초과할 수 없습니다."),
     CHANGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "DOCUMENT_010", "이미 확정된 적 있는 자료를 수정할 때는 자잘한 수정/큰 수정 여부를 선택해야 합니다."),
     EXTRACTION_ALREADY_VERSIONED(HttpStatus.BAD_REQUEST, "DOCUMENT_011", "이미 확정 이력이 있는 자료는 재추출할 수 없습니다. 수정 저장을 이용해주세요."),
+    MIXED_FILE_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DOCUMENT_012", "PDF와 이미지를 함께 업로드할 수 없습니다."),
+    PDF_MULTIPLE_FILES_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DOCUMENT_013", "PDF는 한 번에 1개 파일만 업로드할 수 있습니다."),
+    IMAGE_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "DOCUMENT_014", "이미지는 최대 20장까지 업로드할 수 있습니다."),
 
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다."),
@@ -76,6 +79,10 @@ public enum ErrorCode {
     FOLLOW_UP_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "INTERVIEW_010", "추가 꼬리질문을 생성할 수 없습니다."),
     WEAKNESS_NOT_AVAILABLE(HttpStatus.CONFLICT, "INTERVIEW_011", "약점 보완에 사용할 미해결 약점이 없습니다."),
     ANSWER_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_012", "답변 기준 메시지를 찾을 수 없습니다.");
+    // interview / report
+    INTERVIEW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "존재하지 않는 면접 세션입니다."),
+    INTERVIEW_SESSION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "REPORT_002", "완료되지 않은 세션은 최종 리포트를 생성할 수 없습니다."),
+    FINAL_REPORT_NOT_GENERATABLE(HttpStatus.BAD_REQUEST, "REPORT_003", "평가에 성공한 답변이 없어 최종 리포트를 생성할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

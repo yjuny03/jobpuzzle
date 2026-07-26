@@ -338,6 +338,7 @@
     document.getElementById('material-register-title').textContent = DF.CATEGORY_LABEL[documentType] + ' 등록';
     document.getElementById('material-register-name').value = '';
     document.getElementById('material-register-file').value = '';
+    document.getElementById('material-register-file-list').textContent = '';
     document.getElementById('material-register-content').value = '';
     document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.materialMethod === 'file'); });
     document.querySelector('[data-material-method-panel="file"]').hidden = false;
@@ -368,6 +369,9 @@
   function bindMaterialRegisterModal() {
     document.getElementById('material-register-close').addEventListener('click', closeMaterialRegisterModal);
     document.getElementById('material-register-cancel').addEventListener('click', closeMaterialRegisterModal);
+    document.getElementById('material-register-file').addEventListener('change', function () {
+      document.getElementById('material-register-file-list').textContent = DF.describeSelectedFiles(this.files);
+    });
 
     document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -384,9 +388,9 @@
 
       var opts = { category: state.registerTargetType, name: name, method: state.materialRegisterMethod };
       if (state.materialRegisterMethod === 'file') {
-        var file = document.getElementById('material-register-file').files[0];
-        if (!file) { alert('파일을 선택해주세요.'); return; }
-        opts.file = file;
+        var files = document.getElementById('material-register-file').files;
+        if (!files.length) { alert('파일을 선택해주세요.'); return; }
+        opts.files = files;
       } else {
         var content = document.getElementById('material-register-content').value.trim();
         if (!content) { alert('내용을 입력해주세요.'); return; }

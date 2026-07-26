@@ -36,6 +36,7 @@ import java.util.Set;
 public class DocumentService {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "jpg", "jpeg", "png");
+    private static final int MAX_IMAGE_COUNT = 20;
     private static final Set<UserDocumentType> DIRECT_INPUT_ALLOWED_TYPES = Set.of(
             UserDocumentType.JOB_POSTING, UserDocumentType.COMPANY_INFO, UserDocumentType.EXPERIENCE_NOTE
     );
@@ -47,18 +48,24 @@ public class DocumentService {
 
     @Transactional
     public DocumentResponse uploadDocument(Long userId, DocumentUploadRequest request) {
-        UserDocumentSourceType sourceType = resolveSourceType(request.getFile());
-        String storagePath = fileStorage.store(request.getFile(), request.getDocumentType());
+        List<MultipartFile> files = request.getFiles();
+        if (files == null || files.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+        }
+        UserDocumentSourceType sourceType = resolveSourceType(files);
 
         UserDocument document = UserDocument.builder()
                 .user(userRepository.getReferenceById(userId))
                 .documentType(request.getDocumentType())
                 .sourceType(sourceType)
                 .displayName(request.getDisplayName())
-                .filePath(storagePath)
-                .fileName(request.getFile().getOriginalFilename())
                 .keepOriginal(request.isKeepOriginal())
                 .build();
+
+        for (MultipartFile file : files) {
+            String storagePath = fileStorage.store(file, request.getDocumentType());
+            document.addFile(storagePath, file.getOriginalFilename());
+        }
 
         userDocumentRepository.save(document);
         return DocumentResponse.from(document);
@@ -76,8 +83,6 @@ public class DocumentService {
                 .documentType(request.getDocumentType())
                 .sourceType(UserDocumentSourceType.TEXT)
                 .displayName(request.getDisplayName())
-                .filePath(null)
-                .fileName(null)
                 .keepOriginal(false)
                 .build();
         userDocumentRepository.save(document);
@@ -138,9 +143,9 @@ public class DocumentService {
     @Transactional
     public void updateOriginalFileRetention(Long userId, Long documentId, boolean keepOriginal) {
         UserDocument document = findOwnedDocument(userId, documentId);
-        if (!keepOriginal && document.getFilePath() != null) {
-            fileStorage.delete(document.getFilePath());
-            document.clearFilePath();
+        if (!keepOriginal && !document.getFiles().isEmpty()) {
+            document.getFiles().forEach(file -> fileStorage.delete(file.getFilePath()));
+            document.clearFiles();
         }
         document.updateKeepOriginal(keepOriginal);
     }
@@ -150,12 +155,31 @@ public class DocumentService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DOCUMENT_NOT_FOUND));
     }
 
-    private UserDocumentSourceType resolveSourceType(MultipartFile file) {
-        String extension = extractExtension(file.getOriginalFilename());
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+    private UserDocumentSourceType resolveSourceType(List<MultipartFile> files) {
+        List<String> extensions = files.stream()
+                .map(file -> extractExtension(file.getOriginalFilename()))
+                .toList();
+        for (String extension : extensions) {
+            if (!ALLOWED_EXTENSIONS.contains(extension)) {
+                throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+            }
         }
-        return "pdf".equals(extension) ? UserDocumentSourceType.PDF : UserDocumentSourceType.IMAGE;
+
+        boolean hasPdf = extensions.contains("pdf");
+        boolean hasImage = extensions.stream().anyMatch(extension -> !extension.equals("pdf"));
+        if (hasPdf && hasImage) {
+            throw new CustomException(ErrorCode.MIXED_FILE_TYPE_NOT_ALLOWED);
+        }
+        if (hasPdf) {
+            if (files.size() > 1) {
+                throw new CustomException(ErrorCode.PDF_MULTIPLE_FILES_NOT_ALLOWED);
+            }
+            return UserDocumentSourceType.PDF;
+        }
+        if (files.size() > MAX_IMAGE_COUNT) {
+            throw new CustomException(ErrorCode.IMAGE_COUNT_EXCEEDED);
+        }
+        return UserDocumentSourceType.IMAGE;
     }
 
     private String extractExtension(String originalFileName) {

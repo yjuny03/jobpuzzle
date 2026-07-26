@@ -77,9 +77,7 @@ public class UserWithdrawalService {
         documentExtractionRepository.deleteByDocument_User_UserId(userId);
 
         for (UserDocument document : userDocumentRepository.findByUser_UserId(userId)) {
-            if (document.getFilePath() != null) {
-                fileStorage.delete(document.getFilePath());
-            }
+            document.getFiles().forEach(file -> fileStorage.delete(file.getFilePath()));
         }
         userDocumentRepository.deleteByUser_UserId(userId);
 

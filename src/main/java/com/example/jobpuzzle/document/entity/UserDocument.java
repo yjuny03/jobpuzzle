@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Entity
@@ -35,11 +37,9 @@ public class UserDocument extends BaseEntity {
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
 
-    @Column(name = "file_path", length = 500)
-    private String filePath;
-
-    @Column(name = "file_name", length = 255)
-    private String fileName;
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("pageOrder ASC")
+    private List<UserDocumentFile> files = new ArrayList<>();
 
     @Column(name = "keep_original", nullable = false)
     private boolean keepOriginal = false;
@@ -53,16 +53,12 @@ public class UserDocument extends BaseEntity {
             UserDocumentType documentType,
             UserDocumentSourceType sourceType,
             String displayName,
-            String filePath,
-            String fileName,
             boolean keepOriginal
     ) {
         this.user = user;
         this.documentType = documentType;
         this.sourceType = sourceType;
         this.displayName = displayName;
-        this.filePath = filePath;
-        this.fileName = fileName;
         this.keepOriginal = keepOriginal;
     }
 
@@ -70,8 +66,18 @@ public class UserDocument extends BaseEntity {
         this.keepOriginal = keepOriginal;
     }
 
-    public void clearFilePath() {
-        this.filePath = null;
+    // 업로드 순서대로 반복 호출되는 것을 전제로 pageOrder를 자동 채번
+    public void addFile(String filePath, String fileName) {
+        files.add(UserDocumentFile.builder()
+                .document(this)
+                .filePath(filePath)
+                .fileName(fileName)
+                .pageOrder(files.size() + 1)
+                .build());
+    }
+
+    public void clearFiles() {
+        files.clear();
     }
 
     public void softDelete() {

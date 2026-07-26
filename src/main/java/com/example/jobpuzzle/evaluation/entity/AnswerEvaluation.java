@@ -10,16 +10,19 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Check;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.Map;
 
+// 사용자 답변 메시지별 평가 결과. 원 답변과 꼬리답변을 각각 저장
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "answer_evaluation")
+@Check(constraints = "score >= 0 AND score <= 100")
 public class AnswerEvaluation extends BaseTimeEntity {
 
     @Id
@@ -67,7 +70,11 @@ public class AnswerEvaluation extends BaseTimeEntity {
     private String summary;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "improvement_direction", nullable = false, columnDefinition = "json")
+    @Column(
+            name = "improvement_direction",
+            nullable = false,
+            columnDefinition = "json"
+    )
     private List<String> improvementDirection;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -90,32 +97,45 @@ public class AnswerEvaluation extends BaseTimeEntity {
             AiCallLog aiCallLog
     ) {
         AnswerEvaluation evaluation = new AnswerEvaluation();
+
         evaluation.answerMessage = answerMessage;
         evaluation.sessionQuestion = sessionQuestion;
         evaluation.evaluationMode = mode;
         evaluation.score = score;
         evaluation.passThreshold = passThreshold;
         evaluation.scoreLabel = scoreLabel;
-        evaluation.evaluationDetail = evaluationDetail == null ? Map.of() : Map.copyOf(evaluationDetail);
+        evaluation.evaluationDetail = evaluationDetail == null
+                ? Map.of()
+                : Map.copyOf(evaluationDetail);
         evaluation.targetWeaknessTag = targetWeaknessTag;
         evaluation.targetDimension = targetDimension;
-        evaluation.weaknessTags = weaknessTags == null ? List.of() : List.copyOf(weaknessTags);
+        evaluation.weaknessTags = weaknessTags == null
+                ? List.of()
+                : List.copyOf(weaknessTags);
         evaluation.summary = summary;
         evaluation.improvementDirection = improvementDirection == null
                 ? List.of()
                 : List.copyOf(improvementDirection);
         evaluation.aiCallLog = aiCallLog;
+
         return evaluation;
     }
 
+    // 기존 면접·평가 코드에서 사용
     public boolean passed() {
         return score >= passThreshold;
+    }
+
+    // develop의 최종 리포트 코드와 이름을 맞추기 위한 호환 메서드
+    public boolean isPassed() {
+        return passed();
     }
 
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DimensionEvaluation {
+
         private Integer score;
         private String comment;
     }

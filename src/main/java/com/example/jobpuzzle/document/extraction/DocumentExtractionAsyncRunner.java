@@ -4,6 +4,7 @@ import com.example.jobpuzzle.document.entity.DocumentExtraction;
 import com.example.jobpuzzle.document.entity.DocumentExtractionStatus;
 import com.example.jobpuzzle.document.entity.DocumentVersionStatus;
 import com.example.jobpuzzle.document.entity.UserDocument;
+import com.example.jobpuzzle.document.entity.UserDocumentFile;
 import com.example.jobpuzzle.document.repository.DocumentExtractionRepository;
 import com.example.jobpuzzle.document.repository.UserDocumentRepository;
 import com.example.jobpuzzle.document.storage.FileStorage;
@@ -16,6 +17,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 // DocumentExtractionService.extractDocumentText가 호출을 위임하는 실제 추출 작업.
 // 별도 빈으로 분리한 이유: 같은 클래스 안에서 @Async 메서드를 호출하면 프록시를 안 거쳐서 비동기로 동작하지 않기 때문
@@ -32,7 +34,7 @@ public class DocumentExtractionAsyncRunner {
 
     @Async("documentExtractionExecutor")
     public void run(Long documentId) {
-        UserDocument document = userDocumentRepository.findById(documentId).orElse(null);
+        UserDocument document = userDocumentRepository.findWithFilesById(documentId).orElse(null);
         if (document == null) {
             log.warn("추출 대상 자료를 찾을 수 없습니다. documentId={}", documentId);
             return;
@@ -53,12 +55,16 @@ public class DocumentExtractionAsyncRunner {
     }
 
     private ExtractionOutcome extract(UserDocument document) {
-        try (InputStream inputStream = fileStorage.load(document.getFilePath())) {
-            return switch (document.getSourceType()) {
-                case PDF -> extractPdf(inputStream);
-                case IMAGE -> extractImage(inputStream);
-                case TEXT -> throw new IllegalStateException("TEXT 자료는 비동기 추출 대상이 아닙니다.");
-            };
+        return switch (document.getSourceType()) {
+            case PDF -> extractPdf(document.getFiles().get(0));
+            case IMAGE -> extractImage(document.getFiles());
+            case TEXT -> throw new IllegalStateException("TEXT 자료는 비동기 추출 대상이 아닙니다.");
+        };
+    }
+
+    private ExtractionOutcome extractPdf(UserDocumentFile file) {
+        try (InputStream inputStream = fileStorage.load(file.getFilePath())) {
+            return extractPdf(inputStream);
         } catch (IOException e) {
             throw new DocumentExtractionFailedException("저장된 파일을 불러오지 못했습니다.", e);
         }
@@ -96,9 +102,36 @@ public class DocumentExtractionAsyncRunner {
         return ExtractionOutcome.success(text, result.pageCount(), ocrApplied);
     }
 
-    private ExtractionOutcome extractImage(InputStream inputStream) {
+    // extractPdf와 동일하게 페이지(이미지) 단위로 순회하며 "[N페이지]" 마커로 이어붙임
+    // 이 마커 포맷을 지켜야 AnalysisCaseService.splitPages()가 PDF와 동일하게 파싱
+    private ExtractionOutcome extractImage(List<UserDocumentFile> files) {
+        StringBuilder content = new StringBuilder();
+        int emptyCount = 0;
+
+        for (UserDocumentFile file : files) {
+            String pageText = recognizeImage(file);
+            if (pageText == null || pageText.isBlank()) {
+                emptyCount++;
+            } else {
+                content.append("[").append(file.getPageOrder()).append("페이지]\n");
+                content.append(pageText).append("\n\n");
+            }
+        }
+
+        String text = content.toString().trim();
+        if (emptyCount == files.size()) {
+            return ExtractionOutcome.failed("이미지에서 텍스트를 인식하지 못했습니다.", true);
+        }
+        if (emptyCount > 0) {
+            return ExtractionOutcome.partial(text, files.size(), true,
+                    emptyCount + "개 이미지에서 텍스트를 추출하지 못했습니다.");
+        }
+        return ExtractionOutcome.success(text, files.size(), true);
+    }
+
+    private String recognizeImage(UserDocumentFile file) {
         BufferedImage image;
-        try {
+        try (InputStream inputStream = fileStorage.load(file.getFilePath())) {
             image = ImageIO.read(inputStream);
         } catch (IOException e) {
             throw new DocumentExtractionFailedException("이미지 파일을 읽는 중 오류가 발생했습니다.", e);
@@ -106,12 +139,7 @@ public class DocumentExtractionAsyncRunner {
         if (image == null) {
             throw new DocumentExtractionFailedException("이미지 파일을 읽을 수 없습니다.");
         }
-
-        String text = ocrEngine.recognize(image);
-        if (text == null || text.isBlank()) {
-            return ExtractionOutcome.failed("이미지에서 텍스트를 인식하지 못했습니다.", true);
-        }
-        return ExtractionOutcome.success(text, null, true);
+        return ocrEngine.recognize(image);
     }
 
     // 추출 직후엔 항상 버전 번호 없이 저장 (첫 확정 시점에 1.0 부여 - DocumentExtraction.confirm() 참고)
@@ -133,10 +161,10 @@ public class DocumentExtractionAsyncRunner {
 
     // 추출 진행 중 사용자가 원본 보관 설정을 바꿨을 수 있으므로 완료 시점에 최신 값을 다시 읽어 판단
     private void applyRetentionPolicy(Long documentId) {
-        UserDocument document = userDocumentRepository.findById(documentId).orElse(null);
-        if (document != null && !document.isKeepOriginal() && document.getFilePath() != null) {
-            fileStorage.delete(document.getFilePath());
-            document.clearFilePath();
+        UserDocument document = userDocumentRepository.findWithFilesById(documentId).orElse(null);
+        if (document != null && !document.isKeepOriginal() && !document.getFiles().isEmpty()) {
+            document.getFiles().forEach(file -> fileStorage.delete(file.getFilePath()));
+            document.clearFiles();
             userDocumentRepository.save(document);
         }
     }

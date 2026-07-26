@@ -1,6 +1,8 @@
 package com.example.jobpuzzle.interview.entity;
 
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.CandidateMaterialAnalysis;
+import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
 import com.example.jobpuzzle.global.common.BaseTimeEntity;
 import com.example.jobpuzzle.guide.entity.GuideContextResult;
 import com.example.jobpuzzle.guide.entity.JobGuideDocument;
@@ -17,6 +19,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// 사용자가 선택한 질문으로 생성하는 면접 세션과 모드별 불변 기준 저장
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -32,30 +35,46 @@ public class InterviewSession extends BaseTimeEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // 질문 선택의 원본 묶음
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_set_id", nullable = false)
     private QuestionSet questionSet;
 
+    // COMPANY_FIT에서 사용한 분석 입력 스냅샷
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "snapshot_id")
     private AnalysisInputSnapshot snapshot;
+
+    // COMPANY_FIT 세션에서 사용한 공고 분석 결과
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_posting_analysis_id")
+    private JobPostingAnalysis jobPostingAnalysis;
+
+    // COMPANY_FIT 세션에서 사용한 사용자 자료 분석 결과
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidate_analysis_id")
+    private CandidateMaterialAnalysis candidateAnalysis;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "mode", nullable = false, length = 30)
     private InterviewSessionMode mode;
 
+    // 세션 생성 당시 직무 기준
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_category_id", nullable = false)
     private JobCategory jobCategory;
 
+    // 세션 생성 당시 경력 기준
     @Enumerated(EnumType.STRING)
     @Column(name = "career_level", nullable = false, length = 20)
     private JobCategoryCareerLevel careerLevel;
 
+    // 질문 생성에 사용한 가이드 컨텍스트
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guide_context_id")
     private GuideContextResult guideContextResult;
 
+    // 실제 사용한 가이드
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guide_id")
     private JobGuideDocument guideDocument;
@@ -63,17 +82,21 @@ public class InterviewSession extends BaseTimeEntity {
     @Column(name = "guide_version", length = 20)
     private String guideVersion;
 
+    // AI 질문 생성 프롬프트 버전
     @Column(name = "prompt_version", length = 20)
     private String promptVersion;
 
+    // WEAKNESS_REVIEW 대상 약점 태그
     @Column(name = "target_weakness_tag", length = 100)
     private String targetWeaknessTag;
 
-    @Column(name = "target_dimension", length = 50)
-    private String targetDimension;
-
+    // WEAKNESS_REVIEW 질문 생성에 사용한 평가 ID 목록
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "basis_evaluation_ids", columnDefinition = "json")
+    @Column(
+            name = "basis_evaluation_ids",
+            nullable = false,
+            columnDefinition = "json"
+    )
     private List<Long> basisEvaluationIds;
 
     @Enumerated(EnumType.STRING)
@@ -92,29 +115,59 @@ public class InterviewSession extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /**
+     * BASIC·WEAKNESS_REVIEW와 기존 호출부에서 사용하는 생성 메서드.
+     * COMPANY_FIT 분석 Entity 연결은 전체 충돌 해결 후 서비스에서 추가한다.
+     */
     public static InterviewSession create(QuestionSet questionSet) {
+        return create(questionSet, null, null);
+    }
+
+    /**
+     * COMPANY_FIT 세션 생성 시 분석 결과까지 고정해서 저장하는 생성 메서드.
+     */
+    public static InterviewSession create(
+            QuestionSet questionSet,
+            JobPostingAnalysis jobPostingAnalysis,
+            CandidateMaterialAnalysis candidateAnalysis
+    ) {
         InterviewSession session = new InterviewSession();
+
         session.user = questionSet.getUser();
         session.questionSet = questionSet;
         session.snapshot = questionSet.getSnapshot();
+        session.jobPostingAnalysis = jobPostingAnalysis;
+        session.candidateAnalysis = candidateAnalysis;
         session.mode = questionSet.getInterviewMode();
         session.jobCategory = questionSet.getJobCategory();
         session.careerLevel = questionSet.getCareerLevel();
         session.guideContextResult = questionSet.getGuideContextResult();
+
         if (questionSet.getGuideContextResult() != null) {
-            session.guideDocument = questionSet.getGuideContextResult().getGuide();
-            session.guideVersion = questionSet.getGuideContextResult().getGuideVersion();
+            session.guideDocument =
+                    questionSet.getGuideContextResult().getGuide();
+            session.guideVersion =
+                    questionSet.getGuideContextResult().getGuideVersion();
         }
+
         session.promptVersion = questionSet.getPromptVersion();
         session.targetWeaknessTag = questionSet.getTargetWeaknessTag();
-        session.targetDimension = questionSet.getTargetDimension();
-        session.basisEvaluationIds = questionSet.getBasisEvaluationIds() == null
-                ? List.of()
-                : List.copyOf(questionSet.getBasisEvaluationIds());
+        session.basisEvaluationIds =
+                questionSet.getBasisEvaluationIds() == null
+                        ? List.of()
+                        : List.copyOf(questionSet.getBasisEvaluationIds());
+
         session.status = InterviewSessionStatus.CREATED;
+
         return session;
     }
 
+    // targetDimension은 INTERVIEW_SESSION 컬럼이 아니므로 QuestionSet에서 조회
+    public String getTargetDimension() {
+        return questionSet.getTargetDimension();
+    }
+
+    // 최초 답변 제출 시 IN_PROGRESS로 전환
     public void start() {
         if (status == InterviewSessionStatus.CREATED) {
             status = InterviewSessionStatus.IN_PROGRESS;
@@ -133,7 +186,13 @@ public class InterviewSession extends BaseTimeEntity {
     }
 
     public boolean isEditable() {
-        return status == InterviewSessionStatus.CREATED || status == InterviewSessionStatus.IN_PROGRESS;
+        return status == InterviewSessionStatus.CREATED
+                || status == InterviewSessionStatus.IN_PROGRESS;
+    }
+
+    // 최종 리포트 팀 코드와 상태 확인 시 사용 가능
+    public boolean isCompleted() {
+        return status == InterviewSessionStatus.COMPLETED;
     }
 
     public void softDelete() {
