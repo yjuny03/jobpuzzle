@@ -26,11 +26,13 @@ import com.example.jobpuzzle.interview.entity.InterviewSessionStatus;
 import com.example.jobpuzzle.interview.repository.InterviewMessageRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionQuestionRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
+import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.report.entity.FinalReport;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestion;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestionTargetType;
 import com.example.jobpuzzle.report.repository.FinalReportRepository;
 import com.example.jobpuzzle.report.repository.ImprovementSuggestionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -57,6 +59,7 @@ public class FinalReportService {
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiClientService aiClientService;
     private final TransactionTemplate transactionTemplate;
+    private final int evaluationPassThreshold;
 
     public FinalReportService(
             InterviewSessionRepository interviewSessionRepository,
@@ -69,7 +72,8 @@ public class FinalReportService {
             AiCallLogRepository aiCallLogRepository,
             PromptTemplateRepository promptTemplateRepository,
             AiClientService aiClientService,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            @Value("${evaluation.pass-threshold}") int evaluationPassThreshold
     ) {
         this.interviewSessionRepository = interviewSessionRepository;
         this.interviewSessionQuestionRepository = interviewSessionQuestionRepository;
@@ -83,6 +87,7 @@ public class FinalReportService {
         this.aiClientService = aiClientService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.evaluationPassThreshold = evaluationPassThreshold;
     }
 
     // JSON-07: DB 선점과 AI 호출을 분리한 짧은 트랜잭션 구조는 analysis/service/InitialAnalysisStageExecutor와

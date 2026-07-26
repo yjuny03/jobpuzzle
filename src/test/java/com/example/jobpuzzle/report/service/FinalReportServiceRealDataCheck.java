@@ -261,17 +261,22 @@ class FinalReportServiceRealDataCheck {
         User user = userRepository.save(User.createLocalUser(
                 "report-check-" + suffix, "encoded", suffix + "@example.test", "리포트 확인용", category));
 
-        promptTemplateRepository.save(PromptTemplate.builder()
-                .promptCode("PT-JSON06-" + suffix).name("JSON-06 test").version("v1")
-                .targetJson("JSON-06").templateText("{}").isActive(true).build());
-        promptTemplateRepository.save(PromptTemplate.builder()
-                .promptCode("PT-JSON07-" + suffix).name("JSON-07 test").version("v1")
-                .targetJson("JSON-07")
-                .templateText(JSON07_TEMPLATE_TEXT)
-                .forbiddenRules(JSON07_FORBIDDEN_RULES)
-                .isActive(true).build());
+        ensureTemplate("PT-JSON06-FIXTURE", "JSON-06", "{}", null);
+        ensureTemplate("PT-JSON07-FIXTURE", "JSON-07", JSON07_TEMPLATE_TEXT, JSON07_FORBIDDEN_RULES);
 
         return new Setup(suffix, user, category);
+    }
+
+    // 테스트를 몇 번 돌려도 JSON-06/07 픽스처 템플릿이 매번 새 row로 쌓이지 않도록,
+    // 고정된 promptCode로 이미 있으면 재사용하고 없을 때만 새로 만든다.
+    private void ensureTemplate(String promptCode, String targetJson, String templateText, String forbiddenRules) {
+        if (promptTemplateRepository.findByPromptCode(promptCode).isPresent()) {
+            return;
+        }
+        promptTemplateRepository.save(PromptTemplate.builder()
+                .promptCode(promptCode).name(targetJson + " test").version("v1")
+                .targetJson(targetJson).templateText(templateText).forbiddenRules(forbiddenRules)
+                .isActive(true).build());
     }
 
     private record Setup(String suffix, User user, JobCategory category) {
