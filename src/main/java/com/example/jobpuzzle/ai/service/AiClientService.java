@@ -72,15 +72,17 @@ public class AiClientService {
         }
         return new GenerationClientSelection(stage, anthropicClient, AiProvider.ANTHROPIC,
                 anthropic.getModel(), anthropic.getMaxOutputTokens().forStage(stage));
+    }
+
     // interview 추가: 호출자는 Mock/Anthropic 구현을 알지 않고 동일한 JSON 계약만 사용한다.
     public String generateBasicQuestions(String renderedPrompt) {
-        return aiClient.generateBasicQuestions(renderedPrompt);
+        GenerationClientSelection selection = resolve(AiExecutionStage.BASIC_QUESTION_GENERATION);
+        return selection.client().generateBasicQuestions(renderedPrompt);
     }
 
     public String generateWeaknessQuestions(String renderedPrompt) {
-        return aiClient.generateWeaknessQuestions(renderedPrompt);
-    }
-
+        GenerationClientSelection selection = resolve(AiExecutionStage.WEAKNESS_QUESTION_GENERATION);
+        return selection.client().generateWeaknessQuestions(renderedPrompt);
     }
 
     private void requireStage(GenerationClientSelection selection, AiExecutionStage expected) {

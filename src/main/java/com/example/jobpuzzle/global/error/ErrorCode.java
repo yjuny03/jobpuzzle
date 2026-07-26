@@ -84,9 +84,9 @@ public enum ErrorCode {
     ANSWER_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "INTERVIEW_009", "이미 확정된 답변입니다."),
     FOLLOW_UP_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "INTERVIEW_010", "추가 꼬리질문을 생성할 수 없습니다."),
     WEAKNESS_NOT_AVAILABLE(HttpStatus.CONFLICT, "INTERVIEW_011", "약점 보완에 사용할 미해결 약점이 없습니다."),
-    ANSWER_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_012", "답변 기준 메시지를 찾을 수 없습니다.");
+    ANSWER_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "INTERVIEW_012", "답변 기준 메시지를 찾을 수 없습니다."),
+
     // interview / report
-    INTERVIEW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_001", "존재하지 않는 면접 세션입니다."),
     INTERVIEW_SESSION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "REPORT_002", "완료되지 않은 세션은 최종 리포트를 생성할 수 없습니다."),
     FINAL_REPORT_NOT_GENERATABLE(HttpStatus.BAD_REQUEST, "REPORT_003", "평가에 성공한 답변이 없어 최종 리포트를 생성할 수 없습니다.");
 

@@ -105,6 +105,8 @@ app:
           json-01: ${ANTHROPIC_JSON01_MAX_OUTPUT_TOKENS:4096}
           json-02: ${ANTHROPIC_JSON02_MAX_OUTPUT_TOKENS:6144}
           json-05: ${ANTHROPIC_JSON05_MAX_OUTPUT_TOKENS:8192}
+          json-09: ${ANTHROPIC_JSON09_MAX_OUTPUT_TOKENS:6144}
+          json-11: ${ANTHROPIC_JSON11_MAX_OUTPUT_TOKENS:4096}
       input-limits:
         # fixture 8·9 실측보다 충분히 큰 기본값이다. 초과 입력은 자동 축약하지 않고 Provider 호출 전에 실패한다.
         json-01-rendered-prompt-chars: ${AI_JSON01_RENDERED_PROMPT_CHARS:40000}
