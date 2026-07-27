@@ -2,6 +2,9 @@ package com.example.jobpuzzle.global.config;
 
 import com.example.jobpuzzle.admin.controller.AdminController;
 import com.example.jobpuzzle.admin.controller.AdminViewController;
+import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
+import com.example.jobpuzzle.admin.service.AdminService;
+import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.security.CustomAccessDeniedHandler;
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
@@ -20,6 +23,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,6 +46,9 @@ class AdminAccessSecurityTest {
     @MockitoBean private OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     @MockitoBean private CustomUserDetailsService customUserDetailsService;
     @MockitoBean private PersistentTokenRepository persistentTokenRepository;
+
+    // 인가 통과 여부만 볼 것이므로 응답 내용은 중요하지 않음
+    @MockitoBean private AdminService adminService;
 
     @Test
     void adminPageRedirectsAnonymousUserToLogin() throws Exception {
@@ -78,9 +88,17 @@ class AdminAccessSecurityTest {
 
     @Test
     void adminApiPassesAuthorizationForAdmin() throws Exception {
-        // AdminController에 아직 실제 엔드포인트가 없어서 인가를 통과하면 404가 나는 것으로 통과 여부를 확인한다.
+        when(adminService.getUserList(any(), any(), any(), any())).thenReturn(
+                PageResponse.<AdminUserListResponse>builder()
+                        .content(List.of())
+                        .page(0).size(10).totalElements(0).totalPages(0)
+                        .first(true).last(true)
+                        .build()
+        );
+
         mockMvc.perform(get("/api/admin/users").with(user(UserRole.ADMIN)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     private RequestPostProcessor user(UserRole role) {
