@@ -13,12 +13,6 @@
     { id: 'custom', icon: 'sparkle', label: '맞춤 면접 질문', desc: '내 자료와 공고를 분석해 맞춤 질문을 만들어요' }
   ];
 
-  var WEAKNESS_TAGS = [
-    { tag: '성과 수치화 부족', desc: '결과를 수치나 구체적인 변화로 표현하는 연습이 필요해요', resolved: false },
-    { tag: '운영·장애대응 경험 부족', desc: '직무 가이드에서 중시하는 장애 대응·운영 관점을 더 반영해보세요', resolved: false },
-    { tag: '역할 구분 불명확', desc: '본인이 직접 수행한 역할을 더 명확하게 구분해서 답하면 좋아요', resolved: true }
-  ];
-
   var CAREER_LEVEL_LABEL = { NEW: '신입', EXPERIENCED: '경력', ANY: '경력무관' };
   var COMPANY_TYPES = ['JOB_POSTING', 'COMPANY_INFO'];
   var CANDIDATE_TYPES = ['RESUME', 'COVER_LETTER', 'PORTFOLIO', 'EXPERIENCE_NOTE'];
@@ -65,6 +59,7 @@
   var state = {
     step: 'mode', mode: null,
     selectedWeaknessTag: null,
+    weaknessTags: [],
 
     // 자료 선택 단계
     docsLoaded: false,
@@ -115,6 +110,11 @@
     bindStepEvents();
   }
 
+  function showModeStep() {
+    state.step = 'mode';
+    render();
+  }
+
   // ---- step: mode select ----
   function renderModeStep() {
     return '<div class="card card--pad-lg">' +
@@ -132,8 +132,8 @@
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">보완할 약점 태그를 선택하세요</p>' +
       '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">태그를 선택하면 그 약점에 맞춘 질문을 생성해요 · 해결된 약점은 표시되지 않아요</p>' +
       '<div style="display:flex; flex-direction:column; gap:10px;">' +
-      WEAKNESS_TAGS.filter(function (w) { return !w.resolved; }).map(function (w) {
-        return '<div class="weak-pick-row" data-weak-tag="' + esc(w.tag) + '"><div><span style="font-size:13.5px; font-weight:700;">#' + w.tag + '</span><p style="font-size:12.5px; color:#5B6370; margin:6px 0 0;">' + w.desc + '</p></div>' +
+      state.weaknessTags.map(function (tag) {
+        return '<div class="weak-pick-row" data-weak-tag="' + esc(tag) + '"><div><span style="font-size:13.5px; font-weight:700;">#' + esc(tag) + '</span><p style="font-size:12.5px; color:#5B6370; margin:6px 0 0;">이전 평가에서 확인된 관점을 집중적으로 보완합니다.</p></div>' +
           '<span class="badge-pill" style="background:#FDF0E4; color:#B5622E; white-space:nowrap;">미해결</span></div>';
       }).join('') + '</div></div>';
   }
@@ -579,8 +579,16 @@
     document.querySelectorAll('[data-mode]').forEach(function (el) {
       el.addEventListener('click', function () {
         state.mode = el.dataset.mode;
-        if (state.mode === 'basic') { state.step = 'list'; state.questions = []; state.selectedQIdx = null; render(); if (state.step === 'list') renderChatPanel(); }
-        else if (state.mode === 'weakness') { state.step = 'weaknessPick'; render(); }
+        if (state.mode === 'basic') {
+          if (window.InterviewLive) window.InterviewLive.startBasic();
+        }
+        else if (state.mode === 'weakness') {
+          DF.api('/interview-weakness-tags').then(function (tags) {
+            state.weaknessTags = tags || [];
+            state.step = 'weaknessPick';
+            render();
+          }).catch(function (e) { alert(e.message); });
+        }
         else if (state.mode === 'custom') { enterMaterialSelect(); }
       });
     });
@@ -588,9 +596,7 @@
     document.querySelectorAll('[data-weak-tag]').forEach(function (el) {
       el.addEventListener('click', function () {
         state.selectedWeaknessTag = el.dataset.weakTag;
-        state.step = 'list'; state.questions = []; state.selectedQIdx = null;
-        render();
-        renderChatPanel();
+        if (window.InterviewLive) window.InterviewLive.startWeakness(state.selectedWeaknessTag);
       });
     });
 
@@ -662,4 +668,5 @@
     bindMaterialRegisterModal();
     render();
   });
+  window.InterviewPage = { showModes: showModeStep };
 })();
