@@ -1,11 +1,14 @@
 package com.example.jobpuzzle.ai.service;
 
 import com.example.jobpuzzle.ai.client.AiClient;
+import com.example.jobpuzzle.ai.client.AiProviderCompletionMetadata;
 import com.example.jobpuzzle.ai.config.AiGenerationProperties;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.ai.log.AiProvider;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +57,52 @@ public class AiClientService {
     public String generateCustomizedAnalysis(GenerationClientSelection selection, String renderedPrompt) {
         requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
         return selection.client().generateCustomizedAnalysis(renderedPrompt);
+    }
+
+    public String generateCustomizedAnalysisV13(
+            GenerationClientSelection selection, String renderedPrompt, JsonNode outputSchema
+    ) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysisV13(renderedPrompt, outputSchema);
+    }
+
+    public String generateCustomizedAnalysisV15(
+            GenerationClientSelection selection, String renderedPrompt, JsonNode outputSchema
+    ) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysisV15(renderedPrompt, outputSchema);
+    }
+
+    public String generateCustomizedAnalysisV16(
+            GenerationClientSelection selection, String renderedPrompt, JsonNode outputSchema
+    ) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysisV16(renderedPrompt, outputSchema);
+    }
+
+    public String generateCustomizedAnalysisV17(
+            GenerationClientSelection selection, String renderedPrompt, JsonNode outputSchema
+    ) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysisV17(renderedPrompt, outputSchema);
+    }
+
+    public String generateCustomizedAnalysisV18(
+            GenerationClientSelection selection, String renderedPrompt, JsonNode outputSchema
+    ) {
+        requireStage(selection, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        return selection.client().generateCustomizedAnalysisV18(renderedPrompt, outputSchema);
+    }
+
+    public String analyzeCandidateMaterial(GenerationClientSelection selection, String prompt, UserDocumentType documentType) {
+        requireStage(selection, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS);
+        return selection.client().analyzeCandidateMaterial(prompt, documentType);
+    }
+
+    // provider 호출 직후 같은 스레드에서 한 번만 소비한다. 이전 호출 metadata가 다음 단계에 섞이지 않게 한다.
+    public AiProviderCompletionMetadata consumeCompletionMetadata(GenerationClientSelection selection) {
+        if (selection == null) throw new IllegalArgumentException("generation client selection is required");
+        return selection.client().consumeCompletionMetadata();
     }
 
     private GenerationClientSelection anthropicSelection(AiExecutionStage stage) {

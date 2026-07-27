@@ -9,11 +9,15 @@ import com.example.jobpuzzle.ai.dto.WeaknessAnswerEvaluationResult;
 import com.example.jobpuzzle.ai.dto.SourceReference;
 import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderResult;
 import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -30,6 +34,7 @@ import java.util.regex.Pattern;
 public class AiResponseProcessor {
 
     private static final Pattern JSON_CODE_BLOCK = Pattern.compile("^```json\\s*\\n([\\s\\S]*)\\n?```$");
+    private static final int CANONICAL_EVIDENCE_MAX_LENGTH = 160;
     private static final Set<UserDocumentType> JOB_POSTING_TYPES = Set.of(
             UserDocumentType.JOB_POSTING, UserDocumentType.COMPANY_INFO
     );
@@ -70,17 +75,12 @@ public class AiResponseProcessor {
         validateItems(result.getPreferred(), markers, JOB_POSTING_TYPES, JobPostingAnalysisResult.Requirement::getRequirementId, JobPostingAnalysisResult.Requirement::getText, JobPostingAnalysisResult.Requirement::getSourceRefs);
         validateItems(result.getCompanyValues(), markers, JOB_POSTING_TYPES, JobPostingAnalysisResult.Item::getItemId, JobPostingAnalysisResult.Item::getText, JobPostingAnalysisResult.Item::getSourceRefs);
         validateItems(result.getCoreCompetencies(), markers, JOB_POSTING_TYPES, JobPostingAnalysisResult.Item::getItemId, JobPostingAnalysisResult.Item::getText, JobPostingAnalysisResult.Item::getSourceRefs);
-        for (JobPostingAnalysisResult.Conflict conflict : result.getConflicts()) {
-            requireText("conflicts.field", conflict.getField());
-            requireText("conflicts.postingValue", conflict.getPostingValue());
-            requireText("conflicts.companyInfoValue", conflict.getCompanyInfoValue());
-            requireText("conflicts.appliedValue", conflict.getAppliedValue());
-            validateRefs(conflict.getSourceRefs(), markers, JOB_POSTING_TYPES, "conflicts.sourceRefs");
-            Set<UserDocumentType> types = conflict.getSourceRefs().stream().map(SourceReference::getDocumentType).collect(java.util.stream.Collectors.toSet());
-            if (!types.contains(UserDocumentType.JOB_POSTING) || !types.contains(UserDocumentType.COMPANY_INFO)) {
-                invalidSource("conflicts.sourceRefs", "requires JOB_POSTING and COMPANY_INFO");
-            }
-        }
+        // conflict는 양쪽 문서 근거가 있어야만 의미가 있는 보조 판단이다. 한쪽 근거만 있거나
+        // marker를 잘못 고른 conflict 하나 때문에 핵심 공고 분석 전체를 폐기하지 않는다.
+        // 서버가 근거를 만들어 붙이지 않고 검증 불가능한 conflict 항목만 제외한다.
+        result.setConflicts(result.getConflicts().stream()
+                .filter(conflict -> isVerifiableConflict(conflict, markers))
+                .toList());
         validateMissingEvidence(result.getMissingEvidence(), "missingEvidence");
         return result;
     }
@@ -90,19 +90,16 @@ public class AiResponseProcessor {
             String rawJson,
             List<AnalysisInputSnapshotContextSource> sources
     ) {
-        CandidateMaterialAnalysisResult result = parse(rawJson, CandidateMaterialAnalysisResult.class, "JSON-02");
+        CandidateMaterialAnalysisResult result = parse(
+                normalizeCandidateSourceReferences(rawJson), CandidateMaterialAnalysisResult.class, "JSON-02");
+        assignServerIssuedTechnicalIds(result);
         List<AnalysisSourceMarkerParser.SourceMarker> markers = markerParser.parseSources(sources);
         Set<UserDocumentType> actualTypes = sources.stream().map(AnalysisInputSnapshotContextSource::getDocumentType)
                 .collect(java.util.stream.Collectors.toSet());
         if (!CANDIDATE_TYPES.containsAll(actualTypes)) {
             throw validation("invalid candidate document type");
         }
-        requireList("availableDocumentTypes", result.getAvailableDocumentTypes());
-        Set<UserDocumentType> returnedTypes = new HashSet<>(result.getAvailableDocumentTypes());
-        if (returnedTypes.size() != result.getAvailableDocumentTypes().size() || !returnedTypes.equals(actualTypes)) {
-            throw validation("availableDocumentTypes mismatch");
-        }
-        requireList("missingEvidence", result.getMissingEvidence());
+        normalizeCandidateSections(result, actualTypes);
         validateResume(result.getResume(), actualTypes.contains(UserDocumentType.RESUME), markers);
         validateCoverLetter(result.getCoverLetter(), actualTypes.contains(UserDocumentType.COVER_LETTER), markers);
         validatePortfolio(result.getPortfolio(), actualTypes.contains(UserDocumentType.PORTFOLIO), markers);
@@ -111,15 +108,234 @@ public class AiResponseProcessor {
         return result;
     }
 
+    private void normalizeCandidateSections(CandidateMaterialAnalysisResult result, Set<UserDocumentType> actualTypes) {
+        result.setAvailableDocumentTypes(actualTypes.stream().sorted().toList());
+        if (result.getMissingEvidence() == null) result.setMissingEvidence(new ArrayList<>());
+        if (actualTypes.contains(UserDocumentType.RESUME)) {
+            if (result.getResume() == null) result.setResume(new CandidateMaterialAnalysisResult.Resume());
+            if (result.getResume().getExperiences() == null) result.getResume().setExperiences(new ArrayList<>());
+            if (result.getResume().getSkills() == null) result.getResume().setSkills(new ArrayList<>());
+            if (result.getResume().getRoles() == null) result.getResume().setRoles(new ArrayList<>());
+            if (result.getResume().getResults() == null) result.getResume().setResults(new ArrayList<>());
+        } else result.setResume(null);
+        if (actualTypes.contains(UserDocumentType.COVER_LETTER)) {
+            if (result.getCoverLetter() == null) result.setCoverLetter(new CandidateMaterialAnalysisResult.CoverLetter());
+            if (result.getCoverLetter().getExperienceNarratives() == null)
+                result.getCoverLetter().setExperienceNarratives(new ArrayList<>());
+        } else result.setCoverLetter(null);
+        if (actualTypes.contains(UserDocumentType.PORTFOLIO)) {
+            if (result.getPortfolio() == null) result.setPortfolio(new CandidateMaterialAnalysisResult.Portfolio());
+            if (result.getPortfolio().getProjects() == null) result.getPortfolio().setProjects(new ArrayList<>());
+        } else result.setPortfolio(null);
+        if (actualTypes.contains(UserDocumentType.EXPERIENCE_NOTE)) {
+            if (result.getExperienceNote() == null)
+                result.setExperienceNote(new CandidateMaterialAnalysisResult.ExperienceNote());
+            if (result.getExperienceNote().getStarCandidates() == null)
+                result.getExperienceNote().setStarCandidates(new ArrayList<>());
+        } else result.setExperienceNote(null);
+    }
+
+    private boolean isVerifiableConflict(
+            JobPostingAnalysisResult.Conflict conflict,
+            List<AnalysisSourceMarkerParser.SourceMarker> markers
+    ) {
+        if (conflict == null
+                || blank(conflict.getField())
+                || blank(conflict.getPostingValue())
+                || blank(conflict.getCompanyInfoValue())
+                || blank(conflict.getAppliedValue())) {
+            return false;
+        }
+        try {
+            validateRefs(conflict.getSourceRefs(), markers, JOB_POSTING_TYPES, "conflicts.sourceRefs");
+        } catch (AiProcessingException ignored) {
+            return false;
+        }
+        Set<UserDocumentType> types = conflict.getSourceRefs().stream()
+                .map(SourceReference::getDocumentType)
+                .collect(java.util.stream.Collectors.toSet());
+        return types.contains(UserDocumentType.JOB_POSTING)
+                && types.contains(UserDocumentType.COMPANY_INFO);
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    // Structured Output 전용 sourceRef(필수) + additionalSourceRefs(추가) 형식을 기존 DTO의
+    // sourceRefs 배열로 복원한다. Mock/fake와 기존 저장 payload의 sourceRefs 배열은 그대로 허용한다.
+    private String normalizeCandidateSourceReferences(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) {
+            throw parseFailure("JSON-02 empty response");
+        }
+        try {
+            JsonNode root = strictObjectMapper.readTree(extractSingleObject(rawJson, "JSON-02"));
+            if (!(root instanceof ObjectNode object)) {
+                throw parseFailure("JSON-02 must be a JSON object");
+            }
+            normalizeCandidateSourceReferences(object);
+            return strictObjectMapper.writeValueAsString(object);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-02 source reference normalization failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    private void normalizeCandidateSourceReferences(JsonNode node) {
+        if (node instanceof ObjectNode object) {
+            boolean hasPrimary = object.has("sourceRef");
+            boolean hasAdditional = object.has("additionalSourceRefs");
+            if (hasPrimary || hasAdditional) {
+                if (!hasPrimary || !hasAdditional || object.has("sourceRefs")) {
+                    throw validation("JSON-02 source reference fields must use sourceRef and additionalSourceRefs together");
+                }
+                JsonNode primary = object.get("sourceRef");
+                JsonNode additional = object.get("additionalSourceRefs");
+                if (!primary.isObject() || !additional.isArray()) {
+                    throw validation("JSON-02 sourceRef must be an object and additionalSourceRefs must be an array");
+                }
+                ArrayNode refs = strictObjectMapper.createArrayNode();
+                refs.add(primary);
+                additional.forEach(refs::add);
+                object.remove("sourceRef");
+                object.remove("additionalSourceRefs");
+                object.set("sourceRefs", refs);
+            }
+            object.elements().forEachRemaining(this::normalizeCandidateSourceReferences);
+        } else if (node instanceof ArrayNode array) {
+            array.elements().forEachRemaining(this::normalizeCandidateSourceReferences);
+        }
+    }
+
+    // JSON-02 partition schema는 모델 생성 ID를 받지 않는다. 최종 merger도 원문 순서·사실 key로
+    // 다시 번호를 부여하므로, 이 값은 partition 내 DTO 검증을 위한 안정적인 기술 식별자다.
+    private void assignServerIssuedTechnicalIds(CandidateMaterialAnalysisResult result) {
+        if (result.getResume() != null && result.getResume().getExperiences() != null) {
+            for (int index = 0; index < result.getResume().getExperiences().size(); index++) {
+                result.getResume().getExperiences().get(index).setExperienceId("exp-" + (index + 1));
+            }
+        }
+        if (result.getPortfolio() != null && result.getPortfolio().getProjects() != null) {
+            for (int index = 0; index < result.getPortfolio().getProjects().size(); index++) {
+                result.getPortfolio().getProjects().get(index).setProjectId("project-" + (index + 1));
+            }
+        }
+        if (result.getExperienceNote() != null && result.getExperienceNote().getStarCandidates() != null) {
+            for (int index = 0; index < result.getExperienceNote().getStarCandidates().size(); index++) {
+                result.getExperienceNote().getStarCandidates().get(index).setCandidateId("star-" + (index + 1));
+            }
+        }
+    }
+
     // JSON-05는 설명문 안의 단일 JSON 객체도 허용하되 엄격한 DTO 파싱을 적용한다.
     public CustomizedAnalysisGenerationResult parseCustomizedAnalysis(String rawJson) {
         if (rawJson == null || rawJson.trim().isEmpty()) {
             throw parseFailure("JSON-05 empty response");
         }
         try {
-            return strictObjectMapper.readValue(extractSingleObject(rawJson, "JSON-05"), CustomizedAnalysisGenerationResult.class);
+            return strictObjectMapper.readValue(normalizeCustomizedRequirementMatches(rawJson), CustomizedAnalysisGenerationResult.class);
         } catch (JsonProcessingException exception) {
             throw parseFailure("JSON-05 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    public CustomizedSynthesisProviderResult parseCustomizedAnalysisV13(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) {
+            throw parseFailure("JSON-05 v1.3 empty response");
+        }
+        try {
+            return strictObjectMapper.readValue(
+                    extractSingleObject(rawJson, "JSON-05 v1.3"),
+                    CustomizedSynthesisProviderResult.class
+            );
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 v1.3 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    public com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV15ProviderResult
+    parseCustomizedAnalysisV15(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) {
+            throw parseFailure("JSON-05 v1.5 empty response");
+        }
+        try {
+            return strictObjectMapper.readValue(
+                    extractSingleObject(rawJson, "JSON-05 v1.5"),
+                    com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV15ProviderResult.class);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 v1.5 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    public com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV16ProviderResult
+    parseCustomizedAnalysisV16(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) {
+            throw parseFailure("JSON-05 v1.6 empty response");
+        }
+        try {
+            return strictObjectMapper.readValue(
+                    extractSingleObject(rawJson, "JSON-05 v1.6"),
+                    com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV16ProviderResult.class);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 v1.6 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    public com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV17ProviderResult
+    parseCustomizedAnalysisV17(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) {
+            throw parseFailure("JSON-05 v1.7 empty response");
+        }
+        try {
+            return strictObjectMapper.readValue(
+                    extractSingleObject(rawJson, "JSON-05 v1.7"),
+                    com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV17ProviderResult.class);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 v1.7 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    public com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV18ProviderResult
+    parseCustomizedAnalysisV18(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty()) throw parseFailure("JSON-05 v1.8 empty response");
+        try {
+            return strictObjectMapper.readValue(extractSingleObject(rawJson, "JSON-05 v1.8"),
+                    com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV18ProviderResult.class);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 v1.8 parse failed: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    // Structured Output 전용 두 match 배열을 기존 JSON-05 DTO의 requirementMatches로 복원한다.
+    // Mock/fake와 기존 payload의 requirementMatches 배열은 그대로 허용한다.
+    private String normalizeCustomizedRequirementMatches(String rawJson) {
+        try {
+            JsonNode root = strictObjectMapper.readTree(extractSingleObject(rawJson, "JSON-05"));
+            if (!(root instanceof ObjectNode object)) throw parseFailure("JSON-05 must be a JSON object");
+            boolean evidenced = object.has("evidencedRequirementMatches");
+            boolean nonEvidenced = object.has("nonEvidencedRequirementMatches");
+            if (!evidenced && !nonEvidenced) return strictObjectMapper.writeValueAsString(object);
+            if (!evidenced || !nonEvidenced || object.has("requirementMatches")) {
+                throw parseFailure("JSON-05 match arrays must use evidencedRequirementMatches and nonEvidencedRequirementMatches together");
+            }
+            JsonNode evidenceValues = object.get("evidencedRequirementMatches");
+            JsonNode nonEvidenceValues = object.get("nonEvidencedRequirementMatches");
+            if (!evidenceValues.isArray() || !nonEvidenceValues.isArray()) {
+                throw parseFailure("JSON-05 match arrays must be arrays");
+            }
+            ArrayNode matches = strictObjectMapper.createArrayNode();
+            for (JsonNode value : evidenceValues) matches.add(value);
+            for (JsonNode value : nonEvidenceValues) {
+                if (!(value instanceof ObjectNode match)) throw parseFailure("JSON-05 non-evidenced match must be an object");
+                match.putNull("candidateEvidence");
+                match.set("candidateSourceRefs", strictObjectMapper.createArrayNode());
+                matches.add(match);
+            }
+            object.remove("evidencedRequirementMatches");
+            object.remove("nonEvidencedRequirementMatches");
+            object.set("requirementMatches", matches);
+            return strictObjectMapper.writeValueAsString(object);
+        } catch (JsonProcessingException exception) {
+            throw parseFailure("JSON-05 match normalization failed: " + exception.getClass().getSimpleName());
         }
     }
 
@@ -224,6 +440,11 @@ public class AiResponseProcessor {
         requireList("resume.skills", resume.getSkills());
         requireList("resume.roles", resume.getRoles());
         requireList("resume.results", resume.getResults());
+        // 한 개의 불완전한 요약 항목이 partition 전체를 폐기하지 않도록 의미 없는 항목만 제외한다.
+        resume.getExperiences().removeIf(item -> item == null || blank(item.getTitle()) || blank(item.getSummary()));
+        resume.getSkills().removeIf(item -> item == null || blank(item.getSkill()) || blank(item.getUsageContext()));
+        resume.getRoles().removeIf(item -> item == null || blank(item.getRole()) || blank(item.getContext()));
+        resume.getResults().removeIf(item -> item == null || blank(item.getResult()));
         unique("experienceId", resume.getExperiences(), CandidateMaterialAnalysisResult.Experience::getExperienceId);
         validateItems(resume.getExperiences(), markers, CANDIDATE_TYPES, CandidateMaterialAnalysisResult.Experience::getExperienceId, CandidateMaterialAnalysisResult.Experience::getTitle, CandidateMaterialAnalysisResult.Experience::getSourceRefs);
         for (CandidateMaterialAnalysisResult.Experience item : resume.getExperiences()) {
@@ -243,6 +464,13 @@ public class AiResponseProcessor {
             return;
         }
         if (coverLetter == null) throw validation("coverLetter is required");
+        if (coverLetter.getMotivation() != null && blank(coverLetter.getMotivation().getSummary()))
+            coverLetter.setMotivation(null);
+        if (coverLetter.getValues() != null && blank(coverLetter.getValues().getSummary()))
+            coverLetter.setValues(null);
+        if (coverLetter.getJobConnection() != null && blank(coverLetter.getJobConnection().getSummary()))
+            coverLetter.setJobConnection(null);
+        coverLetter.getExperienceNarratives().removeIf(item -> item == null || blank(item.getSummary()));
         validateSummary(coverLetter.getMotivation(), markers, "coverLetter.motivation");
         validateSummary(coverLetter.getValues(), markers, "coverLetter.values");
         requireList("coverLetter.experienceNarratives", coverLetter.getExperienceNarratives());
@@ -257,6 +485,8 @@ public class AiResponseProcessor {
         }
         if (portfolio == null) throw validation("portfolio is required");
         requireList("portfolio.projects", portfolio.getProjects());
+        portfolio.getProjects().removeIf(project -> project == null
+                || blank(project.getProjectName()) || blank(project.getStructure()) || blank(project.getRole()));
         unique("projectId", portfolio.getProjects(), CandidateMaterialAnalysisResult.Project::getProjectId);
         for (CandidateMaterialAnalysisResult.Project project : portfolio.getProjects()) {
             requireText("portfolio.projects.projectId", project.getProjectId());
@@ -307,7 +537,7 @@ public class AiResponseProcessor {
         if (refs == null || refs.isEmpty()) invalidSource(field, "must contain at least one reference");
         for (SourceReference ref : refs) {
             if (ref == null || ref.getExtractionId() == null || ref.getDocumentId() == null || ref.getDocumentType() == null
-                    || ref.getEvidenceText() == null || ref.getEvidenceText().isBlank()) {
+                    || ref.getSegmentId() == null || ref.getSegmentId().isBlank()) {
                 invalidSource(field, "missing required reference field");
             }
             if (!allowedTypes.contains(ref.getDocumentType()))
@@ -319,11 +549,40 @@ public class AiResponseProcessor {
                     .filter(value -> java.util.Objects.equals(value.pageNumber(), ref.getPageNumber()))
                     .filter(value -> java.util.Objects.equals(value.segmentId(), ref.getSegmentId()))
                     .findFirst().orElse(null);
+            // Provider가 extraction/document identity를 잘못 echo해도 segmentId가 현재 partition에서
+            // 유일하면 서버 marker로 결정적으로 복원한다. 중복 segment면 추측하지 않고 실패한다.
+            if (marker == null && (ref.getExtractionId() <= 0 || ref.getDocumentId() <= 0)) {
+                List<AnalysisSourceMarkerParser.SourceMarker> sameSegment = markers.stream()
+                        .filter(value -> allowedTypes.contains(value.documentType()))
+                        .filter(value -> java.util.Objects.equals(value.segmentId(), ref.getSegmentId()))
+                        .toList();
+                if (sameSegment.size() == 1) {
+                    marker = sameSegment.getFirst();
+                    ref.setExtractionId(marker.extractionId());
+                    ref.setDocumentId(marker.documentId());
+                    ref.setDocumentType(marker.documentType());
+                    ref.setPageNumber(marker.pageNumber());
+                    ref.setSegmentId(marker.segmentId());
+                }
+            }
             if (marker == null)
                 invalidSource(field, "unknown marker extractionId=" + ref.getExtractionId() + ", segmentId=" + ref.getSegmentId());
+            // 모델은 marker 식별자만 선택한다. 표시·저장할 원문 발췌는 서버가 marker 원문에서
+            // 결정적으로 채워, 모델의 재서술·문자 정규화 때문에 유효한 근거가 거절되지 않게 한다.
+            ref.setEvidenceText(canonicalEvidenceText(marker));
             if (!marker.segmentText().contains(ref.getEvidenceText()))
                 invalidSource(field, "evidenceText is not in segmentId=" + ref.getSegmentId());
         }
+    }
+
+    private String canonicalEvidenceText(AnalysisSourceMarkerParser.SourceMarker marker) {
+        String text = marker.segmentText();
+        if (text == null || text.isBlank()) {
+            throw validation("marker segmentText must not be blank");
+        }
+        return text.length() <= CANONICAL_EVIDENCE_MAX_LENGTH
+                ? text
+                : text.substring(0, CANONICAL_EVIDENCE_MAX_LENGTH);
     }
 
     private void validateMissingEvidence(List<?> missingEvidence, String field) {

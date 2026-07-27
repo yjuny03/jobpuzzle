@@ -10,6 +10,7 @@ import com.example.jobpuzzle.ai.service.AiClientService;
 import com.example.jobpuzzle.ai.service.GenerationClientSelection;
 import com.example.jobpuzzle.ai.service.GenerationInputLimitValidator;
 import com.example.jobpuzzle.ai.validation.AiResponseProcessor;
+import com.example.jobpuzzle.ai.validation.AiProcessingException;
 import com.example.jobpuzzle.ai.validation.CustomizedAnalysisResponseValidator;
 import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
 import com.example.jobpuzzle.analysis.entity.*;
@@ -17,6 +18,13 @@ import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContext;
 import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
 import com.example.jobpuzzle.analysis.rag.service.RetrievalContextService;
 import com.example.jobpuzzle.analysis.repository.*;
+import com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisEvidenceCatalogFactory;
+import com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisProviderInputFactory;
+import com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisResultAssembler;
+import com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV13SchemaFactory;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisEvidenceCatalog;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderInput;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderResult;
 import com.example.jobpuzzle.guide.entity.GuideContextResult;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.guide.repository.GuideContextChunkRepository;
@@ -73,6 +81,19 @@ class CustomizedSynthesisStageExecutorTest {
     @Mock private CustomizedSynthesisResultWriter resultWriter;
     @Mock private RetrievalContextService retrievalContextService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private Json05ExecutionDiagnostic diagnostic;
+    @Mock private CustomizedSynthesisEvidenceCatalogFactory evidenceCatalogFactory;
+    @Mock private CustomizedSynthesisProviderInputFactory providerInputFactory;
+    @Mock private CustomizedSynthesisV13SchemaFactory v13SchemaFactory;
+    @Mock private CustomizedSynthesisResultAssembler resultAssembler;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV15SchemaFactory v15SchemaFactory;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV15ResultAssembler v15ResultAssembler;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV16SchemaFactory v16SchemaFactory;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV16ResultAssembler v16ResultAssembler;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV17SchemaFactory v17SchemaFactory;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV17ResultAssembler v17ResultAssembler;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV18SchemaFactory v18SchemaFactory;
+    @Mock private com.example.jobpuzzle.analysis.synthesis.service.CustomizedSynthesisV18ResultAssembler v18ResultAssembler;
     @Mock private AnalysisInputSnapshot snapshot;
     @Mock private JobPostingAnalysis jobPosting;
     @Mock private CandidateMaterialAnalysis candidate;
@@ -86,7 +107,13 @@ class CustomizedSynthesisStageExecutorTest {
                 guideContextRepository, guideContextChunkRepository, readinessRepository, matchRepository,
                 actionPlanRepository, questionSetRepository, questionRepository, aiCallLogRepository,
                 promptTemplateRepository, aiClientService, promptTemplateRenderer, aiResponseProcessor, validator,
-                inputMapper, resultWriter, new ObjectMapper(), retrievalContextService, inputLimitValidator, 600L, transactionManager);
+                inputMapper, resultWriter, new ObjectMapper(), retrievalContextService, inputLimitValidator, diagnostic,
+                evidenceCatalogFactory, providerInputFactory, v13SchemaFactory, resultAssembler,
+                v15SchemaFactory, v15ResultAssembler,
+                v16SchemaFactory, v16ResultAssembler,
+                v17SchemaFactory, v17ResultAssembler,
+                v18SchemaFactory, v18ResultAssembler,
+                600L, transactionManager);
         when(transactionManager.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
 
         JobCategory category = JobCategory.builder().mainCategory("IT").subCategory("BACKEND")
@@ -141,7 +168,7 @@ class CustomizedSynthesisStageExecutorTest {
     }
 
     @Test
-    void providerFailureLeavesNoResultAndMarksOnlyTheClaimedLogFailed() {
+    void unexpectedProviderBoundaryFailureRecordsOnlyItsExceptionType() {
         when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
                 .thenReturn("rendered prompt");
         when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
@@ -155,6 +182,115 @@ class CustomizedSynthesisStageExecutorTest {
         verify(resultWriter, never()).write(anyLong(), anyLong(), any(), any());
         assertThat(runningLog.getStatus()).isEqualTo(AiCallLogStatus.FAILED);
         assertThat(runningLog.getErrorType()).isEqualTo(AiCallLogErrorType.PROVIDER_ERROR);
+        assertThat(runningLog.getErrorMessage())
+                .isEqualTo("JSON-05 provider boundary failed; exceptionType=IllegalStateException")
+                .doesNotContain("provider unavailable");
+    }
+
+    @Test
+    void unexpectedPostProcessingFailureRecordsOnlyItsExceptionType() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysis("{}")).thenThrow(new IllegalStateException("response detail must not be logged"));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
+
+        assertThat(runningLog.getErrorType()).isEqualTo(AiCallLogErrorType.RESPONSE_PARSE_FAILED);
+        assertThat(runningLog.getErrorMessage())
+                .isEqualTo("AI response parsing failed")
+                .doesNotContain("response detail");
+    }
+
+    @Test
+    void unexpectedValidatorFailureIsNotMisclassifiedAsAProviderFailure() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysis("{}")).thenReturn(mock(CustomizedAnalysisGenerationResult.class));
+        when(validator.validate(any(), any())).thenThrow(new IllegalStateException("validator implementation detail"));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
+
+        assertThat(runningLog.getErrorType()).isEqualTo(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED);
+        assertThat(runningLog.getErrorMessage()).isEqualTo("AI response validation failed")
+                .doesNotContain("validator implementation detail");
+        verify(diagnostic).failure(eq("JSON05_PROVIDER_DTO_MAPPED"), isA(IllegalStateException.class));
+    }
+
+    @Test
+    void preservesValidatorFailureWhenAiCallLogFailureRecordingAlsoFails() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysis("{}")).thenReturn(mock(CustomizedAnalysisGenerationResult.class));
+        when(validator.validate(any(), any())).thenThrow(new AiProcessingException(
+                AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, "safe validator reason"));
+        when(aiCallLogRepository.findById(900L)).thenThrow(new IllegalStateException("log database unavailable"));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.AI_RESPONSE_INVALID);
+
+        verify(diagnostic).failure(eq("JSON05_PROVIDER_DTO_MAPPED"), isA(AiProcessingException.class));
+        verify(diagnostic).failure(eq("JSON05_PROVIDER_DTO_MAPPED_FAILURE_RECORDING"), isA(IllegalStateException.class));
+    }
+
+    @Test
+    void whitelistsOnlyAnthropicAdapterTransportExceptionTypes() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenThrow(new AiProcessingException(AiCallLogErrorType.PROVIDER_ERROR,
+                        "Anthropic request failed; exception=IllegalStateException; cause=NullPointerException"));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class);
+
+        assertThat(runningLog.getErrorMessage())
+                .isEqualTo("Anthropic request failed; exception=IllegalStateException; cause=NullPointerException");
+    }
+
+    @Test
+    void preservesSanitizedAnthropicHttpDiagnosticForSchemaFailures() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenThrow(new AiProcessingException(AiCallLogErrorType.PROVIDER_ERROR,
+                        "Anthropic request failed; httpStatus=400; providerType=invalid_request_error; providerMessage=Schema is too complex for compilation.; requestId=req_safe_123"));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class);
+
+        assertThat(runningLog.getErrorMessage())
+                .isEqualTo("Anthropic request failed; httpStatus=400; providerType=invalid_request_error; providerMessage=Schema is too complex for compilation.; requestId=req_safe_123");
+    }
+
+    @Test
+    void preservesCustomExceptionApiContractButRecordsItsErrorCodeAtProviderBoundary() {
+        when(promptTemplateRenderer.renderCustomizedAnalysis(any(), anyString(), anyString(), anyString(), any(), any(), any(), any()))
+                .thenReturn("rendered prompt");
+        when(aiClientService.generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt")))
+                .thenThrow(new com.example.jobpuzzle.global.error.CustomException(
+                        com.example.jobpuzzle.global.error.ErrorCode.EMBEDDING_PROVIDER_ERROR));
+
+        assertThatThrownBy(() -> executor.execute(SNAPSHOT_ID))
+                .isInstanceOf(com.example.jobpuzzle.global.error.CustomException.class)
+                .extracting(error -> ((com.example.jobpuzzle.global.error.CustomException) error).getErrorCode())
+                .isEqualTo(com.example.jobpuzzle.global.error.ErrorCode.EMBEDDING_PROVIDER_ERROR);
+
+        assertThat(runningLog.getErrorMessage())
+                .isEqualTo("JSON-05 provider boundary failed; errorCode=EMBEDDING_PROVIDER_ERROR");
     }
 
     @Test
@@ -208,6 +344,135 @@ class CustomizedSynthesisStageExecutorTest {
 
         verify(aiClientService).generateCustomizedAnalysis(any(GenerationClientSelection.class), eq("rendered prompt"));
         verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), any());
+    }
+
+    @Test
+    void v14UsesProjectionSchemaAssemblerAndExistingValidatedWriter() {
+        PromptTemplate v13 = prompt("JSON-05", 3L);
+        ReflectionTestUtils.setField(v13, "version", "v1.4");
+        when(promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05"))
+                .thenReturn(Optional.of(v13));
+        CustomizedSynthesisEvidenceCatalog authority =
+                new CustomizedSynthesisEvidenceCatalog(List.of(), List.of());
+        CustomizedSynthesisProviderInput input = new CustomizedSynthesisProviderInput(
+                new CustomizedSynthesisProviderInput.JobContext("IT", "BACKEND", "NEW"),
+                List.of(), List.of(), null,
+                new com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderEvidenceCatalog(List.of()),
+                new CustomizedSynthesisProviderInput.GenerationPolicy(false, 0));
+        CustomizedSynthesisProviderResult provider = mock(CustomizedSynthesisProviderResult.class);
+        CustomizedAnalysisGenerationResult assembled = mock(CustomizedAnalysisGenerationResult.class);
+        com.fasterxml.jackson.databind.JsonNode schema = new ObjectMapper().createObjectNode();
+        when(evidenceCatalogFactory.create(any(), any())).thenReturn(authority);
+        when(providerInputFactory.create(anyString(), anyString(), anyString(), any(), any(), eq(authority)))
+                .thenReturn(input);
+        when(promptTemplateRenderer.renderCustomizedAnalysisV13(v13, input)).thenReturn("v1.3 prompt");
+        when(v13SchemaFactory.schema(any())).thenReturn(schema);
+        when(aiClientService.generateCustomizedAnalysisV13(any(), eq("v1.3 prompt"), eq(schema))).thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysisV13("{}")).thenReturn(provider);
+        when(resultAssembler.assemble(eq(provider), eq(authority), eq(GuideMatchType.NONE))).thenReturn(assembled);
+
+        executor.execute(SNAPSHOT_ID);
+
+        verify(aiClientService).generateCustomizedAnalysisV13(any(), eq("v1.3 prompt"), eq(schema));
+        verify(aiClientService, never()).generateCustomizedAnalysis(any(), anyString());
+        verify(validator).validate(any(), eq(assembled));
+        verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), eq(assembled));
+    }
+
+    @Test
+    void v15UsesFixedSlotSchemaAssemblerAndExistingValidatedWriter() {
+        PromptTemplate template = prompt("JSON-05", 4L);
+        ReflectionTestUtils.setField(template, "version", "v1.5");
+        when(promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05"))
+                .thenReturn(Optional.of(template));
+        CustomizedSynthesisEvidenceCatalog authority =
+                new CustomizedSynthesisEvidenceCatalog(List.of(), List.of());
+        CustomizedSynthesisProviderInput input = new CustomizedSynthesisProviderInput(
+                new CustomizedSynthesisProviderInput.JobContext("IT", "BACKEND", "NEW"),
+                List.of(), List.of(), null,
+                new com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderEvidenceCatalog(List.of()),
+                new CustomizedSynthesisProviderInput.GenerationPolicy(false, 0));
+        var provider = mock(com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV15ProviderResult.class);
+        CustomizedAnalysisGenerationResult assembled = mock(CustomizedAnalysisGenerationResult.class);
+        com.fasterxml.jackson.databind.JsonNode schema = new ObjectMapper().createObjectNode();
+        when(evidenceCatalogFactory.create(any(), any())).thenReturn(authority);
+        when(providerInputFactory.create(anyString(), anyString(), anyString(), any(), any(), eq(authority)))
+                .thenReturn(input);
+        when(promptTemplateRenderer.renderCustomizedAnalysisV13(template, input)).thenReturn("v1.5 prompt");
+        when(v15SchemaFactory.schema(input)).thenReturn(schema);
+        when(aiClientService.generateCustomizedAnalysisV15(any(), eq("v1.5 prompt"), eq(schema))).thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysisV15("{}")).thenReturn(provider);
+        when(v15ResultAssembler.assemble(provider, input, authority, GuideMatchType.NONE)).thenReturn(assembled);
+
+        executor.execute(SNAPSHOT_ID);
+
+        verify(aiClientService).generateCustomizedAnalysisV15(any(), eq("v1.5 prompt"), eq(schema));
+        verify(validator).validate(any(), eq(assembled));
+        verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), eq(assembled));
+    }
+
+    @Test
+    void v16UsesRequirementScopedFlatSchemaAndExistingValidatedWriter() {
+        PromptTemplate template = prompt("JSON-05", 5L);
+        ReflectionTestUtils.setField(template, "version", "v1.6");
+        when(promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05"))
+                .thenReturn(Optional.of(template));
+        CustomizedSynthesisEvidenceCatalog authority =
+                new CustomizedSynthesisEvidenceCatalog(List.of(), List.of());
+        CustomizedSynthesisProviderInput input = new CustomizedSynthesisProviderInput(
+                new CustomizedSynthesisProviderInput.JobContext("IT", "BACKEND", "NEW"),
+                List.of(), List.of(), null,
+                new com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderEvidenceCatalog(List.of()),
+                new CustomizedSynthesisProviderInput.GenerationPolicy(false, 0));
+        var provider = mock(com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV16ProviderResult.class);
+        CustomizedAnalysisGenerationResult assembled = mock(CustomizedAnalysisGenerationResult.class);
+        com.fasterxml.jackson.databind.JsonNode schema = new ObjectMapper().createObjectNode();
+        when(evidenceCatalogFactory.create(any(), any())).thenReturn(authority);
+        when(providerInputFactory.create(anyString(), anyString(), anyString(), any(), any(), eq(authority)))
+                .thenReturn(input);
+        when(promptTemplateRenderer.renderCustomizedAnalysisV13(template, input)).thenReturn("v1.6 prompt");
+        when(v16SchemaFactory.schema(input)).thenReturn(schema);
+        when(aiClientService.generateCustomizedAnalysisV16(any(), eq("v1.6 prompt"), eq(schema))).thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysisV16("{}")).thenReturn(provider);
+        when(v16ResultAssembler.assemble(provider, input, authority, GuideMatchType.NONE)).thenReturn(assembled);
+
+        executor.execute(SNAPSHOT_ID);
+
+        verify(aiClientService).generateCustomizedAnalysisV16(any(), eq("v1.6 prompt"), eq(schema));
+        verify(validator).validate(any(), eq(assembled));
+        verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), eq(assembled));
+    }
+
+    @Test
+    void v17UsesCompactSchemaAndExistingValidatedWriter() {
+        PromptTemplate template = prompt("JSON-05", 6L);
+        ReflectionTestUtils.setField(template, "version", "v1.7");
+        when(promptTemplateRepository.findFirstByTargetJsonAndIsActiveTrueOrderByPromptTemplateIdDesc("JSON-05"))
+                .thenReturn(Optional.of(template));
+        CustomizedSynthesisEvidenceCatalog authority =
+                new CustomizedSynthesisEvidenceCatalog(List.of(), List.of());
+        CustomizedSynthesisProviderInput input = new CustomizedSynthesisProviderInput(
+                new CustomizedSynthesisProviderInput.JobContext("IT", "BACKEND", "NEW"),
+                List.of(), List.of(), null,
+                new com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderEvidenceCatalog(List.of()),
+                new CustomizedSynthesisProviderInput.GenerationPolicy(false, 0));
+        var provider = mock(com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV17ProviderResult.class);
+        CustomizedAnalysisGenerationResult assembled = mock(CustomizedAnalysisGenerationResult.class);
+        com.fasterxml.jackson.databind.JsonNode schema = new ObjectMapper().createObjectNode();
+        when(evidenceCatalogFactory.create(any(), any())).thenReturn(authority);
+        when(providerInputFactory.create(anyString(), anyString(), anyString(), any(), any(), eq(authority)))
+                .thenReturn(input);
+        when(promptTemplateRenderer.renderCustomizedAnalysisV13(template, input)).thenReturn("v1.7 prompt");
+        when(v17SchemaFactory.schema(input)).thenReturn(schema);
+        when(aiClientService.generateCustomizedAnalysisV17(any(), eq("v1.7 prompt"), eq(schema))).thenReturn("{}");
+        when(aiResponseProcessor.parseCustomizedAnalysisV17("{}")).thenReturn(provider);
+        when(v17ResultAssembler.assemble(provider, input, authority, GuideMatchType.NONE)).thenReturn(assembled);
+
+        executor.execute(SNAPSHOT_ID);
+
+        verify(aiClientService).generateCustomizedAnalysisV17(any(), eq("v1.7 prompt"), eq(schema));
+        verify(validator).validate(any(), eq(assembled));
+        verify(resultWriter).write(eq(SNAPSHOT_ID), eq(900L), any(), eq(assembled));
     }
 
     @Test
