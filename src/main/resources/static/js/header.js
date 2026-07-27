@@ -25,6 +25,11 @@
 
     nameEl.textContent = (user.name || user.loginId) + '님';
     avatarEl.textContent = (user.name || user.loginId).charAt(0);
+
+    var adminLink = document.getElementById('app-admin-link');
+    if (adminLink) {
+      adminLink.hidden = user.role !== 'ADMIN';
+    }
   }
 
   // 로그인된 실제 회원 정보를 불러와서 헤더의 이름/아바타를 채움
