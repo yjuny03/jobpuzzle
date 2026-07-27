@@ -25,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -128,5 +129,33 @@ public class AdminController {
     ) {
         AdminGuideResponse response = adminService.createGuide(request, file, admin);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    // 가이드 새 버전 생성 - guideCode는 기존 가이드에서 상속, 버전만 자동 증가
+    // POST /api/admin/guides/{guideId}/versions (multipart: request(json), file(선택))
+    @PostMapping(value = "/guides/{guideId}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<AdminGuideResponse>> createGuideVersion(
+            @PathVariable Long guideId,
+            @Valid @RequestPart("request") AdminGuideCreateRequest request,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @AuthenticationPrincipal(expression = "user") User admin
+    ) {
+        AdminGuideResponse response = adminService.createGuideVersion(guideId, request, file, admin);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    // 가이드 활성화 - 같은 범위에 이미 활성화된 가이드가 있으면 force=true를 줘야 진행됨
+    @PatchMapping("/guides/{guideId}/activate")
+    public ResponseEntity<ApiResponse<AdminGuideResponse>> activateGuide(
+            @PathVariable Long guideId,
+            @RequestParam(defaultValue = "false") boolean force
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.activateGuide(guideId, force)));
+    }
+
+    // 가이드 비활성화
+    @PatchMapping("/guides/{guideId}/deactivate")
+    public ResponseEntity<ApiResponse<AdminGuideResponse>> deactivateGuide(@PathVariable Long guideId) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.deactivateGuide(guideId)));
     }
 }

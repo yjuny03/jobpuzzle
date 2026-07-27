@@ -13,6 +13,7 @@ import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.guide.entity.JobGuideDocument;
+import com.example.jobpuzzle.guide.entity.JobGuideDocumentStatus;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
@@ -124,11 +125,35 @@ public class AdminService {
 
     // 가이드 등록 - file은 sourceType=PDF일 때만 사용
     public AdminGuideResponse createGuide(AdminGuideCreateRequest request, MultipartFile file, User admin) {
+        if (request.getGuideCode() == null || request.getGuideCode().isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "가이드 코드를 입력해주세요.");
+        }
         String version = "v1.0";
         if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(request.getGuideCode(), version)) {
             throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
         }
+        JobGuideDocument guide = buildGuide(request, file, admin, request.getGuideCode(), version, null);
+        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+    }
 
+    // 가이드 새 버전 생성 - guideCode는 이전 버전에서 상속하고 버전만 자동 증가
+    public AdminGuideResponse createGuideVersion(Long guideId, AdminGuideCreateRequest request, MultipartFile file, User admin) {
+        JobGuideDocument previous = jobGuideDocumentRepository.findById(guideId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+
+        String nextVersion = bumpVersion(previous.getVersion());
+        if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(previous.getGuideCode(), nextVersion)) {
+            throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
+        }
+
+        JobGuideDocument guide = buildGuide(request, file, admin, previous.getGuideCode(), nextVersion, previous);
+        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+    }
+
+    private JobGuideDocument buildGuide(
+            AdminGuideCreateRequest request, MultipartFile file, User admin,
+            String guideCode, String version, JobGuideDocument previousGuide
+    ) {
         JobCategory jobCategory = request.getJobCategoryId() != null
                 ? jobCategoryRepository.findById(request.getJobCategoryId())
                         .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND))
@@ -136,9 +161,9 @@ public class AdminService {
 
         String filePath = (file != null && !file.isEmpty()) ? storeGuideFile(file) : null;
 
-        JobGuideDocument guide = JobGuideDocument.builder()
-                .guideCode(request.getGuideCode())
-                .previousGuide(null)
+        return JobGuideDocument.builder()
+                .guideCode(guideCode)
+                .previousGuide(previousGuide)
                 .scopeType(request.getScopeType())
                 .jobCategory(jobCategory)
                 .scopeMainCategory(request.getScopeMainCategory())
@@ -153,8 +178,62 @@ public class AdminService {
                 .questionDirection(request.getQuestionDirection())
                 .avoidQuestions(request.getAvoidQuestions())
                 .build();
+    }
 
-        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+    // "v1.0" -> "v1.1" 처럼 minor 버전만 증가
+    private String bumpVersion(String version) {
+        var matcher = java.util.regex.Pattern.compile("^v(\\d+)\\.(\\d+)$").matcher(version);
+        if (!matcher.matches()) {
+            return version + ".1";
+        }
+        int major = Integer.parseInt(matcher.group(1));
+        int minor = Integer.parseInt(matcher.group(2));
+        return "v" + major + "." + (minor + 1);
+    }
+
+    // 가이드 활성화 - 같은 범위에 이미 활성화된 가이드가 있으면 force=true일 때만 그 가이드를 비활성화하고 진행
+    public AdminGuideResponse activateGuide(Long guideId, boolean force) {
+        JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+
+        List<JobGuideDocument> conflicts = findActiveConflicts(guide);
+        if (!conflicts.isEmpty() && !force) {
+            JobGuideDocument conflict = conflicts.get(0);
+            throw new CustomException(ErrorCode.GUIDE_ACTIVE_DUPLICATED,
+                    "이미 활성화된 가이드가 있습니다: [" + conflict.getGuideCode() + " " + conflict.getVersion() + "] "
+                            + conflict.getTitle() + ". 계속하면 이 가이드는 비활성화되고 지금 가이드가 새로 활성화됩니다.");
+        }
+
+        conflicts.forEach(JobGuideDocument::deactivate);
+        guide.activate();
+        return AdminGuideResponse.from(guide);
+    }
+
+    // 가이드 비활성화
+    public AdminGuideResponse deactivateGuide(Long guideId) {
+        JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+        guide.deactivate();
+        return AdminGuideResponse.from(guide);
+    }
+
+    // 같은 검색 범위(scope)에서 이 가이드를 제외하고 이미 ACTIVE인 가이드를 찾는다
+    private List<JobGuideDocument> findActiveConflicts(JobGuideDocument guide) {
+        List<JobGuideDocument> found = switch (guide.getScopeType()) {
+            case CATEGORY -> jobGuideDocumentRepository
+                    .findByScopeTypeAndJobCategory_MainCategoryAndJobCategory_SubCategoryAndJobCategory_CareerLevelAndStatus(
+                            guide.getScopeType(),
+                            guide.getJobCategory().getMainCategory(),
+                            guide.getJobCategory().getSubCategory(),
+                            guide.getJobCategory().getCareerLevel(),
+                            JobGuideDocumentStatus.ACTIVE
+                    );
+            case PARENT_CATEGORY -> jobGuideDocumentRepository.findByScopeTypeAndScopeMainCategoryAndStatus(
+                    guide.getScopeType(), guide.getScopeMainCategory(), JobGuideDocumentStatus.ACTIVE);
+            case GLOBAL_COMMON -> jobGuideDocumentRepository.findByScopeTypeAndStatus(
+                    guide.getScopeType(), JobGuideDocumentStatus.ACTIVE);
+        };
+        return found.stream().filter(g -> !g.getGuideId().equals(guide.getGuideId())).toList();
     }
 
     private String storeGuideFile(MultipartFile file) {

@@ -14,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 public class AdminGuideCreateRequest {
 
-    @NotBlank(message = "가이드 코드를 입력해주세요.")
+    // 새 버전 등록(createGuideVersion) 시에는 이전 버전에서 상속하므로 비워도 됨 - 신규 등록 시에만 서비스에서 필수 확인
     @Size(max = 50, message = "가이드 코드는 50자 이내로 입력해주세요.")
     private String guideCode;
 
