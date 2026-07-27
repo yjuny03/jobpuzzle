@@ -109,6 +109,18 @@ class AnalysisPipelineHttpIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.questionSet.questions").isNotEmpty());
+
+        // 세션 모듈은 Repository가 아닌 이 handoff API만으로 PASS 질문 세트를 받아야 한다.
+        mockMvc.perform(get("/api/analysis/cases/{caseId}/question-set", fixture.analysisCase().getAnalysisCaseId())
+                        .with(authenticated(fixture.user())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.mode").value("COMPANY_FIT"))
+                .andExpect(jsonPath("$.data.canGenerateQuestions").value(true))
+                .andExpect(jsonPath("$.data.questionSetId").isNumber())
+                .andExpect(jsonPath("$.data.questions").isNotEmpty())
+                .andExpect(jsonPath("$.data.questions[0].questionId").isNumber())
+                .andExpect(jsonPath("$.data.questions[0].displayOrder").value(0));
     }
 
     @Test

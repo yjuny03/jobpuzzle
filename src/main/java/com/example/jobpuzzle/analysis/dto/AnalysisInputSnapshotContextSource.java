@@ -43,4 +43,11 @@ public class AnalysisInputSnapshotContextSource {
                 analysisText
         );
     }
+
+    // JSON-02 partition은 같은 snapshot source의 marker 일부만 사용한다. 원본 메타데이터는 유지하고 analysisText만 교체한다.
+    public AnalysisInputSnapshotContextSource withAnalysisText(String partitionAnalysisText) {
+        return new AnalysisInputSnapshotContextSource(
+                extractionId, documentId, documentType, displayName, majorVersion, minorVersion, partitionAnalysisText
+        );
+    }
 }

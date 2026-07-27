@@ -12,6 +12,7 @@ import java.util.List;
 @Builder
 public class GuideContextResultDto {
     private final Long guideId;
+    private final String guideCode;
     private final String title;
     private final String version;
     private final GuideMatchType matchType;
@@ -31,6 +32,7 @@ public class GuideContextResultDto {
     public static GuideContextResultDto from(GuideContextResult result, List<GuideContextChunk> chunks) {
         return GuideContextResultDto.builder()
                 .guideId(result.getGuide() == null ? null : result.getGuide().getGuideId())
+                .guideCode(result.getGuide() == null ? null : result.getGuide().getGuideCode())
                 .title(result.getGuide() == null ? null : result.getGuide().getTitle())
                 .version(result.getGuideVersion())
                 .matchType(result.getMatchType())
@@ -65,9 +67,11 @@ public class GuideContextResultDto {
         private static Chunk from(GuideContextChunk contextChunk) {
             return Chunk.builder()
                     .chunkId(contextChunk.getJobGuideChunk().getChunkId())
-                    .title(contextChunk.getJobGuideChunk().getTitle())
+                    .title(contextChunk.getChunkTitleSnapshot() == null
+                            ? contextChunk.getJobGuideChunk().getTitle() : contextChunk.getChunkTitleSnapshot())
                     .contentSummary(contextChunk.getJobGuideChunk().getContentSummary())
-                    .content(contextChunk.getJobGuideChunk().getContent())
+                    .content(contextChunk.getChunkContentSnapshot() == null
+                            ? contextChunk.getJobGuideChunk().getContent() : contextChunk.getChunkContentSnapshot())
                     .score(contextChunk.getSimilarityScore())
                     .build();
         }

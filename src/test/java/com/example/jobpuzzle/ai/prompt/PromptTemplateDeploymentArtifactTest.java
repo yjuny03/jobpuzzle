@@ -30,6 +30,103 @@ class PromptTemplateDeploymentArtifactTest {
                 .isEqualTo(prompt("json-02-v1.0.txt"));
     }
 
+    @Test
+    void json02V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.1.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.1.txt"));
+    }
+
+    @Test
+    void json02V12ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.2.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.2.txt"));
+    }
+
+    @Test
+    void json02V13ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.3.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.3.txt"));
+    }
+
+    @Test
+    void json02V14ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.4.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.4.txt"));
+    }
+
+    @Test
+    void json02V15ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.5.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.5.txt"));
+    }
+
+    @Test
+    void json02V16ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-02-v1.6.sql", "PT-CAND-001"))
+                .isEqualTo(prompt("json-02-v1.6.txt"));
+    }
+
+    @Test
+    void json05V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.1.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.1.txt"));
+    }
+
+    @Test
+    void json05V12ActivationSqlUsesTheV11ToV12RetrievalContractReplacement() throws IOException {
+        String sql = Files.readString(Path.of("src/main/resources/db/manual/activate-json-05-v1.2.sql"));
+
+        assertThat(sql).contains("'v1.2'", "REPLACE(template_text", "candidateEvidenceIds", "candidateEvidence[].evidenceId");
+    }
+
+    @Test
+    void json05V13ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.3.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.3.txt"));
+    }
+
+    @Test
+    void json05V14ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.4.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.4.txt"));
+    }
+
+    @Test
+    void json05V15ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.5.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.5.txt"));
+    }
+
+    @Test
+    void json05V16ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.6.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.6.txt"));
+    }
+
+    @Test
+    void json05V17ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.7.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.7.txt"));
+    }
+
+    @Test
+    void json05V18ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.8.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.8.txt"));
+    }
+
+    @Test
+    void json05V19ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.9.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.9.txt"));
+    }
+
+    @Test
+    void json05V110ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        assertThat(sqlLiteral("activate-json-05-v1.10.sql", "PT-JSON05-001"))
+                .isEqualTo(prompt("json-05-v1.10.txt"));
+    }
+
     private String prompt(String filename) throws IOException {
         // UTF-8 정본의 마지막 줄바꿈 차이는 SQL literal 비교에서 제거한다.
         return Files.readString(Path.of("src/main/resources/prompts", filename)).trim();

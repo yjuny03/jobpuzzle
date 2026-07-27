@@ -10,12 +10,19 @@ import com.example.jobpuzzle.ai.log.*; import com.example.jobpuzzle.analysis.dto
   JobPostingAnalysis job=mock(JobPostingAnalysis.class);when(job.getAiCallLog()).thenReturn(pending);when(jobs.findBySnapshot_SnapshotId(10L)).thenReturn(Optional.of(job));
   CandidateMaterialAnalysis candidate=mock(CandidateMaterialAnalysis.class);when(candidate.getAiCallLog()).thenReturn(running);when(candidates.findBySnapshot_SnapshotId(10L)).thenReturn(Optional.of(candidate));
   ReadinessResult result=mock(ReadinessResult.class);when(result.getAiCallLog()).thenReturn(succeeded);when(result.getStatus()).thenReturn(ReadinessResultStatus.PARTIAL);when(result.isCanGenerateQuestions()).thenReturn(true);when(readiness.findBySnapshot_SnapshotId(10L)).thenReturn(Optional.of(result));
+  when(logs.findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(AiExecutionStage.CUSTOMIZED_SYNTHESIS,AiInputReferenceType.ANALYSIS_SNAPSHOT,"10")).thenReturn(Optional.of(succeeded));
   when(guides.findByPurposeAndInputReferenceTypeAndInputReferenceId(any(),any(),eq("10"))).thenReturn(Optional.of(mock(GuideContextResult.class)));
-  AiCallLog failed=log(AiCallLogStatus.FAILED);when(failed.getExecutionStage()).thenReturn(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS);when(failed.getErrorType()).thenReturn(AiCallLogErrorType.TIMEOUT);when(failed.getErrorMessage()).thenReturn("provider timed out");when(logs.findFirstByInputReferenceTypeAndInputReferenceIdAndStatusOrderByAiCallLogIdDesc(AiInputReferenceType.ANALYSIS_SNAPSHOT,"10",AiCallLogStatus.FAILED)).thenReturn(Optional.of(failed));
+  AiCallLog failed=log(AiCallLogStatus.FAILED);when(failed.getExecutionStage()).thenReturn(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS);when(failed.getErrorType()).thenReturn(AiCallLogErrorType.TIMEOUT);when(failed.getErrorMessage()).thenReturn("provider timed out");when(logs.findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(AiInputReferenceType.ANALYSIS_SNAPSHOT,"10")).thenReturn(Optional.of(failed));
 
   var response=service.getStatus(1L,1L);
 
-  assertThat(response.getAnalysisCaseStatus()).isEqualTo("ANALYZING");assertThat(response.getJobPostingAnalysisStatus()).isEqualTo(AnalysisStageStatus.RUNNING);assertThat(response.getCandidateMaterialAnalysisStatus()).isEqualTo(AnalysisStageStatus.RUNNING);assertThat(response.getGuideContextStatus()).isEqualTo(AnalysisStageStatus.SUCCEEDED);assertThat(response.getCustomizedAnalysisStatus()).isEqualTo(AnalysisStageStatus.SUCCEEDED);assertThat(response.getLatestFailureStage()).isEqualTo("CANDIDATE_MATERIAL_ANALYSIS");assertThat(response.getLatestFailureType()).isEqualTo("TIMEOUT");assertThat(response.getLatestFailureMessage()).isEqualTo("provider timed out");
+  assertThat(response.getAnalysisCaseStatus()).isEqualTo("ANALYZING");assertThat(response.getJobPostingAnalysisStatus()).isEqualTo(AnalysisStageStatus.RUNNING);assertThat(response.getCandidateMaterialAnalysisStatus()).isEqualTo(AnalysisStageStatus.RUNNING);assertThat(response.getGuideContextStatus()).isEqualTo(AnalysisStageStatus.SUCCEEDED);assertThat(response.getCustomizedAnalysisStatus()).isEqualTo(AnalysisStageStatus.SUCCEEDED);assertThat(response.getLatestFailureStage()).isEqualTo("CANDIDATE_MATERIAL_ANALYSIS");assertThat(response.getLatestFailureType()).isEqualTo("TIMEOUT");assertThat(response.getUserMessage()).isEqualTo("분석 서비스 응답이 지연되고 있어요.");assertThat(response.getErrorCode()).isEqualTo("ANALYSIS_PROVIDER_TEMPORARILY_UNAVAILABLE");assertThat(response.getRetryable()).isTrue();
+ }
+ @Test void clearsHistoricalFailureWhenLatestAttemptSucceeded(){
+  AnalysisInputSnapshot snapshot=mock(AnalysisInputSnapshot.class);when(snapshot.getSnapshotId()).thenReturn(10L);when(snapshots.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(1L,1L)).thenReturn(Optional.of(snapshot));
+  AiCallLog succeeded=log(AiCallLogStatus.SUCCEEDED);when(logs.findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(AiInputReferenceType.ANALYSIS_SNAPSHOT,"10")).thenReturn(Optional.of(succeeded));
+  var response=service.getStatus(1L,1L);
+  assertThat(response.getLatestFailureStage()).isNull();assertThat(response.getLatestFailureType()).isNull();assertThat(response.getUserMessage()).isNull();
  }
  private AiCallLog log(AiCallLogStatus status){
   // 단계 상태 변환만 검증하도록 필요한 AI call log 상태를 만든다.

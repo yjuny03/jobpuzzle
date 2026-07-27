@@ -38,6 +38,7 @@ public class AnalysisService {
     private final AnalysisCaseService analysisCaseService;
     private final AnalysisCaseStatusTransitionService statusTransitionService;
     private final InitialAnalysisStageExecutor initialAnalysisStageExecutor;
+    private final CandidateMaterialPartitionOrchestrator candidateMaterialPartitionOrchestrator;
     private final GuideContextService guideContextService;
     private final RequirementRetrievalService requirementRetrievalService;
     private final AnalysisVectorIndexService vectorIndexService;
@@ -72,12 +73,7 @@ public class AnalysisService {
                 jobPostingSources,
                 companyInfoSources
         );
-        initialAnalysisStageExecutor.execute(
-                AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
-                context,
-                candidateSources,
-                List.of()
-        );
+        candidateMaterialPartitionOrchestrator.execute(context, candidateSources);
     }
 
     // JSON-01·02와 JSON-04 뒤에 snapshot 고정 retrieval을 준비한 다음 JSON-05를 실행한다.

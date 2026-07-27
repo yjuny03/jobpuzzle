@@ -108,6 +108,9 @@ app:
         # fixture 8·9 실측보다 충분히 큰 기본값이다. 초과 입력은 자동 축약하지 않고 Provider 호출 전에 실패한다.
         json-01-rendered-prompt-chars: ${AI_JSON01_RENDERED_PROMPT_CHARS:40000}
         json-02-rendered-prompt-chars: ${AI_JSON02_RENDERED_PROMPT_CHARS:50000}
+        # JSON-02 partition은 marker를 자르지 않으며, 한도를 넘으면 다음 partition으로 넘긴다.
+        json-02-partition-marker-content-chars: ${AI_JSON02_PARTITION_MARKER_CONTENT_CHARS:12000}
+        json-02-partition-max-markers: ${AI_JSON02_PARTITION_MAX_MARKERS:8}
         json-05-requirement-count: ${AI_JSON05_REQUIREMENT_COUNT:20}
         json-05-retrieval-chars: ${AI_JSON05_RETRIEVAL_CHARS:36000}
         json-05-rendered-prompt-chars: ${AI_JSON05_RENDERED_PROMPT_CHARS:64000}

@@ -7,13 +7,40 @@ spring:
 
 app:
   ai:
+    json05-diagnostic:
+      enabled: true
     generation:
+      # 현재 JSON-01·02는 사실 추출, JSON-05는 구조화된 매칭·질문 생성 단계이므로
+      # thinking token이 JSON 출력 예산을 잠식하지 않게 E2E에서만 비활성화한다.
+      thinking-by-stage:
+        JOB_POSTING_ANALYSIS: disabled
+        CANDIDATE_MATERIAL_ANALYSIS: disabled
+        CUSTOMIZED_SYNTHESIS: disabled
       stage-overrides:
         # 4-5 JSON-01 Claude E2E의 시작점이다. 4-6·4-7에서 후속 stage를 한 개씩 전환한다.
         JOB_POSTING_ANALYSIS: anthropic
-        CANDIDATE_MATERIAL_ANALYSIS: mock
-        CUSTOMIZED_SYNTHESIS: mock
+        CANDIDATE_MATERIAL_ANALYSIS: anthropic
+        # JSON-02 Structured Output 검증 후 전체 Claude E2E에서 JSON-05도 실연동한다.
+        CUSTOMIZED_SYNTHESIS: anthropic
       anthropic:
+        # JSON-02는 thinking과 완결 JSON을 함께 생성할 때 90초를 넘겼다.
+        # 실서비스 기본 timeout은 유지하고, 수동 4-6 E2E에서만 provider 응답을 끝까지 관찰한다.
+        request-timeout: 180s
         max-output-tokens:
           # 실제 JSON-01 응답이 4,096 토큰에서 잘리는 것을 확인해, E2E에서만 충분한 출력 상한을 준다.
           json01: 8192
+          # Claude의 thinking block과 JSON-02 text가 기본 6,144 토큰을 함께 소진해 응답이 잘렸다.
+          # 운영 기본값은 유지하고, 4-6 실연동 검증에서만 완결 JSON을 받을 여유를 둔다.
+          json02: 12288
+          # JSON-05는 요구사항별 매칭·실행안·질문을 함께 반환하므로 E2E에서만 여유를 둔다.
+          json05: 16384
+      input-limits:
+        # JSON-02는 최종 배열을 자르는 것이 아니라, marker를 보존한 채 Claude 호출만 작게 나눈다.
+        # case 11의 7개 페이지 marker가 단일 호출로 묶여 max_tokens에 도달한 것을 막기 위한 E2E 전용 기준이다.
+        json02-partition-max-markers: 2
+        json02-partition-marker-content-chars: 4500
+        # case 10의 고정 retrieval 근거가 46,276자여서, E2E에서만 실제값보다 작은 여유를 둔다.
+        json05-retrieval-chars: 50000
+        # case 11의 JSON-02 v1.3 결과를 포함한 JSON-05 전체 렌더링은 109,580자다.
+        # 운영 기본값은 유지하고, E2E에서 Mock 후속 단계를 끝까지 검증할 여유를 둔다.
+        json05-rendered-prompt-chars: 120000
