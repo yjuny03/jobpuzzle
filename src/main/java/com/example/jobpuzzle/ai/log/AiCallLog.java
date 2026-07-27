@@ -44,6 +44,11 @@ public class AiCallLog {
     @Column(name = "model", nullable = false, length = 100)
     private String model;
 
+    // 기존 DB 행은 null일 수 있으므로 비용 집계에서는 null을 PROVIDER_CALL로 해석한다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "call_role", length = 30)
+    private AiCallLogRole callRole;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "execution_stage", nullable = false, length = 50)
     private AiExecutionStage executionStage;
@@ -92,6 +97,11 @@ public class AiCallLog {
     @Column(name = "error_message", length = 1000)
     private String errorMessage;
 
+    // 원문·비밀값 없이 provider 종료/usage와 서버 후처리 결과만 JSON으로 보관한다.
+    @jakarta.persistence.Lob
+    @Column(name = "provider_completion_metadata", columnDefinition = "longtext")
+    private String providerCompletionMetadata;
+
     @Column(name = "reused", nullable = false)
     private boolean reused;
 
@@ -120,6 +130,7 @@ public class AiCallLog {
         AiCallLog log = new AiCallLog();
         log.provider = provider;
         log.model = model;
+        log.callRole = AiCallLogRole.PROVIDER_CALL;
         log.executionStage = executionStage;
         log.inputReferenceType = inputReferenceType;
         log.inputReferenceId = inputReferenceId;
@@ -133,6 +144,24 @@ public class AiCallLog {
         log.reused = false;
         log.retryCount = parentAiCallLog == null ? 0 : parentAiCallLog.retryCount + 1;
         log.parentAiCallLog = parentAiCallLog;
+        return log;
+    }
+
+    // 외부 요청 없이 partition 결과를 대표하는 log다. provider/model은 해당 run의 확정 계약을 기록한다.
+    public static AiCallLog aggregateResult(AiProvider provider, String model, AiExecutionStage stage,
+                                            AiInputReferenceType referenceType, String referenceId, String fingerprint,
+                                            PromptTemplate template) {
+        AiCallLog log = pending(provider, model, stage, referenceType, referenceId, fingerprint, template, null, null);
+        log.callRole = AiCallLogRole.AGGREGATE_RESULT;
+        return log;
+    }
+
+    // prompt 렌더링·입력 제한 실패는 실제 외부 요청이 아니므로 provider 비용 집계와 분리한다.
+    public static AiCallLog preparationFailure(AiProvider provider, String model, AiExecutionStage stage,
+                                               AiInputReferenceType referenceType, String referenceId, String fingerprint,
+                                               PromptTemplate template) {
+        AiCallLog log = pending(provider, model, stage, referenceType, referenceId, fingerprint, template, null, null);
+        log.callRole = AiCallLogRole.PREPARATION_FAILURE;
         return log;
     }
 
@@ -155,6 +184,10 @@ public class AiCallLog {
         this.errorType = errorType;
         this.errorMessage = errorMessage;
         this.completedAt = LocalDateTime.now();
+    }
+
+    public void recordProviderCompletionMetadata(String metadataJson) {
+        this.providerCompletionMetadata = metadataJson;
     }
 
     public void reuse(AiCallLog sourceCall) {

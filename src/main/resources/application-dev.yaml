@@ -1,0 +1,4 @@
+app:
+  ai:
+    json05-diagnostic:
+      enabled: true

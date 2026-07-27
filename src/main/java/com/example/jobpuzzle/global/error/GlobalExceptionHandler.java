@@ -19,10 +19,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e){
         ErrorCode errorCode = e.getErrorCode();
+        // 내부 진단 메시지는 로그에만 남기고 AI 계약/Provider 상세를 공개 응답으로 전달하지 않는다.
+        log.error("handled custom exception errorCode={} technicalMessage={}",
+                errorCode.getCode(), e.getMessage(), e);
+        String publicMessage = errorCode == ErrorCode.AI_RESPONSE_INVALID
+                ? errorCode.getMessage()
+                : e.getMessage();
 
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ApiResponse.fail(errorCode, e.getMessage()));
+                .body(ApiResponse.fail(errorCode, publicMessage));
     }
 
     // @Valid 검증 실패 (JoinRequest/LoginRequest/MyInfoUpdateRequest 등의 @NotBlank, @Email 등) - 첫 번째 오류 메시지를 그대로 보여줌

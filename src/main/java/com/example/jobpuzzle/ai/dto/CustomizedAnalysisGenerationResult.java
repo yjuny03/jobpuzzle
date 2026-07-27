@@ -41,6 +41,8 @@ public class CustomizedAnalysisGenerationResult {
         private String requirement;
         private List<SourceReference> postingSourceRefs;
         private String candidateEvidence;
+        // JSON-05 provider가 선택한 retrieval chunk ID다. validator가 권위 sourceRefs로 복원한 뒤 저장 경계에서는 사용하지 않는다.
+        private List<String> candidateEvidenceIds;
         private List<SourceReference> candidateSourceRefs;
         private MatchAnalysisResultMatchLevel matchLevel;
         private String reason;

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- JSON-05 진단은 개발/ai-e2e에서만 별도 파일에 남긴다. 다른 logger와 원문 데이터는 이 appender로 전달하지 않는다. -->
+    <springProfile name="dev,ai-e2e">
+        <appender name="JSON05_DIAGNOSTIC_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>build/logs/json05-diagnostic.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>build/logs/json05-diagnostic.%d{yyyy-MM-dd}.log</fileNamePattern>
+                <maxHistory>7</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level %msg%n</pattern>
+            </encoder>
+        </appender>
+        <logger name="com.example.jobpuzzle.analysis.service.Json05ExecutionDiagnostic" level="INFO" additivity="false">
+            <appender-ref ref="JSON05_DIAGNOSTIC_FILE"/>
+        </logger>
+    </springProfile>
+</configuration>

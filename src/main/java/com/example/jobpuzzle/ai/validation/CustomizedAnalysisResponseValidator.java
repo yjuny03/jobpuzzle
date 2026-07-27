@@ -11,6 +11,8 @@ import com.example.jobpuzzle.analysis.entity.RequirementType;
 import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
+import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
+import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -21,23 +23,140 @@ import java.util.function.Function;
 public class CustomizedAnalysisResponseValidator {
 
     public CustomizedAnalysisGenerationResult validate(CustomizedAnalysisValidationContext context,
-                                                        CustomizedAnalysisGenerationResult result) {
+                                                       CustomizedAnalysisGenerationResult result) {
         if (result == null || result.getReadiness() == null) fail("readiness is required");
-        requireList("requirementMatches", result.getRequirementMatches());
-        requireList("questions", result.getQuestions());
-        requireList("tasks", result.getTasks());
+        if (result.getRequirementMatches() == null) result.setRequirementMatches(new ArrayList<>());
+        if (result.getQuestions() == null) result.setQuestions(new ArrayList<>());
+        if (result.getTasks() == null) result.setTasks(new ArrayList<>());
         Map<String, RequirementInput> inputs = requirements(context.jobPostingAnalysis());
         Map<String, List<SourceReference>> candidateRefs = candidateRefs(context.retrievedEvidence());
+        Map<String, Map<String, SourceReference>> candidateRefsById = candidateRefsById(context.retrievedEvidence());
         validateReadiness(context.guideContext(), inputs, allCandidateRefs(candidateRefs), result.getReadiness());
-        Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches = validateMatches(inputs, candidateRefs, result.getRequirementMatches());
+        Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches = validateMatches(inputs, candidateRefs, candidateRefsById, result.getRequirementMatches());
+        result.setRequirementMatches(new ArrayList<>(matches.values()));
+        result.setQuestions(ensureQuestions(
+                result.getReadiness().isCanGenerateQuestions(), matches, inputs, result.getQuestions()));
         validateQuestions(result.getReadiness().isCanGenerateQuestions(), matches, inputs.keySet(), inputs, allCandidateRefs(candidateRefs), result.getQuestions());
+        result.setTasks(addMissingTasks(matches, result.getTasks()));
         validateTasks(matches, result.getTasks());
         return result;
+    }
+
+    private List<CustomizedAnalysisGenerationResult.Question> ensureQuestions(
+            boolean canGenerateQuestions,
+            Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches,
+            Map<String, RequirementInput> inputs,
+            List<CustomizedAnalysisGenerationResult.Question> generated) {
+        if (!canGenerateQuestions) return List.of();
+
+        List<CustomizedAnalysisGenerationResult.Question> values = new ArrayList<>(generated);
+        Set<String> ids = values.stream()
+                .map(CustomizedAnalysisGenerationResult.Question::getQuestionId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> coveredRequirementIds = values.stream()
+                .map(CustomizedAnalysisGenerationResult.Question::getRelatedRequirementId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        List<CustomizedAnalysisGenerationResult.RequirementMatch> ordered = matches.values().stream()
+                .sorted(java.util.Comparator
+                        .comparing((CustomizedAnalysisGenerationResult.RequirementMatch match) ->
+                                match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH)
+                        .thenComparing(CustomizedAnalysisGenerationResult.RequirementMatch::getRequirementId))
+                .toList();
+
+        int targetCount = Math.min(6, ordered.size());
+        for (CustomizedAnalysisGenerationResult.RequirementMatch match : ordered) {
+            if (values.size() >= targetCount) break;
+            if (!coveredRequirementIds.add(match.getRequirementId())) continue;
+            String questionId = "server-question-" + match.getRequirementId();
+            if (!ids.add(questionId)) continue;
+            List<SourceReference> refs = new ArrayList<>(
+                    copyReferences(inputs.get(match.getRequirementId()).sourceRefs()));
+            if (match.getCandidateSourceRefs() != null) {
+                refs.addAll(copyReferences(match.getCandidateSourceRefs()));
+            }
+            boolean strong = match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH;
+            String question = fallbackQuestion(match);
+            String intent = fallbackIntent(match);
+            values.add(CustomizedAnalysisGenerationResult.Question.builder()
+                    .questionId(questionId)
+                    .questionType(strong ? InterviewQuestionType.EXPERIENCE : InterviewQuestionType.PROBLEM_SOLVING)
+                    .question(question)
+                    .intent(intent)
+                    .evaluationFocus(strong
+                            ? List.of(InterviewQuestionEvaluationFocus.ownRole,
+                            InterviewQuestionEvaluationFocus.resultExpression)
+                            : List.of(InterviewQuestionEvaluationFocus.specificity,
+                            InterviewQuestionEvaluationFocus.requirementConnection))
+                    .relatedMatchId(match.getMatchId())
+                    .relatedRequirementId(match.getRequirementId())
+                    .sourceRefs(refs)
+                    .reviewStatus(InterviewQuestionReviewStatus.PASS)
+                    .reviewNote(null)
+                    .build());
+        }
+        return values.size() <= 10 ? values : new ArrayList<>(values.subList(0, 10));
+    }
+
+    private String fallbackQuestion(CustomizedAnalysisGenerationResult.RequirementMatch match) {
+        String requirement = match.getRequirement();
+        int variant = Math.floorMod(match.getRequirementId().hashCode(), 3);
+        return switch (match.getMatchLevel()) {
+            case HIGH -> switch (variant) {
+                case 0 -> "다음 역량을 가장 잘 보여주는 사례는 무엇인가요: " + requirement
+                        + ". 당시 본인의 역할과 구체적인 성과를 설명해 주세요?";
+                case 1 -> "본인이 수행한 경험 중 다음 요구사항과 가장 가까운 사례를 설명해 주세요: "
+                        + requirement + ". 어떤 판단을 내렸고 결과는 어땠나요?";
+                default -> "다음 역량을 실제로 활용했던 상황을 하나 선택해 주세요: " + requirement
+                        + ". 본인이 직접 기여한 부분과 성과는 무엇이었나요?";
+            };
+            case MEDIUM -> switch (variant) {
+                case 0 -> "다음 요구사항과 관련해 본인이 직접 수행한 경험을 설명해 주세요: " + requirement
+                        + ". 당시 판단 기준과 수행 범위는 무엇이었나요?";
+                case 1 -> "제출 자료에서 일부 경험이 확인된 항목입니다: " + requirement
+                        + ". 실제 업무나 프로젝트에서 어떻게 적용했는지 구체적으로 설명해 주세요?";
+                default -> "다음 요구사항을 수행했던 사례가 있다면 설명해 주세요: " + requirement
+                        + ". 본인의 역할과 의사결정, 결과를 중심으로 말씀해 주세요?";
+            };
+            case LOW -> switch (variant) {
+                case 0 -> "다음 요구사항과 연결되는 경험을 확인하고 싶습니다: " + requirement
+                        + ". 직접 또는 간접적인 경험이 있다면 본인의 역할과 실제 결과를 설명해 주세요?";
+                case 1 -> "제출 자료만으로는 다음 역량을 충분히 확인하기 어려웠습니다: " + requirement
+                        + ". 유사한 경험이 있다면 어떤 상황에서 활용했는지 설명해 주세요?";
+                default -> "다음 항목과 연관된 학습이나 프로젝트 경험을 확인하고 싶습니다: "
+                        + requirement + ". 이를 실제 역량으로 연결한 구체적인 행동과 결과를 말씀해 주세요?";
+            };
+            case NONE, INSUFFICIENT -> switch (variant) {
+                case 0 -> "제출 자료에서는 다음 경험을 확인하기 어려웠습니다: " + requirement
+                        + ". 관련 경험이 있다면 상황과 행동, 결과를 설명해 주세요?";
+                case 1 -> "다음 요구사항과 관련해 자료에 포함하지 못한 경험이 있는지 확인하고 싶습니다: "
+                        + requirement + ". 있다면 본인이 직접 수행한 내용을 구체적으로 말씀해 주세요?";
+                default -> "현재 자료에서 근거가 확인되지 않은 항목입니다: " + requirement
+                        + ". 보유한 경험이 있다면 역할과 수행 과정, 결과를 설명해 주세요?";
+            };
+        };
+    }
+
+    private String fallbackIntent(CustomizedAnalysisGenerationResult.RequirementMatch match) {
+        return switch (match.getMatchLevel()) {
+            case HIGH -> "확인된 강점이 실제 본인 기여인지 역할과 결과의 구체성으로 검증합니다.";
+            case MEDIUM -> "부분적으로 확인된 경험의 판단 기준과 실제 수행 깊이를 확인합니다.";
+            case LOW -> "간접 근거가 해당 요구 역량으로 이어지는지 본인의 역할과 결과로 확인합니다.";
+            case NONE, INSUFFICIENT -> "제출 자료에 없던 경험의 실제 보유 여부를 중립적으로 확인합니다.";
+        };
+    }
+
+    private String compact(String value) {
+        if (blank(value)) return "구체적인 경험과 근거";
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80) + "…";
     }
 
     // JSON-01의 REQUIRED/PREFERRED 요구사항이 JSON-05에 정확히 한 번씩 대응되는지 확인한다.
     private Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> validateMatches(
             Map<String, RequirementInput> inputs, Map<String, List<SourceReference>> candidateRefs,
+            Map<String, Map<String, SourceReference>> candidateRefsById,
             List<CustomizedAnalysisGenerationResult.RequirementMatch> matches) {
         Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> byRequirement = new LinkedHashMap<>();
         Set<String> matchIds = new HashSet<>();
@@ -48,34 +167,99 @@ public class CustomizedAnalysisResponseValidator {
             if (byRequirement.put(match.getRequirementId(), match) != null) fail("duplicate requirementId");
             RequirementInput input = inputs.get(match.getRequirementId());
             if (input == null) fail("unknown requirementId");
-            if (match.getRequirementType() != input.type()) fail("requirementType mismatch");
-            if (!normalize(match.getRequirement()).equals(normalize(input.requirement()))) fail("requirement text mismatch");
+            // requirementId만 AI가 선택한다. 유형·표시 문구는 JSON-01이 소유한 권위값으로 복원한다.
+            match.setRequirementType(input.type());
+            match.setRequirement(input.requirement());
             requireText("reason", match.getReason());
             if (match.getMatchLevel() == null) fail("matchLevel is required");
-            validateReferences(match.getPostingSourceRefs(), input.sourceRefs(), "postingSourceRefs", true);
-            validateCandidateEvidence(match, candidateRefs.getOrDefault(match.getRequirementId(), List.of()));
+            // 공고 근거는 requirementId로 이미 권위 입력이 확정되어 있다. 모델이 내부 identity를
+            // 잘못 echo해도 분석 전체를 폐기하지 않고 JSON-01 원본으로 결정적으로 복원한다.
+            match.setPostingSourceRefs(copyReferences(input.sourceRefs()));
+            validateCandidateEvidence(match, candidateRefs.getOrDefault(match.getRequirementId(), List.of()),
+                    candidateRefsById.getOrDefault(match.getRequirementId(), Map.of()));
             boolean high = match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH;
             if (high && !blank(match.getMissingPoint())) fail("HIGH missingPoint must be blank");
             if (!high) requireText("missingPoint", match.getMissingPoint());
         }
-        if (!byRequirement.keySet().equals(inputs.keySet())) fail("JSON-01 requirements must be included exactly once");
+        if (!byRequirement.keySet().equals(inputs.keySet())) {
+            List<CustomizedAnalysisGenerationResult.RequirementMatch> normalized = new ArrayList<>(matches);
+            inputs.forEach((requirementId, input) -> {
+                if (byRequirement.containsKey(requirementId)) return;
+                CustomizedAnalysisGenerationResult.RequirementMatch missing =
+                        CustomizedAnalysisGenerationResult.RequirementMatch.builder()
+                                .matchId("server-missing-" + requirementId)
+                                .requirementId(requirementId)
+                                .requirementType(input.type())
+                                .requirement(input.requirement())
+                                .postingSourceRefs(copyReferences(input.sourceRefs()))
+                                .candidateEvidence(null)
+                                .candidateSourceRefs(List.of())
+                                .matchLevel(MatchAnalysisResultMatchLevel.NONE)
+                                .reason("분석 응답에서 해당 요구사항의 판단 근거를 확인하지 못했습니다.")
+                                .missingPoint("관련 경험과 근거를 추가로 확인해 주세요.")
+                                .build();
+                normalized.add(missing);
+                byRequirement.put(requirementId, missing);
+            });
+            matches = normalized;
+        }
         return matches.stream().collect(java.util.stream.Collectors.toMap(
-                CustomizedAnalysisGenerationResult.RequirementMatch::getMatchId, Function.identity()));
+                CustomizedAnalysisGenerationResult.RequirementMatch::getMatchId, Function.identity(),
+                (left, right) -> left, LinkedHashMap::new));
     }
 
-    private void validateCandidateEvidence(CustomizedAnalysisGenerationResult.RequirementMatch match, List<SourceReference> candidateRefs) {
+    private List<CustomizedAnalysisGenerationResult.Task> addMissingTasks(
+            Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches,
+            List<CustomizedAnalysisGenerationResult.Task> tasks) {
+        List<CustomizedAnalysisGenerationResult.Task> normalized = new ArrayList<>(tasks);
+        Set<String> covered = normalized.stream()
+                .map(CustomizedAnalysisGenerationResult.Task::getRelatedMatchId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        matches.values().stream()
+                .filter(match -> match.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH)
+                .filter(match -> !covered.contains(match.getMatchId()))
+                .forEach(match -> normalized.add(CustomizedAnalysisGenerationResult.Task.builder()
+                        .taskId("server-task-" + match.getMatchId())
+                        .relatedMatchId(match.getMatchId())
+                        .relatedRequirementId(match.getRequirementId())
+                        .matchLevel(com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel.valueOf(match.getMatchLevel().name()))
+                        .missingPoint(match.getMissingPoint())
+                        .suggestion("관련 경험을 구체적인 사례와 결과 중심으로 정리해 주세요.")
+                        .build()));
+        return normalized;
+    }
+
+    private void validateCandidateEvidence(CustomizedAnalysisGenerationResult.RequirementMatch match, List<SourceReference> candidateRefs,
+                                           Map<String, SourceReference> candidateRefsById) {
         boolean evidenceRequired = Set.of(MatchAnalysisResultMatchLevel.HIGH, MatchAnalysisResultMatchLevel.MEDIUM, MatchAnalysisResultMatchLevel.LOW)
                 .contains(match.getMatchLevel());
         if (evidenceRequired) {
             requireText("candidateEvidence", match.getCandidateEvidence());
-            validateReferences(match.getCandidateSourceRefs(), candidateRefs, "candidateSourceRefs", true);
+            if (match.getCandidateEvidenceIds() != null) {
+                List<SourceReference> selected = new ArrayList<>();
+                for (String evidenceId : match.getCandidateEvidenceIds()) {
+                    SourceReference source = candidateRefsById.get(evidenceId);
+                    // 모델이 잘못 만든 chunk ID는 폐기하고 아래에서 requirement 범위의 권위 근거로 복원한다.
+                    if (source == null) continue;
+                    if (selected.stream().noneMatch(existing -> sameIdentity(existing, source))) selected.add(source);
+                }
+                match.setCandidateSourceRefs(selected.isEmpty() ? copyReferences(candidateRefs) : copyReferences(selected));
+            }
+            match.setCandidateSourceRefs(normalizeReferences(match.getCandidateSourceRefs(), candidateRefs, true));
+            if (match.getCandidateSourceRefs().isEmpty()) {
+                match.setMatchLevel(MatchAnalysisResultMatchLevel.NONE);
+                match.setCandidateEvidence(null);
+                match.setMissingPoint("관련 경험과 근거를 추가로 확인해 주세요.");
+            }
         } else if (match.getMatchLevel() == MatchAnalysisResultMatchLevel.NONE) {
             if (!blank(match.getCandidateEvidence())) fail("candidateEvidence must be blank for NONE");
             requireList("candidateSourceRefs", match.getCandidateSourceRefs());
             if (!match.getCandidateSourceRefs().isEmpty()) fail("candidateSourceRefs must be empty for NONE");
         } else {
-            if (!blank(match.getCandidateEvidence())) fail("candidateEvidence must be blank for " + match.getMatchLevel());
-            validateReferences(match.getCandidateSourceRefs(), candidateRefs, "candidateSourceRefs", false);
+            if (!blank(match.getCandidateEvidence()))
+                fail("candidateEvidence must be blank for " + match.getMatchLevel());
+            match.setCandidateSourceRefs(normalizeReferences(match.getCandidateSourceRefs(), candidateRefs, false));
         }
     }
 
@@ -84,22 +268,22 @@ public class CustomizedAnalysisResponseValidator {
                                    Map<String, RequirementInput> inputs, List<SourceReference> candidateRefs,
                                    CustomizedAnalysisGenerationResult.Readiness readiness) {
         if (readiness.getStatus() == null) fail("readiness.status is required");
-        requireText("readiness.reason", readiness.getReason());
-        requireList("readiness.limitations", readiness.getLimitations());
+        if (blank(readiness.getReason())) readiness.setReason("등록된 자료를 기준으로 분석 결과를 정리했습니다.");
+        if (readiness.getLimitations() == null) readiness.setLimitations(new ArrayList<>());
         readiness.getLimitations().forEach(value -> requireText("readiness.limitations", value));
         List<ReadinessResultStatus> lacks = new ArrayList<>();
         if (inputs.isEmpty()) lacks.add(ReadinessResultStatus.POSTING_LACK);
         if (candidateRefs.isEmpty()) lacks.add(ReadinessResultStatus.CANDIDATE_LACK);
         if (guide == null || guide.getMatchType() == GuideMatchType.NONE) lacks.add(ReadinessResultStatus.GUIDE_LACK);
         ReadinessResultStatus expected = lacks.isEmpty() ? null : lacks.get(0);
-        if (expected != null && readiness.getStatus() != expected) fail("readiness status priority mismatch");
+        if (expected != null) readiness.setStatus(expected);
         if (expected == null && guide != null && Set.of(GuideMatchType.FALLBACK_PARENT_CATEGORY, GuideMatchType.FALLBACK_COMMON).contains(guide.getMatchType())
-                && readiness.getStatus() != ReadinessResultStatus.PARTIAL) fail("limited guide must be PARTIAL");
+                && readiness.getStatus() != ReadinessResultStatus.PARTIAL) readiness.setStatus(ReadinessResultStatus.PARTIAL);
         if (expected == null && guide != null && Set.of(GuideMatchType.EXACT, GuideMatchType.FALLBACK_SAME_SUBCATEGORY).contains(guide.getMatchType())
-                && !Set.of(ReadinessResultStatus.SUFFICIENT, ReadinessResultStatus.PARTIAL).contains(readiness.getStatus())) fail("exact guide requires SUFFICIENT or PARTIAL");
+                && !Set.of(ReadinessResultStatus.SUFFICIENT, ReadinessResultStatus.PARTIAL).contains(readiness.getStatus()))
+            readiness.setStatus(ReadinessResultStatus.PARTIAL);
         boolean expectedQuestions = readiness.getStatus() == ReadinessResultStatus.SUFFICIENT || readiness.getStatus() == ReadinessResultStatus.PARTIAL;
-        if (readiness.isCanGenerateQuestions() != expectedQuestions) fail("canGenerateQuestions mismatch");
-        if (lacks.size() > 1 && readiness.getLimitations().isEmpty()) fail("secondary readiness limitations are required");
+        readiness.setCanGenerateQuestions(expectedQuestions);
     }
 
     // 질문은 실제 requirementMatch와 JSON-01·02 근거를 연결한 PASS 결과만 허용한다.
@@ -114,21 +298,33 @@ public class CustomizedAnalysisResponseValidator {
         }
         if (questions.isEmpty() || questions.size() > 10) fail("questions must contain 1 to 10 PASS items");
         Set<String> ids = new HashSet<>();
-        List<SourceReference> allRefs = new ArrayList<>(); inputs.values().forEach(value -> allRefs.addAll(value.sourceRefs())); allRefs.addAll(candidateRefs);
+        List<SourceReference> allRefs = new ArrayList<>();
+        inputs.values().forEach(value -> allRefs.addAll(value.sourceRefs()));
+        allRefs.addAll(candidateRefs);
         for (CustomizedAnalysisGenerationResult.Question question : questions) {
-            requireText("questionId", question.getQuestionId()); if (!ids.add(question.getQuestionId())) fail("duplicate questionId");
-            requireText("question", question.getQuestion()); requireText("intent", question.getIntent());
+            question.setQuestion(normalizeQuestion(question.getQuestion()));
+            question.setIntent(normalizeSentence(question.getIntent()));
+            requireText("questionId", question.getQuestionId());
+            if (!ids.add(question.getQuestionId())) fail("duplicate questionId");
+            requireText("question", question.getQuestion());
+            requireText("intent", question.getIntent());
             if (question.getQuestionType() == null) fail("questionType is required");
-            requireList("evaluationFocus", question.getEvaluationFocus()); if (question.getEvaluationFocus().isEmpty()) fail("evaluationFocus must not be empty");
-            if (new HashSet<>(question.getEvaluationFocus()).size() != question.getEvaluationFocus().size()) fail("duplicate evaluationFocus");
-            if (question.getReviewStatus() != InterviewQuestionReviewStatus.PASS) fail("only PASS questions are allowed");
+            requireList("evaluationFocus", question.getEvaluationFocus());
+            if (question.getEvaluationFocus().isEmpty()) fail("evaluationFocus must not be empty");
+            if (new HashSet<>(question.getEvaluationFocus()).size() != question.getEvaluationFocus().size())
+                fail("duplicate evaluationFocus");
+            if (question.getReviewStatus() != InterviewQuestionReviewStatus.PASS)
+                fail("only PASS questions are allowed");
             CustomizedAnalysisGenerationResult.RequirementMatch match = null;
             if (question.getRelatedMatchId() != null) {
-                match = matches.get(question.getRelatedMatchId()); if (match == null) fail("unknown relatedMatchId");
+                match = matches.get(question.getRelatedMatchId());
+                if (match == null) fail("unknown relatedMatchId");
             }
-            if (question.getRelatedRequirementId() != null && !requirementIds.contains(question.getRelatedRequirementId())) fail("unknown relatedRequirementId");
-            if (match != null && question.getRelatedRequirementId() != null && !match.getRequirementId().equals(question.getRelatedRequirementId())) fail("question relation mismatch");
-            validateReferences(question.getSourceRefs(), allRefs, "question.sourceRefs", true);
+            if (question.getRelatedRequirementId() != null && !requirementIds.contains(question.getRelatedRequirementId()))
+                fail("unknown relatedRequirementId");
+            if (match != null && question.getRelatedRequirementId() != null && !match.getRequirementId().equals(question.getRelatedRequirementId()))
+                fail("question relation mismatch");
+            question.setSourceRefs(normalizeReferences(question.getSourceRefs(), allRefs, true));
         }
     }
 
@@ -138,18 +334,23 @@ public class CustomizedAnalysisResponseValidator {
         Set<String> ids = new HashSet<>();
         Map<String, Integer> counts = new HashMap<>();
         for (CustomizedAnalysisGenerationResult.Task task : tasks) {
-            requireText("taskId", task.getTaskId()); if (!ids.add(task.getTaskId())) fail("duplicate taskId");
-            requireText("relatedMatchId", task.getRelatedMatchId()); requireText("relatedRequirementId", task.getRelatedRequirementId());
+            requireText("taskId", task.getTaskId());
+            if (!ids.add(task.getTaskId())) fail("duplicate taskId");
+            requireText("relatedMatchId", task.getRelatedMatchId());
+            requireText("relatedRequirementId", task.getRelatedRequirementId());
             CustomizedAnalysisGenerationResult.RequirementMatch match = matches.get(task.getRelatedMatchId());
             if (match == null) fail("unknown task relatedMatchId");
             if (!match.getRequirementId().equals(task.getRelatedRequirementId())) fail("task requirement mismatch");
-            if (task.getMatchLevel() == null || !task.getMatchLevel().name().equals(match.getMatchLevel().name())) fail("task matchLevel mismatch");
+            if (task.getMatchLevel() == null || !task.getMatchLevel().name().equals(match.getMatchLevel().name()))
+                fail("task matchLevel mismatch");
             if (match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH) fail("HIGH task is forbidden");
-            requireText("task.missingPoint", task.getMissingPoint()); requireText("task.suggestion", task.getSuggestion());
+            requireText("task.missingPoint", task.getMissingPoint());
+            requireText("task.suggestion", task.getSuggestion());
             counts.merge(match.getMatchId(), 1, Integer::sum);
         }
         for (CustomizedAnalysisGenerationResult.RequirementMatch match : matches.values()) {
-            if (match.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH && counts.getOrDefault(match.getMatchId(), 0) == 0) fail("task is required for " + match.getMatchLevel());
+            if (match.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH && counts.getOrDefault(match.getMatchId(), 0) == 0)
+                fail("task is required for " + match.getMatchLevel());
         }
     }
 
@@ -158,16 +359,34 @@ public class CustomizedAnalysisResponseValidator {
         if (values == null) fail(field + " must not be null");
         if (required && values.isEmpty()) source(field + " must not be empty");
         for (SourceReference value : values) {
-            if (value == null || value.getExtractionId() == null || value.getDocumentId() == null || value.getDocumentType() == null
-                    || blank(value.getEvidenceText())) source(field + " missing required source field");
+            if (value == null || value.getExtractionId() == null || value.getDocumentId() == null || value.getDocumentType() == null)
+                source(field + " missing required source identity");
             SourceReference original = allowed.stream().filter(candidate -> sameIdentity(candidate, value)).findFirst().orElse(null);
+            // 모델이 retrieval 원문을 정확히 선택했지만 위치 숫자를 잘못 echo한 경우에는, 유일한 권위 원문으로만 identity를 복원한다.
+            if (original == null) original = uniquelyMatchingEvidence(allowed, value.getEvidenceText());
             if (original == null) source(field + " unknown source identity");
-            if (!normalize(original.getEvidenceText()).contains(normalize(value.getEvidenceText()))) source(field + " evidenceText mismatch");
+            // 모델은 근거 identity만 선택한다. 발췌 원문은 JSON-01·02/retrieval 권위값으로 결정적으로 복원한다.
+            value.setExtractionId(original.getExtractionId());
+            value.setDocumentId(original.getDocumentId());
+            value.setDocumentType(original.getDocumentType());
+            value.setPageNumber(original.getPageNumber());
+            value.setSegmentId(original.getSegmentId());
+            value.setEvidenceText(original.getEvidenceText());
         }
     }
 
+    private SourceReference uniquelyMatchingEvidence(List<SourceReference> allowed, String evidenceText) {
+        String requested = normalize(evidenceText);
+        if (requested.length() < 8) return null;
+        List<SourceReference> matches = allowed.stream()
+                .filter(candidate -> normalize(candidate.getEvidenceText()).contains(requested))
+                .toList();
+        return matches.size() == 1 ? matches.get(0) : null;
+    }
+
     private Map<String, RequirementInput> requirements(JobPostingAnalysisResult result) {
-        if (result == null || result.getRequirements() == null || result.getPreferred() == null) fail("JSON-01 requirements are required");
+        if (result == null || result.getRequirements() == null || result.getPreferred() == null)
+            fail("JSON-01 requirements are required");
         Map<String, RequirementInput> values = new LinkedHashMap<>();
         result.getRequirements().forEach(value -> putRequirement(values, value, RequirementType.REQUIRED));
         result.getPreferred().forEach(value -> putRequirement(values, value, RequirementType.PREFERRED));
@@ -175,8 +394,10 @@ public class CustomizedAnalysisResponseValidator {
     }
 
     private void putRequirement(Map<String, RequirementInput> values, JobPostingAnalysisResult.Requirement value, RequirementType type) {
-        if (value == null || blank(value.getRequirementId()) || blank(value.getText()) || value.getSourceRefs() == null) fail("invalid JSON-01 requirement");
-        if (values.put(value.getRequirementId(), new RequirementInput(type, value.getText(), value.getSourceRefs())) != null) fail("duplicate JSON-01 requirementId");
+        if (value == null || blank(value.getRequirementId()) || blank(value.getText()) || value.getSourceRefs() == null)
+            fail("invalid JSON-01 requirement");
+        if (values.put(value.getRequirementId(), new RequirementInput(type, value.getText(), value.getSourceRefs())) != null)
+            fail("duplicate JSON-01 requirementId");
     }
 
     // retrieval-selected chunk만 requirement별 candidateSourceRefs의 허용 근거로 변환한다.
@@ -194,16 +415,95 @@ public class CustomizedAnalysisResponseValidator {
         return refs;
     }
 
+    private String normalizeQuestion(String value) {
+        String normalized = normalizeSentence(value);
+        if (blank(normalized) || normalized.endsWith("?")) return normalized;
+        return normalized.replaceFirst("[.!]+$", "") + "?";
+    }
+
+    private String normalizeSentence(String value) {
+        return value == null ? null : value.replaceAll("\\s+", " ").trim();
+    }
+
+    private List<SourceReference> normalizeReferences(List<SourceReference> values,
+                                                      List<SourceReference> allowed,
+                                                      boolean required) {
+        List<SourceReference> normalized = new ArrayList<>();
+        if (values != null) {
+            for (SourceReference value : values) {
+                if (value == null) continue;
+                SourceReference original = allowed.stream()
+                        .filter(candidate -> sameIdentity(candidate, value))
+                        .findFirst().orElse(null);
+                if (original == null) original = uniquelyMatchingEvidence(allowed, value.getEvidenceText());
+                SourceReference resolved = original;
+                if (resolved != null && normalized.stream().noneMatch(existing -> sameIdentity(existing, resolved))) {
+                    normalized.add(resolved);
+                }
+            }
+        }
+        if (required && normalized.isEmpty()) normalized.addAll(allowed);
+        return copyReferences(normalized);
+    }
+
+    private Map<String, Map<String, SourceReference>> candidateRefsById(RetrievedEvidenceContextDto evidence) {
+        Map<String, Map<String, SourceReference>> refs = new HashMap<>();
+        for (RetrievedEvidenceContextDto.RequirementEvidence requirement : evidence.requirements()) {
+            Map<String, SourceReference> values = new LinkedHashMap<>();
+            for (RetrievedEvidenceContextDto.RetrievedChunk chunk : requirement.chunks()) {
+                values.put("chunk-" + chunk.chunkId(), SourceReference.builder().extractionId(chunk.extractionId())
+                        .documentId(chunk.documentId()).documentType(chunk.documentType()).pageNumber(chunk.pageStart())
+                        .segmentId(null).evidenceText(chunk.content()).build());
+            }
+            refs.put(requirement.requirementId(), values);
+        }
+        return refs;
+    }
+
     // readiness와 질문은 전체 retrieval 근거를 보되 requirement match는 개별 범위를 유지한다.
     private List<SourceReference> allCandidateRefs(Map<String, List<SourceReference>> values) {
         return values.values().stream().flatMap(Collection::stream).toList();
     }
-    private boolean sameIdentity(SourceReference left, SourceReference right) { return Objects.equals(left.getExtractionId(), right.getExtractionId()) && Objects.equals(left.getDocumentId(), right.getDocumentId()) && left.getDocumentType() == right.getDocumentType() && Objects.equals(left.getPageNumber(), right.getPageNumber()) && Objects.equals(left.getSegmentId(), right.getSegmentId()); }
-    private String normalize(String value) { return value == null ? "" : value.replaceAll("\\s+", " ").trim(); }
-    private boolean blank(String value) { return value == null || value.isBlank(); }
-    private void requireText(String field, String value) { if (blank(value)) fail(field + " must not be blank"); }
-    private void requireList(String field, List<?> value) { if (value == null) fail(field + " must not be null"); }
-    private void fail(String message) { throw new AiProcessingException(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, message); }
-    private void source(String message) { throw new AiProcessingException(AiCallLogErrorType.SOURCE_REFERENCE_INVALID, message); }
-    private record RequirementInput(RequirementType type, String requirement, List<SourceReference> sourceRefs) { }
+
+    private boolean sameIdentity(SourceReference left, SourceReference right) {
+        return Objects.equals(left.getExtractionId(), right.getExtractionId()) && Objects.equals(left.getDocumentId(), right.getDocumentId()) && left.getDocumentType() == right.getDocumentType() && Objects.equals(left.getPageNumber(), right.getPageNumber()) && Objects.equals(left.getSegmentId(), right.getSegmentId());
+    }
+
+    private List<SourceReference> copyReferences(List<SourceReference> values) {
+        return values.stream().map(value -> SourceReference.builder()
+                .extractionId(value.getExtractionId())
+                .documentId(value.getDocumentId())
+                .documentType(value.getDocumentType())
+                .pageNumber(value.getPageNumber())
+                .segmentId(value.getSegmentId())
+                .evidenceText(value.getEvidenceText())
+                .build()).toList();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", " ").trim();
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private void requireText(String field, String value) {
+        if (blank(value)) fail(field + " must not be blank");
+    }
+
+    private void requireList(String field, List<?> value) {
+        if (value == null) fail(field + " must not be null");
+    }
+
+    private void fail(String message) {
+        throw new AiProcessingException(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, message);
+    }
+
+    private void source(String message) {
+        throw new AiProcessingException(AiCallLogErrorType.SOURCE_REFERENCE_INVALID, message);
+    }
+
+    private record RequirementInput(RequirementType type, String requirement, List<SourceReference> sourceRefs) {
+    }
 }

@@ -49,12 +49,30 @@ class CustomizedAnalysisResponseValidatorTest {
 
         // 운영 본문의 7개 변수가 모두 치환되고 Mock이 읽는 네 입력 구역이 남는지 검증한다.
         assertThat(prompt).contains("[JOB_CONTEXT]", "<JOB_POSTING_ANALYSIS>", "<CANDIDATE_MATERIAL_ANALYSIS>",
-                "<GUIDE_CONTEXT>", "<RETRIEVED_EVIDENCE>", "\"requirementId\":\"req-1\"")
+                "<GUIDE_CONTEXT>", "<RETRIEVED_EVIDENCE>", "\"requirementId\":\"req-1\"",
+                "[REQUIREMENT_COMPLETENESS_CHECKLIST]", "req-1")
                 .doesNotContain("{{");
         assertThat(validated.getReadiness().getStatus()).isEqualTo(ReadinessResultStatus.SUFFICIENT);
         assertThat(validated.getRequirementMatches()).singleElement().extracting(CustomizedAnalysisGenerationResult.RequirementMatch::getRequirementId).isEqualTo("req-1");
         assertThat(validated.getQuestions()).singleElement().extracting(CustomizedAnalysisGenerationResult.Question::getReviewStatus)
                 .isEqualTo(com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS);
+    }
+
+    @Test
+    void rendersRepeatedRetrievedChunkOnlyOnceWithRequirementEvidenceIdReferences() {
+        RetrievedEvidenceContextDto.RetrievedChunk shared = new RetrievedEvidenceContextDto.RetrievedChunk(
+                101L, 2L, 20L, UserDocumentType.RESUME, 1, 1, 0, 10, 1, 0.9d, "공통 근거");
+        RetrievedEvidenceContextDto duplicated = new RetrievedEvidenceContextDto(List.of(
+                new RetrievedEvidenceContextDto.RequirementEvidence("req-1", RequirementType.REQUIRED, "Spring 경험",
+                        com.example.jobpuzzle.analysis.rag.entity.RetrievalStatus.COMPLETED, List.of(shared)),
+                new RetrievedEvidenceContextDto.RequirementEvidence("req-2", RequirementType.PREFERRED, "테스트 경험",
+                        com.example.jobpuzzle.analysis.rag.entity.RetrievalStatus.COMPLETED, List.of(shared))));
+
+        String prompt = renderer.renderCustomizedAnalysis(template(), "개발", "백엔드", "EXPERIENCED", posting(), candidate(),
+                guide(GuideMatchType.EXACT), duplicated);
+
+        assertThat(prompt).contains("\"candidateEvidenceIds\":[\"chunk-101\"]", "\"evidenceId\":\"chunk-101\"");
+        assertThat(prompt.split("공통 근거", -1)).hasSize(2);
     }
 
     @Test
@@ -94,7 +112,22 @@ class CustomizedAnalysisResponseValidatorTest {
     }
 
     @Test
-    void validatesReadinessPriorityAndQuestionRules() {
+    void restoresNonEvidencedStructuredOutputMatchesToTheExistingDtoContract() {
+        String raw = """
+                {"readiness":{"status":"SUFFICIENT","canGenerateQuestions":true,"reason":"ok","limitations":[]},"evidencedRequirementMatches":[],"nonEvidencedRequirementMatches":[{"matchId":"match-1","requirementId":"req-1","requirementType":"REQUIRED","requirement":"요구사항","postingSourceRefs":[],"matchLevel":"NONE","reason":"근거 없음","missingPoint":"보완 필요"}],"questions":[],"tasks":[]}
+                """;
+
+        CustomizedAnalysisGenerationResult result = processor.parseCustomizedAnalysis(raw);
+
+        assertThat(result.getRequirementMatches()).singleElement().satisfies(match -> {
+            assertThat(match.getMatchLevel()).isEqualTo(MatchAnalysisResultMatchLevel.NONE);
+            assertThat(match.getCandidateEvidence()).isNull();
+            assertThat(match.getCandidateSourceRefs()).isEmpty();
+        });
+    }
+
+    @Test
+    void normalizesReadinessPriorityAndQuestionRules() {
         JobPostingAnalysisResult posting = posting();
         CandidateMaterialAnalysisResult noCandidate = CandidateMaterialAnalysisResult.builder()
                 .availableDocumentTypes(List.of(UserDocumentType.RESUME))
@@ -106,8 +139,11 @@ class CustomizedAnalysisResponseValidatorTest {
                 .requirementMatches(List.of(match(MatchAnalysisResultMatchLevel.NONE, List.of())))
                 .questions(List.of()).tasks(List.of(task("match-1", MatchAnalysisResultMatchLevel.NONE))).build();
 
-        assertFailure(() -> validator.validate(new CustomizedAnalysisValidationContext(posting, noCandidate, guide(GuideMatchType.NONE), emptyEvidence()), invalid),
-                AiCallLogErrorType.RESPONSE_VALIDATION_FAILED);
+        CustomizedAnalysisGenerationResult normalized = validator.validate(
+                new CustomizedAnalysisValidationContext(posting, noCandidate, guide(GuideMatchType.NONE), emptyEvidence()), invalid);
+
+        assertThat(normalized.getReadiness().getStatus()).isEqualTo(ReadinessResultStatus.CANDIDATE_LACK);
+        assertThat(normalized.getReadiness().isCanGenerateQuestions()).isFalse();
     }
 
     @Test
@@ -136,7 +172,139 @@ class CustomizedAnalysisResponseValidatorTest {
     }
 
     @Test
-    void rejectsSourceRoleMismatchAndTaskRelationshipMismatch() {
+    void createsFallbackQuestionWhenReadinessAllowsQuestionsButProviderOmitsThem() {
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder()
+                        .status(ReadinessResultStatus.SUFFICIENT)
+                        .canGenerateQuestions(true)
+                        .reason("분석 가능")
+                        .limitations(List.of())
+                        .build())
+                .requirementMatches(List.of(match(MatchAnalysisResultMatchLevel.HIGH, List.of(candidateRef()))))
+                .questions(List.of())
+                .tasks(List.of())
+                .build();
+
+        CustomizedAnalysisGenerationResult normalized = validator.validate(
+                new CustomizedAnalysisValidationContext(
+                        posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(normalized.getReadiness().isCanGenerateQuestions()).isTrue();
+        assertThat(normalized.getQuestions()).singleElement().satisfies(question -> {
+            assertThat(question.getQuestion()).contains("Spring 경험");
+            assertThat(question.getRelatedRequirementId()).isEqualTo("req-1");
+            assertThat(question.getReviewStatus())
+                    .isEqualTo(com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS);
+        });
+    }
+
+    @Test
+    void restoresRequirementDisplayFieldsAndEvidenceTextFromAuthoritativeInputs() {
+        CustomizedAnalysisGenerationResult.RequirementMatch generated = match(MatchAnalysisResultMatchLevel.HIGH, List.of(candidateRef()));
+        generated.setRequirementType(RequirementType.PREFERRED);
+        generated.setRequirement("모델이 재서술한 요구사항");
+        generated.getPostingSourceRefs().get(0).setEvidenceText("모델이 재서술한 공고 근거");
+        generated.getCandidateSourceRefs().get(0).setEvidenceText("모델이 재서술한 지원자 근거");
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(ReadinessResultStatus.SUFFICIENT)
+                        .canGenerateQuestions(true).reason("정상").limitations(List.of()).build())
+                .requirementMatches(List.of(generated)).questions(List.of(question())).tasks(List.of()).build();
+
+        CustomizedAnalysisGenerationResult validated = validator.validate(
+                new CustomizedAnalysisValidationContext(posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(validated.getRequirementMatches()).singleElement().satisfies(match -> {
+            assertThat(match.getRequirementType()).isEqualTo(RequirementType.REQUIRED);
+            assertThat(match.getRequirement()).isEqualTo("Spring 경험");
+            assertThat(match.getPostingSourceRefs()).extracting(SourceReference::getEvidenceText).containsExactly("Spring 경험 요구");
+            assertThat(match.getCandidateSourceRefs()).extracting(SourceReference::getEvidenceText).containsExactly("Spring 프로젝트 경험");
+        });
+    }
+
+    @Test
+    void restoresCandidateSourceIdentityWhenItsUniqueEvidenceExcerptIsAuthoritative() {
+        SourceReference mistypedIdentity = SourceReference.builder().extractionId(999L).documentId(999L)
+                .documentType(UserDocumentType.PORTFOLIO).pageNumber(99).segmentId(null)
+                .evidenceText("Spring 프로젝트 경험").build();
+        CustomizedAnalysisGenerationResult.RequirementMatch generated = match(MatchAnalysisResultMatchLevel.HIGH, List.of(mistypedIdentity));
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(ReadinessResultStatus.SUFFICIENT)
+                        .canGenerateQuestions(true).reason("정상").limitations(List.of()).build())
+                .requirementMatches(List.of(generated)).questions(List.of(question())).tasks(List.of()).build();
+
+        CustomizedAnalysisGenerationResult validated = validator.validate(
+                new CustomizedAnalysisValidationContext(posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(validated.getRequirementMatches().get(0).getCandidateSourceRefs()).singleElement().satisfies(source -> {
+            assertThat(source.getExtractionId()).isEqualTo(2L);
+            assertThat(source.getDocumentId()).isEqualTo(20L);
+            assertThat(source.getDocumentType()).isEqualTo(UserDocumentType.RESUME);
+            assertThat(source.getPageNumber()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void materializesCandidateSourceRefsFromRequirementScopedEvidenceIds() {
+        CustomizedAnalysisGenerationResult.RequirementMatch generated = match(MatchAnalysisResultMatchLevel.HIGH, null);
+        generated.setCandidateEvidenceIds(List.of("chunk-101"));
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(ReadinessResultStatus.SUFFICIENT)
+                        .canGenerateQuestions(true).reason("정상").limitations(List.of()).build())
+                .requirementMatches(List.of(generated)).questions(List.of(question())).tasks(List.of()).build();
+
+        CustomizedAnalysisGenerationResult validated = validator.validate(
+                new CustomizedAnalysisValidationContext(posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(validated.getRequirementMatches().get(0).getCandidateSourceRefs()).singleElement().satisfies(source -> {
+            assertThat(source.getExtractionId()).isEqualTo(2L);
+            assertThat(source.getDocumentId()).isEqualTo(20L);
+            assertThat(source.getEvidenceText()).isEqualTo("Spring 프로젝트 경험");
+        });
+    }
+
+    @Test
+    void replacesUnknownCandidateEvidenceIdWithRequirementScopedEvidence() {
+        CustomizedAnalysisGenerationResult.RequirementMatch generated =
+                match(MatchAnalysisResultMatchLevel.HIGH, null);
+        generated.setCandidateEvidenceIds(List.of("model-invented-chunk"));
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder()
+                        .status(ReadinessResultStatus.SUFFICIENT)
+                        .canGenerateQuestions(true).reason("정상").limitations(List.of()).build())
+                .requirementMatches(List.of(generated))
+                .questions(List.of(question()))
+                .tasks(List.of())
+                .build();
+
+        CustomizedAnalysisGenerationResult normalized = validator.validate(
+                new CustomizedAnalysisValidationContext(
+                        posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(normalized.getRequirementMatches().get(0).getCandidateSourceRefs())
+                .singleElement()
+                .satisfies(source -> {
+                    assertThat(source.getExtractionId()).isEqualTo(2L);
+                    assertThat(source.getDocumentId()).isEqualTo(20L);
+                    assertThat(source.getEvidenceText()).isEqualTo("Spring 프로젝트 경험");
+                });
+    }
+
+    @Test
+    void rejectsUnknownRequirementIdEvenWhenOtherFieldsAreValid() {
+        CustomizedAnalysisGenerationResult.RequirementMatch generated = match(MatchAnalysisResultMatchLevel.NONE, List.of());
+        generated.setRequirementId("unknown-requirement");
+        CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
+                .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(ReadinessResultStatus.CANDIDATE_LACK)
+                        .canGenerateQuestions(false).reason("지원자 근거 없음").limitations(List.of()).build())
+                .requirementMatches(List.of(generated)).questions(List.of()).tasks(List.of(task("match-1", MatchAnalysisResultMatchLevel.NONE))).build();
+
+        assertFailure(() -> validator.validate(
+                        new CustomizedAnalysisValidationContext(posting(), noCandidate(), guide(GuideMatchType.EXACT), emptyEvidence()), result),
+                AiCallLogErrorType.RESPONSE_VALIDATION_FAILED);
+    }
+
+    @Test
+    void restoresPostingSourceFromRequirementInsteadOfRejectingModelIdentity() {
         SourceReference postingRef = postingRef();
         CustomizedAnalysisGenerationResult.RequirementMatch invalidMatch = CustomizedAnalysisGenerationResult.RequirementMatch.builder()
                 .matchId("match-1").requirementId("req-1").requirementType(RequirementType.REQUIRED).requirement("Spring 경험")
@@ -146,11 +314,18 @@ class CustomizedAnalysisResponseValidatorTest {
                 .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(ReadinessResultStatus.SUFFICIENT)
                         .canGenerateQuestions(true).reason("정상").limitations(List.of()).build())
                 .requirementMatches(List.of(invalidMatch))
-                .questions(List.of())
+                .questions(List.of(question()))
                 .tasks(List.of()).build();
-        assertFailure(() -> validator.validate(new CustomizedAnalysisValidationContext(posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result),
-                AiCallLogErrorType.SOURCE_REFERENCE_INVALID);
-        assertThat(postingRef.getDocumentType()).isEqualTo(UserDocumentType.JOB_POSTING);
+        CustomizedAnalysisGenerationResult normalized = validator.validate(
+                new CustomizedAnalysisValidationContext(posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
+
+        assertThat(normalized.getRequirementMatches().get(0).getPostingSourceRefs()).singleElement()
+                .satisfies(source -> {
+                    assertThat(source.getExtractionId()).isEqualTo(1L);
+                    assertThat(source.getDocumentId()).isEqualTo(10L);
+                    assertThat(source.getDocumentType()).isEqualTo(UserDocumentType.JOB_POSTING);
+                    assertThat(source.getSegmentId()).isEqualTo("post-1");
+                });
     }
 
     @Test
@@ -253,6 +428,15 @@ class CustomizedAnalysisResponseValidatorTest {
     private CustomizedAnalysisGenerationResult.Task task(String matchId, MatchAnalysisResultMatchLevel level) {
         return CustomizedAnalysisGenerationResult.Task.builder().taskId("task-1").relatedMatchId(matchId).relatedRequirementId("req-1")
                 .matchLevel(com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel.valueOf(level.name())).missingPoint("보완 필요").suggestion("학습").build();
+    }
+
+    private CustomizedAnalysisGenerationResult.Question question() {
+        return CustomizedAnalysisGenerationResult.Question.builder().questionId("question-1")
+                .questionType(com.example.jobpuzzle.interview.entity.InterviewQuestionType.COMPANY_FIT)
+                .question("Spring 경험을 설명해 주세요.").intent("요구사항 충족 여부 확인")
+                .evaluationFocus(List.of(com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection))
+                .relatedMatchId("match-1").relatedRequirementId("req-1").sourceRefs(List.of(postingRef()))
+                .reviewStatus(com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS).build();
     }
 
     private SourceReference postingRef() { return SourceReference.builder().extractionId(1L).documentId(10L).documentType(UserDocumentType.JOB_POSTING).pageNumber(1).segmentId("post-1").evidenceText("Spring 경험 요구").build(); }
