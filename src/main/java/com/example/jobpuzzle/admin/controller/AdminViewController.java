@@ -11,4 +11,9 @@ public class AdminViewController {
     public String users() {
         return "admin/users";
     }
+
+    @GetMapping("/admin/job-categories")
+    public String jobCategories() {
+        return "admin/job-categories";
+    }
 }

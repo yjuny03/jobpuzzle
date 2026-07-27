@@ -66,6 +66,8 @@ public enum ErrorCode {
 
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다."),
+    JOB_CATEGORY_DUPLICATE(HttpStatus.CONFLICT, "JOB_CATEGORY_002", "이미 등록된 대분류·중분류·경력수준 조합입니다."),
+    JOB_CATEGORY_IN_USE(HttpStatus.CONFLICT, "JOB_CATEGORY_003", "다른 데이터에서 사용 중인 직무 분류는 삭제할 수 없습니다."),
 
     // guide
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),

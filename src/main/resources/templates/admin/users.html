@@ -17,6 +17,11 @@
     <h1 class="page-title">회원 관리</h1>
     <p class="page-subtitle">아이디·이름·이메일로 검색하고 상태로 필터링할 수 있어요</p>
 
+    <div class="tabbar" style="margin-bottom:20px;">
+      <a class="tabbar__btn is-active" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+    </div>
+
     <div class="flex-row" style="gap:8px; margin-bottom:20px;">
       <select class="select-input" id="user-search-field" style="max-width:110px;">
         <option value="LOGIN_ID">아이디</option>
