@@ -1,11 +1,16 @@
 package com.example.jobpuzzle.admin.service;
 
+import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
+import com.example.jobpuzzle.admin.dto.AdminGuideUsageResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
+import com.example.jobpuzzle.ai.log.AiCallLogRepository;
+import com.example.jobpuzzle.ai.log.AiCallLogStatus;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
@@ -27,6 +32,8 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final JobCategoryRepository jobCategoryRepository;
+    private final GuideContextResultRepository guideContextResultRepository;
+    private final AiCallLogRepository aiCallLogRepository;
 
     // 회원 목록/검색
     public PageResponse<AdminUserListResponse> getUserList(
@@ -101,11 +108,17 @@ public class AdminService {
         // TODO: 클래스 정의서 기준으로 구현
     }
 
-    public void getGuideUsageHistory() {
-        // TODO: 클래스 정의서 기준으로 구현
+    // 가이드 사용 이력 조회
+    public PageResponse<AdminGuideUsageResponse> getGuideUsageHistory(Pageable pageable) {
+        Page<AdminGuideUsageResponse> response = guideContextResultRepository.findAll(pageable)
+                .map(AdminGuideUsageResponse::from);
+        return PageResponse.from(response);
     }
 
-    public void getAiErrorLog() {
-        // TODO: 클래스 정의서 기준으로 구현
+    // AI 분석 오류 로그 조회 - status가 없으면 전체 상태
+    public PageResponse<AdminAiCallLogResponse> getAiErrorLogs(AiCallLogStatus status, Pageable pageable) {
+        Page<AdminAiCallLogResponse> response = aiCallLogRepository.search(status, pageable)
+                .map(AdminAiCallLogResponse::from);
+        return PageResponse.from(response);
     }
 }

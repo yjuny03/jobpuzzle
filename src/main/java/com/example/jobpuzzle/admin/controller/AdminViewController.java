@@ -16,4 +16,14 @@ public class AdminViewController {
     public String jobCategories() {
         return "admin/job-categories";
     }
+
+    @GetMapping("/admin/guide-usage")
+    public String guideUsage() {
+        return "admin/guide-usage";
+    }
+
+    @GetMapping("/admin/ai-logs")
+    public String aiLogs() {
+        return "admin/ai-logs";
+    }
 }

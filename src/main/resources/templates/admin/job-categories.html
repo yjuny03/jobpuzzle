@@ -17,9 +17,11 @@
     <h1 class="page-title">직무 분류 관리</h1>
     <p class="page-subtitle">공고·가이드·리포트에서 공통으로 쓰는 직무 분류 기준이에요</p>
 
-    <div class="tabbar" style="margin-bottom:20px;">
+    <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
       <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
       <a class="tabbar__btn is-active" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
     </div>
 
     <div class="flex-row" style="justify-content:flex-end; margin-bottom:12px;">

@@ -1,9 +1,12 @@
 package com.example.jobpuzzle.admin.controller;
 
+import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
+import com.example.jobpuzzle.admin.dto.AdminGuideUsageResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
 import com.example.jobpuzzle.admin.service.AdminService;
+import com.example.jobpuzzle.ai.log.AiCallLogStatus;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
@@ -11,6 +14,8 @@ import com.example.jobpuzzle.user.entity.UserStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -72,5 +77,24 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Void>> deleteJobCategory(@PathVariable Long jobCategoryId) {
         adminService.deleteJobCategory(jobCategoryId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    // 가이드 사용 이력 조회
+    // GET /api/admin/guide-usage?page=&size=
+    @GetMapping("/guide-usage")
+    public ResponseEntity<ApiResponse<PageResponse<AdminGuideUsageResponse>>> getGuideUsageHistory(
+            @PageableDefault(sort = "guideContextResultId", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getGuideUsageHistory(pageable)));
+    }
+
+    // AI 분석 오류 로그 조회
+    // GET /api/admin/ai-call-logs?status=&page=&size=
+    @GetMapping("/ai-call-logs")
+    public ResponseEntity<ApiResponse<PageResponse<AdminAiCallLogResponse>>> getAiErrorLogs(
+            @RequestParam(required = false) AiCallLogStatus status,
+            @PageableDefault(sort = "aiCallLogId", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAiErrorLogs(status, pageable)));
     }
 }
