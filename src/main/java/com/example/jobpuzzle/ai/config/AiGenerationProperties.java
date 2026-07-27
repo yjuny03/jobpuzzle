@@ -23,12 +23,30 @@ public class AiGenerationProperties {
 
     private AiProvider defaultProvider = AiProvider.MOCK;
     private Map<AiExecutionStage, AiProvider> stageOverrides = new EnumMap<>(AiExecutionStage.class);
+    // stage별 thinking 정책은 기본값을 바꾸지 않고, 명시된 stage에만 Messages API body를 추가한다.
+    private Map<AiExecutionStage, ThinkingMode> thinkingByStage = new EnumMap<>(AiExecutionStage.class);
     private Anthropic anthropic = new Anthropic();
     private InputLimits inputLimits = new InputLimits();
 
     public AiProvider providerFor(AiExecutionStage stage) {
         if (stage == null) throw new IllegalArgumentException("AI execution stage is required");
         return stageOverrides.getOrDefault(stage, defaultProvider);
+    }
+
+    public ThinkingMode thinkingFor(AiExecutionStage stage) {
+        if (stage == null) throw new IllegalArgumentException("AI execution stage is required");
+        return thinkingByStage.getOrDefault(stage, ThinkingMode.DEFAULT);
+    }
+
+    // partition 재사용은 provider/model뿐 아니라 출력 생성 정책도 같을 때만 허용한다.
+    public String generationPolicyFingerprintMaterial(AiExecutionStage stage) {
+        return stage + "|maxOutputTokens=" + anthropic.getMaxOutputTokens().forStage(stage)
+                + "|thinking=" + thinkingFor(stage);
+    }
+
+    public enum ThinkingMode {
+        DEFAULT,
+        DISABLED
     }
 
     @Getter
@@ -67,6 +85,9 @@ public class AiGenerationProperties {
         // 기본값은 fixture 8·9 측정값보다 충분히 크되, 원문 전체가 무제한 prompt로 전달되는 것은 차단한다.
         private int json01RenderedPromptChars = 40_000;
         private int json02RenderedPromptChars = 50_000;
+        // JSON-02 분할 분석 전용 기준이다. marker를 버리지 않고 이 기준에서만 새 partition을 만든다.
+        private int json02PartitionMarkerContentChars = 12_000;
+        private int json02PartitionMaxMarkers = 8;
         private int json05RequirementCount = 20;
         private int json05RetrievalChars = 36_000;
         private int json05RenderedPromptChars = 64_000;

@@ -327,7 +327,7 @@
     return '<div class="card card--pad-lg" style="text-align:center; padding:60px 20px;">' +
       '<p style="font-size:16px; font-weight:700; margin:0 0 8px;">분석 요청이 접수됐어요</p>' +
       '<p style="font-size:13px; color:#8A93A3; margin:0 0 24px; line-height:1.7;">자료가 확정되었습니다. 분석 화면에서 직접 실행하고 결과를 확인할 수 있어요.</p>' +
-      '<a href="/analysis/' + state.analysisCaseId + '" class="btn btn--primary" style="text-decoration:none;">분석 화면으로 이동</a>' +
+      '<a href="/api/analysis/' + state.analysisCaseId + '" class="btn btn--primary" style="text-decoration:none;">분석 화면으로 이동</a>' +
     '</div>';
   }
 

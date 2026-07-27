@@ -56,6 +56,8 @@ class AnalysisServiceTest {
     @Mock
     private InitialAnalysisStageExecutor initialAnalysisStageExecutor;
     @Mock
+    private CandidateMaterialPartitionOrchestrator candidateMaterialPartitionOrchestrator;
+    @Mock
     private AnalysisInputSnapshotRepository analysisInputSnapshotRepository;
     @Mock
     private GuideContextService guideContextService;
@@ -104,9 +106,7 @@ class AnalysisServiceTest {
         );
         assertThat(primaryCaptor.getAllValues().get(0)).containsExactly(jobPosting);
         assertThat(supplementaryCaptor.getAllValues().get(0)).containsExactly(companyInfo);
-        verify(initialAnalysisStageExecutor).execute(
-                eq(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS), eq(context), eq(List.of(resume)), eq(List.of())
-        );
+        verify(candidateMaterialPartitionOrchestrator).execute(eq(context), eq(List.of(resume)));
         verify(analysisCaseService).getAnalysisContext(USER_ID, ANALYSIS_CASE_ID);
     }
 
@@ -122,6 +122,7 @@ class AnalysisServiceTest {
                 .isEqualTo(ErrorCode.ANALYSIS_CASE_NOT_FOUND);
         verify(analysisCaseService, never()).getAnalysisContext(any(), any());
         verify(initialAnalysisStageExecutor, never()).execute(any(), any(), any(), any());
+        verify(candidateMaterialPartitionOrchestrator, never()).execute(any(), any());
     }
 
     @Test
@@ -162,6 +163,7 @@ class AnalysisServiceTest {
 
         verify(statusTransitionService).failIfAnalyzing(USER_ID, ANALYSIS_CASE_ID);
         verify(initialAnalysisStageExecutor, never()).execute(any(), any(), any(), any());
+        verify(candidateMaterialPartitionOrchestrator, never()).execute(any(), any());
     }
 
     @Test

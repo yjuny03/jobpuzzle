@@ -1,7 +1,130 @@
 package com.example.jobpuzzle.analysis.service;
-import com.example.jobpuzzle.ai.log.*; import com.example.jobpuzzle.analysis.dto.*; import com.example.jobpuzzle.analysis.entity.*; import com.example.jobpuzzle.analysis.repository.*; import com.example.jobpuzzle.guide.entity.*; import com.example.jobpuzzle.guide.repository.*; import com.example.jobpuzzle.interview.entity.*; import com.example.jobpuzzle.interview.repository.*; import com.example.jobpuzzle.global.error.*; import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
-@Service @RequiredArgsConstructor public class AnalysisStatusQueryService {
- private final AnalysisCaseRepository cases; private final AnalysisInputSnapshotRepository snapshots; private final JobPostingAnalysisRepository jobs; private final CandidateMaterialAnalysisRepository candidates; private final GuideContextResultRepository guides; private final ReadinessResultRepository readiness; private final QuestionSetRepository sets; private final AiCallLogRepository logs;
- @Transactional(readOnly=true) public AnalysisStatusResponse getStatus(Long userId,Long caseId){ AnalysisCase c=cases.findByAnalysisCaseIdAndUser_UserId(caseId,userId).orElseThrow(()->new CustomException(ErrorCode.ANALYSIS_CASE_NOT_FOUND)); AnalysisInputSnapshot s=snapshots.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(caseId,userId).orElse(null); if(s==null)return AnalysisStatusResponse.builder().analysisCaseId(caseId).analysisCaseStatus(c.getStatus().name()).jobPostingAnalysisStatus(AnalysisStageStatus.NOT_STARTED).candidateMaterialAnalysisStatus(AnalysisStageStatus.NOT_STARTED).guideContextStatus(AnalysisStageStatus.NOT_STARTED).customizedAnalysisStatus(AnalysisStageStatus.NOT_STARTED).build(); Long id=s.getSnapshotId(); var j=jobs.findBySnapshot_SnapshotId(id).orElse(null); var m=candidates.findBySnapshot_SnapshotId(id).orElse(null); var r=readiness.findBySnapshot_SnapshotId(id).orElse(null); var failure=logs.findFirstByInputReferenceTypeAndInputReferenceIdAndStatusOrderByAiCallLogIdDesc(AiInputReferenceType.ANALYSIS_SNAPSHOT,String.valueOf(id),AiCallLogStatus.FAILED).orElse(null); return AnalysisStatusResponse.builder().analysisCaseId(caseId).snapshotId(id).analysisCaseStatus(c.getStatus().name()).jobPostingAnalysisStatus(stage(j==null?null:j.getAiCallLog())).candidateMaterialAnalysisStatus(stage(m==null?null:m.getAiCallLog())).guideContextStatus(guides.findByPurposeAndInputReferenceTypeAndInputReferenceId(GuideContextPurpose.CUSTOMIZED_SYNTHESIS,GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,String.valueOf(id)).isPresent()?AnalysisStageStatus.SUCCEEDED:AnalysisStageStatus.NOT_STARTED).customizedAnalysisStatus(stage(r==null?null:r.getAiCallLog())).readinessStatus(r==null?null:r.getStatus().name()).canGenerateQuestions(r==null?null:r.isCanGenerateQuestions()).questionSetAvailable(sets.existsBySnapshot_SnapshotIdAndInterviewMode(id,InterviewSessionMode.COMPANY_FIT)).latestFailureStage(failure==null?null:failure.getExecutionStage().name()).latestFailureType(failure==null?null:failure.getErrorType().name()).latestFailureMessage(failure==null?null:failure.getErrorMessage()).build(); }
- private AnalysisStageStatus stage(AiCallLog l){if(l==null)return AnalysisStageStatus.NOT_STARTED; return switch(l.getStatus()){case PENDING,RUNNING->AnalysisStageStatus.RUNNING;case SUCCEEDED->AnalysisStageStatus.SUCCEEDED;case FAILED->AnalysisStageStatus.FAILED;};}
+
+import com.example.jobpuzzle.ai.log.*;
+import com.example.jobpuzzle.analysis.dto.*;
+import com.example.jobpuzzle.analysis.entity.*;
+import com.example.jobpuzzle.analysis.repository.*;
+import com.example.jobpuzzle.global.error.CustomException;
+import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.entity.GuideContextInputReferenceType;
+import com.example.jobpuzzle.guide.entity.GuideContextPurpose;
+import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
+import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
+import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class AnalysisStatusQueryService {
+
+    private final AnalysisCaseRepository cases;
+    private final AnalysisInputSnapshotRepository snapshots;
+    private final JobPostingAnalysisRepository jobs;
+    private final CandidateMaterialAnalysisRepository candidates;
+    private final GuideContextResultRepository guides;
+    private final ReadinessResultRepository readiness;
+    private final QuestionSetRepository sets;
+    private final AiCallLogRepository logs;
+
+    @Transactional(readOnly = true)
+    public AnalysisStatusResponse getStatus(Long userId, Long caseId) {
+        AnalysisCase analysisCase = cases.findByAnalysisCaseIdAndUser_UserId(caseId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ANALYSIS_CASE_NOT_FOUND));
+        AnalysisInputSnapshot snapshot = snapshots
+                .findByAnalysisCase_AnalysisCaseIdAndUser_UserId(caseId, userId).orElse(null);
+        if (snapshot == null) return emptyStatus(caseId, analysisCase);
+
+        Long snapshotId = snapshot.getSnapshotId();
+        JobPostingAnalysis job = jobs.findBySnapshot_SnapshotId(snapshotId).orElse(null);
+        CandidateMaterialAnalysis candidate = candidates.findBySnapshot_SnapshotId(snapshotId).orElse(null);
+        ReadinessResult readinessResult = readiness.findBySnapshot_SnapshotId(snapshotId).orElse(null);
+        AiCallLog customizedLog = logs
+                .findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+                        AiExecutionStage.CUSTOMIZED_SYNTHESIS,
+                        AiInputReferenceType.ANALYSIS_SNAPSHOT,
+                        String.valueOf(snapshotId))
+                .orElse(null);
+        AiCallLog latest = logs
+                .findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+                        AiInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(snapshotId))
+                .orElse(null);
+        AiCallLog failure = latest != null && latest.getStatus() == AiCallLogStatus.FAILED ? latest : null;
+
+        return AnalysisStatusResponse.builder()
+                .analysisCaseId(caseId)
+                .snapshotId(snapshotId)
+                .analysisCaseStatus(analysisCase.getStatus().name())
+                .jobPostingAnalysisStatus(stage(job == null ? null : job.getAiCallLog()))
+                .candidateMaterialAnalysisStatus(stage(candidate == null ? null : candidate.getAiCallLog()))
+                .guideContextStatus(guides.findByPurposeAndInputReferenceTypeAndInputReferenceId(
+                                GuideContextPurpose.CUSTOMIZED_SYNTHESIS,
+                                GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,
+                                String.valueOf(snapshotId)).isPresent()
+                        ? AnalysisStageStatus.SUCCEEDED : AnalysisStageStatus.NOT_STARTED)
+                // 결과 row가 없어도 실제 JSON-05 실행 로그로 RUNNING/FAILED를 표시한다.
+                .customizedAnalysisStatus(stage(customizedLog))
+                .readinessStatus(readinessResult == null ? null : readinessResult.getStatus().name())
+                .canGenerateQuestions(readinessResult == null ? null : readinessResult.isCanGenerateQuestions())
+                .questionSetAvailable(sets.existsBySnapshot_SnapshotIdAndInterviewMode(
+                        snapshotId, InterviewSessionMode.COMPANY_FIT))
+                .latestFailureStage(failure == null ? null : failure.getExecutionStage().name())
+                .latestFailureType(failure == null ? null : failure.getErrorType().name())
+                // 내부 errorMessage는 API에 싣지 않는다.
+                .errorCode(failure == null ? null : publicErrorCode(failure.getErrorType()))
+                .retryable(failure == null ? null : retryable(failure.getErrorType()))
+                .userMessage(failure == null ? null : userMessage(failure.getErrorType()))
+                .attemptCount(failure == null ? null : failure.getRetryCount() + 1)
+                .maxAttempts(failure == null ? null : maxAttempts(failure.getErrorType()))
+                .retryAfterSeconds(null)
+                .traceId(failure == null ? null : "analysis-" + caseId + "-" + failure.getAiCallLogId())
+                .build();
+    }
+
+    private AnalysisStatusResponse emptyStatus(Long caseId, AnalysisCase analysisCase) {
+        return AnalysisStatusResponse.builder()
+                .analysisCaseId(caseId)
+                .analysisCaseStatus(analysisCase.getStatus().name())
+                .jobPostingAnalysisStatus(AnalysisStageStatus.NOT_STARTED)
+                .candidateMaterialAnalysisStatus(AnalysisStageStatus.NOT_STARTED)
+                .guideContextStatus(AnalysisStageStatus.NOT_STARTED)
+                .customizedAnalysisStatus(AnalysisStageStatus.NOT_STARTED)
+                .build();
+    }
+
+    private AnalysisStageStatus stage(AiCallLog log) {
+        if (log == null) return AnalysisStageStatus.NOT_STARTED;
+        return switch (log.getStatus()) {
+            case PENDING, RUNNING -> AnalysisStageStatus.RUNNING;
+            case SUCCEEDED -> AnalysisStageStatus.SUCCEEDED;
+            case FAILED -> AnalysisStageStatus.FAILED;
+        };
+    }
+
+    private boolean retryable(AiCallLogErrorType type) {
+        return type == AiCallLogErrorType.TIMEOUT || type == AiCallLogErrorType.RATE_LIMIT;
+    }
+
+    private int maxAttempts(AiCallLogErrorType type) {
+        return retryable(type) ? 3 : 1;
+    }
+
+    private String publicErrorCode(AiCallLogErrorType type) {
+        return switch (type) {
+            case TIMEOUT, RATE_LIMIT -> "ANALYSIS_PROVIDER_TEMPORARILY_UNAVAILABLE";
+            case INPUT_LIMIT_EXCEEDED -> "ANALYSIS_INPUT_INVALID";
+            case SOURCE_REFERENCE_INVALID, RESPONSE_VALIDATION_FAILED ->
+                    "ANALYSIS_RESULT_GENERATION_FAILED";
+            default -> "ANALYSIS_EXECUTION_FAILED";
+        };
+    }
+
+    private String userMessage(AiCallLogErrorType type) {
+        return switch (type) {
+            case TIMEOUT, RATE_LIMIT -> "분석 서비스 응답이 지연되고 있어요.";
+            case INPUT_LIMIT_EXCEEDED -> "분석할 자료의 내용을 확인해 주세요.";
+            default -> "분석 결과를 생성하지 못했어요.";
+        };
+    }
 }

@@ -14,7 +14,14 @@ import com.example.jobpuzzle.analysis.entity.ActionPlanMatchLevel;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.entity.ReadinessResultStatus;
 import com.example.jobpuzzle.analysis.entity.RequirementType;
-import com.example.jobpuzzle.analysis.rag.dto.RetrievedEvidenceContextDto;
+import com.example.jobpuzzle.analysis.rag.dto.CustomizedSynthesisEvidenceProjection;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderInput;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderResult;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisProviderEvidenceCatalog;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV15ProviderResult;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV16ProviderResult;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV17ProviderResult;
+import com.example.jobpuzzle.analysis.synthesis.dto.CustomizedSynthesisV18ProviderResult;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
@@ -125,7 +132,7 @@ public class MockAiClient implements AiClient {
         JobPostingAnalysisResult jobPosting = readSection(renderedPrompt, "JOB_POSTING_ANALYSIS", JobPostingAnalysisResult.class);
         readSection(renderedPrompt, "CANDIDATE_MATERIAL_ANALYSIS", CandidateMaterialAnalysisResult.class);
         JsonNode guide = readSectionTree(renderedPrompt, "GUIDE_CONTEXT");
-        RetrievedEvidenceContextDto evidence = readSection(renderedPrompt, "RETRIEVED_EVIDENCE", RetrievedEvidenceContextDto.class);
+        CustomizedSynthesisEvidenceProjection evidence = readSection(renderedPrompt, "RETRIEVED_EVIDENCE", CustomizedSynthesisEvidenceProjection.class);
         Map<String, List<SourceReference>> candidateRefs = retrievedCandidateSourceRefs(evidence);
         List<RequirementInput> requirements = requirements(jobPosting);
         ReadinessResultStatus status = readiness(requirements, candidateRefs.values().stream().flatMap(List::stream).toList(), guide.path("matchType").asText());
@@ -158,6 +165,239 @@ public class MockAiClient implements AiClient {
                 .readiness(CustomizedAnalysisGenerationResult.Readiness.builder().status(status).canGenerateQuestions(canGenerateQuestions)
                         .reason("입력 구조화 결과 기준 준비도").limitations(limitations(status)).build())
                 .requirementMatches(matches).questions(questions).tasks(tasks).build());
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV13(String renderedPrompt, JsonNode outputSchema) {
+        CustomizedSynthesisProviderInput input =
+                readSection(renderedPrompt, "SYNTHESIS_INPUT", CustomizedSynthesisProviderInput.class);
+        Map<String, String> evidenceText = input.evidenceCatalog().evidence().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId,
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceText
+                ));
+        List<CustomizedSynthesisProviderResult.RequirementMatch> matches = input.requirementCatalog().stream()
+                .map(requirement -> {
+                    List<String> selected = requirement.allowedCandidateEvidenceIds().stream().limit(1).toList();
+                    boolean evidenced = !selected.isEmpty();
+                    return CustomizedSynthesisProviderResult.RequirementMatch.builder()
+                            .requirementId(requirement.requirementId())
+                            .matchLevel(evidenced ? MatchAnalysisResultMatchLevel.HIGH : MatchAnalysisResultMatchLevel.NONE)
+                            .reason(evidenced ? "허용된 지원자 근거와 연결됨" : "허용된 지원자 근거가 없음")
+                            .missingPoint(evidenced ? null : "지원자 경험 근거 보완 필요")
+                            .candidateEvidence(evidenced ? evidenceText.get(selected.get(0)) : null)
+                            .candidateEvidenceIds(selected)
+                            .build();
+                }).toList();
+        CustomizedSynthesisProviderInput.RequirementItem questionRequirement = input.requirementCatalog().stream()
+                .filter(value -> !value.postingEvidenceIds().isEmpty() && !value.allowedCandidateEvidenceIds().isEmpty())
+                .findFirst().orElse(null);
+        boolean guideAvailable = input.guideProjection() != null
+                && input.guideProjection().matchType() != GuideMatchType.NONE;
+        List<CustomizedSynthesisProviderResult.Question> questions =
+                guideAvailable && questionRequirement != null
+                        ? List.of(CustomizedSynthesisProviderResult.Question.builder()
+                        .relatedRequirementId(questionRequirement.requirementId())
+                        .questionType(InterviewQuestionType.COMPANY_FIT)
+                        .question(questionRequirement.requirementText() + " 경험을 설명해주세요.")
+                        .intent("요구사항과 지원자 근거의 연결 확인")
+                        .evaluationFocus(List.of(
+                                com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection))
+                        .evidenceIds(List.of(questionRequirement.postingEvidenceIds().get(0),
+                                questionRequirement.allowedCandidateEvidenceIds().get(0)))
+                        .build()) : List.of();
+        List<CustomizedSynthesisProviderResult.Task> tasks = matches.stream()
+                .filter(value -> value.getMatchLevel() != MatchAnalysisResultMatchLevel.HIGH)
+                .map(value -> CustomizedSynthesisProviderResult.Task.builder()
+                        .relatedRequirementId(value.getRequirementId())
+                        .missingPoint(value.getMissingPoint())
+                        .suggestion("관련 경험 근거를 보완하세요.")
+                        .build())
+                .toList();
+        return json(CustomizedSynthesisProviderResult.builder()
+                .readiness(CustomizedSynthesisProviderResult.Readiness.builder()
+                        .reason("입력 구조화 결과 기준 준비도")
+                        .limitations(List.of())
+                        .build())
+                .requirementMatches(matches)
+                .questions(questions)
+                .tasks(tasks)
+                .build());
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV15(String renderedPrompt, JsonNode outputSchema) {
+        CustomizedSynthesisProviderInput input =
+                readSection(renderedPrompt, "SYNTHESIS_INPUT", CustomizedSynthesisProviderInput.class);
+        Map<String, String> evidenceText = input.evidenceCatalog().evidence().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId,
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceText));
+        Map<String, CustomizedSynthesisV15ProviderResult.MatchSlot> matches = new java.util.LinkedHashMap<>();
+        Map<String, CustomizedSynthesisV15ProviderResult.TaskSlot> tasks = new java.util.LinkedHashMap<>();
+        for (CustomizedSynthesisProviderInput.RequirementItem requirement : input.requirementCatalog()) {
+            List<String> selected = requirement.allowedCandidateEvidenceIds().stream().limit(1).toList();
+            boolean evidenced = !selected.isEmpty();
+            matches.put(requirement.requirementId(), CustomizedSynthesisV15ProviderResult.MatchSlot.builder()
+                    .matchLevel(evidenced ? MatchAnalysisResultMatchLevel.HIGH : MatchAnalysisResultMatchLevel.NONE)
+                    .reason(evidenced ? "허용된 지원자 근거와 연결됨" : "허용된 지원자 근거가 없음")
+                    .missingPoint(evidenced ? "" : "지원자 경험 근거 보완 필요")
+                    .candidateEvidence(evidenced ? evidenceText.get(selected.get(0)) : "")
+                    .candidateEvidenceIds(selected)
+                    .build());
+            tasks.put(requirement.requirementId(), CustomizedSynthesisV15ProviderResult.TaskSlot.builder()
+                    .applicable(!evidenced)
+                    .missingPoint(evidenced ? "" : "지원자 경험 근거 보완 필요")
+                    .suggestion(evidenced ? "" : "관련 경험 근거를 보완하세요.")
+                    .build());
+        }
+        CustomizedSynthesisV15ProviderResult.QuestionSlot question = null;
+        if (input.generationPolicy().questionGenerationEnabled()) {
+            CustomizedSynthesisProviderInput.RequirementItem requirement = input.requirementCatalog().stream()
+                    .filter(value -> !value.postingEvidenceIds().isEmpty()
+                            && !value.allowedCandidateEvidenceIds().isEmpty())
+                    .findFirst().orElse(null);
+            String relatedRequirementId = requirement == null ? "" : requirement.requirementId();
+            List<String> questionEvidenceIds;
+            String questionText;
+            if (requirement != null) {
+                questionEvidenceIds = List.of(requirement.postingEvidenceIds().get(0),
+                        requirement.allowedCandidateEvidenceIds().get(0));
+                questionText = requirement.requirementText() + " 경험을 설명해주세요.";
+            } else {
+                questionEvidenceIds = input.evidenceCatalog().evidence().stream()
+                        .map(CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId)
+                        .limit(2).toList();
+                questionText = "지원 직무와 연결되는 경험을 설명해주세요.";
+            }
+            question = CustomizedSynthesisV15ProviderResult.QuestionSlot.builder()
+                    .relatedRequirementId(relatedRequirementId)
+                    .questionType(InterviewQuestionType.COMPANY_FIT)
+                    .question(questionText)
+                    .intent("요구사항과 지원자 근거의 연결 확인")
+                    .evaluationFocus(List.of(
+                            com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection))
+                    .evidenceIds(questionEvidenceIds)
+                    .build();
+        }
+        return json(CustomizedSynthesisV15ProviderResult.builder()
+                .readiness(CustomizedSynthesisV15ProviderResult.Readiness.builder()
+                        .reason("입력 구조화 결과 기준 준비도").limitations(List.of()).build())
+                .requirementMatchesById(matches)
+                .primaryQuestion(question)
+                .tasksByRequirementId(tasks)
+                .build());
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV16(String renderedPrompt, JsonNode outputSchema) {
+        CustomizedSynthesisProviderInput input =
+                readSection(renderedPrompt, "SYNTHESIS_INPUT", CustomizedSynthesisProviderInput.class);
+        Map<String, String> evidenceText = input.evidenceCatalog().evidence().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId,
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceText));
+        Map<String, MatchAnalysisResultMatchLevel> levels = new java.util.LinkedHashMap<>();
+        Map<String, String> reasons = new java.util.LinkedHashMap<>();
+        Map<String, String> missing = new java.util.LinkedHashMap<>();
+        Map<String, String> candidateEvidence = new java.util.LinkedHashMap<>();
+        Map<String, String> candidateId = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> applicable = new java.util.LinkedHashMap<>();
+        Map<String, String> taskMissing = new java.util.LinkedHashMap<>();
+        Map<String, String> suggestions = new java.util.LinkedHashMap<>();
+        for (CustomizedSynthesisProviderInput.RequirementItem requirement : input.requirementCatalog()) {
+            String selected = requirement.allowedCandidateEvidenceIds().stream().findFirst().orElse("");
+            boolean evidenced = !selected.isBlank();
+            levels.put(requirement.requirementId(),
+                    evidenced ? MatchAnalysisResultMatchLevel.HIGH : MatchAnalysisResultMatchLevel.NONE);
+            reasons.put(requirement.requirementId(), evidenced ? "허용된 지원자 근거와 연결됨" : "허용된 지원자 근거가 없음");
+            missing.put(requirement.requirementId(), evidenced ? "" : "지원자 경험 근거 보완 필요");
+            candidateEvidence.put(requirement.requirementId(), evidenced ? evidenceText.get(selected) : "");
+            candidateId.put(requirement.requirementId(), selected);
+            applicable.put(requirement.requirementId(), !evidenced);
+            taskMissing.put(requirement.requirementId(), evidenced ? "" : "지원자 경험 근거 보완 필요");
+            suggestions.put(requirement.requirementId(), evidenced ? "" : "관련 경험 근거를 보완하세요.");
+        }
+        CustomizedSynthesisV16ProviderResult.QuestionSlot question = null;
+        if (input.generationPolicy().questionGenerationEnabled()) {
+            List<String> evidenceIds = input.evidenceCatalog().evidence().stream()
+                    .map(CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId).limit(2).toList();
+            question = new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                    "", InterviewQuestionType.COMPANY_FIT, "지원 직무와 연결되는 경험을 설명해주세요.",
+                    "지원자 근거와 직무 적합성 확인",
+                    com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
+                    evidenceIds.get(0));
+        }
+        return json(new CustomizedSynthesisV16ProviderResult(
+                new CustomizedSynthesisV16ProviderResult.Readiness("입력 구조화 결과 기준 준비도", List.of()),
+                levels, reasons, missing, candidateEvidence, candidateId, question,
+                applicable, taskMissing, suggestions));
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV17(String renderedPrompt, JsonNode outputSchema) {
+        CustomizedSynthesisProviderInput input =
+                readSection(renderedPrompt, "SYNTHESIS_INPUT", CustomizedSynthesisProviderInput.class);
+        Map<String, String> evidenceText = input.evidenceCatalog().evidence().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId,
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceText));
+        Map<String, String> decisions = new java.util.LinkedHashMap<>();
+        Map<String, List<String>> narratives = new java.util.LinkedHashMap<>();
+        for (CustomizedSynthesisProviderInput.RequirementItem requirement : input.requirementCatalog()) {
+            String selected = requirement.allowedCandidateEvidenceIds().stream().findFirst().orElse("");
+            boolean evidenced = !selected.isBlank();
+            decisions.put(requirement.requirementId(), evidenced ? "HIGH::" + selected : "NONE");
+            narratives.put(requirement.requirementId(), evidenced
+                    ? List.of("허용된 지원자 근거와 연결됨", "", evidenceText.get(selected), "")
+                    : List.of("허용된 지원자 근거가 없음", "지원자 경험 근거 보완 필요", "",
+                    "관련 경험 근거를 보완하세요."));
+        }
+        CustomizedSynthesisV16ProviderResult.QuestionSlot question = null;
+        if (input.generationPolicy().questionGenerationEnabled()) {
+            String evidenceId = input.evidenceCatalog().evidence().get(0).evidenceId();
+            question = new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                    "", InterviewQuestionType.COMPANY_FIT, "지원 직무와 연결되는 경험을 설명해주세요.",
+                    "지원자 근거와 직무 적합성 확인",
+                    com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
+                    evidenceId);
+        }
+        return json(new CustomizedSynthesisV17ProviderResult(
+                new CustomizedSynthesisV16ProviderResult.Readiness("입력 구조화 결과 기준 준비도", List.of()),
+                decisions, narratives, question));
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV18(String renderedPrompt, JsonNode outputSchema) {
+        CustomizedSynthesisProviderInput input =
+                readSection(renderedPrompt, "SYNTHESIS_INPUT", CustomizedSynthesisProviderInput.class);
+        Map<String, String> evidenceText = input.evidenceCatalog().evidence().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceId,
+                        CustomizedSynthesisProviderEvidenceCatalog.EvidenceItem::evidenceText));
+        Map<String, String> decisions = new java.util.LinkedHashMap<>();
+        Map<String, CustomizedSynthesisV18ProviderResult.Narrative> narratives = new java.util.LinkedHashMap<>();
+        for (CustomizedSynthesisProviderInput.RequirementItem requirement : input.requirementCatalog()) {
+            String selected = requirement.allowedCandidateEvidenceIds().stream().findFirst().orElse("");
+            boolean evidenced = !selected.isBlank();
+            decisions.put(requirement.requirementId(), evidenced ? "HIGH::" + selected : "NONE");
+            narratives.put(requirement.requirementId(), new CustomizedSynthesisV18ProviderResult.Narrative(
+                    evidenced ? "허용된 지원자 근거와 연결됨" : "허용된 지원자 근거가 없음",
+                    evidenced ? "" : "지원자 경험 근거 보완 필요",
+                    evidenced ? evidenceText.get(selected) : "",
+                    evidenced ? "" : "관련 경험 근거를 보완하세요."));
+        }
+        CustomizedSynthesisV16ProviderResult.QuestionSlot question = null;
+        if (input.generationPolicy().questionGenerationEnabled()) {
+            question = new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                    "", InterviewQuestionType.COMPANY_FIT, "지원 직무와 연결되는 경험을 설명해주세요.",
+                    "지원자 근거와 직무 적합성 확인",
+                    com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
+                    input.evidenceCatalog().evidence().get(0).evidenceId());
+        }
+        return json(new CustomizedSynthesisV18ProviderResult(
+                new CustomizedSynthesisV16ProviderResult.Readiness("입력 구조화 결과 기준 준비도", List.of()),
+                decisions, narratives, question));
     }
 
     private ReadinessResultStatus readiness(List<RequirementInput> requirements, List<SourceReference> candidateRefs, String guideMatchType) {
@@ -218,14 +458,21 @@ public class MockAiClient implements AiClient {
         return refs;
     }
 
-    // retrievedEvidenceJson의 requirement별 selected chunk만 JSON-05 candidate 근거로 echo한다.
-    private Map<String, List<SourceReference>> retrievedCandidateSourceRefs(RetrievedEvidenceContextDto evidence) {
+    // projection의 requirement별 evidenceId가 가리키는 chunk만 JSON-05 candidate 근거로 echo한다.
+    private Map<String, List<SourceReference>> retrievedCandidateSourceRefs(CustomizedSynthesisEvidenceProjection evidence) {
         if (evidence == null || evidence.requirements() == null) throw new IllegalArgumentException("missing mock retrieved evidence");
+        Map<String, CustomizedSynthesisEvidenceProjection.CandidateEvidence> byId = new java.util.LinkedHashMap<>();
+        for (CustomizedSynthesisEvidenceProjection.CandidateEvidence candidate : evidence.candidateEvidence()) {
+            byId.put(candidate.evidenceId(), candidate);
+        }
         Map<String, List<SourceReference>> values = new java.util.LinkedHashMap<>();
-        for (RetrievedEvidenceContextDto.RequirementEvidence requirement : evidence.requirements()) {
-            values.put(requirement.requirementId(), requirement.chunks().stream().map(chunk -> SourceReference.builder()
-                    .extractionId(chunk.extractionId()).documentId(chunk.documentId()).documentType(chunk.documentType())
-                    .pageNumber(chunk.pageStart()).segmentId(null).evidenceText(chunk.content()).build()).toList());
+        for (CustomizedSynthesisEvidenceProjection.RequirementEvidence requirement : evidence.requirements()) {
+            values.put(requirement.requirementId(), requirement.candidateEvidenceIds().stream()
+                    .map(byId::get)
+                    .filter(java.util.Objects::nonNull)
+                    .map(chunk -> SourceReference.builder().extractionId(chunk.extractionId()).documentId(chunk.documentId())
+                            .documentType(chunk.documentType()).pageNumber(chunk.pageStart()).segmentId(null)
+                            .evidenceText(chunk.content()).build()).toList());
         }
         return values;
     }

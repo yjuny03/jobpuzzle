@@ -1,6 +1,7 @@
 package com.example.jobpuzzle.analysis.service;
 
 import com.example.jobpuzzle.ai.log.AiCallLogRepository;
+import com.example.jobpuzzle.ai.log.AiCallLogRole;
 import com.example.jobpuzzle.ai.log.AiCallLogStatus;
 import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.ai.client.MockAiClient;
@@ -119,11 +120,19 @@ class AnalysisPipelineDatabaseIntegrationTest {
         // JSON-01·02·05 로그와 case 완료 상태가 동일한 DB 흐름에서 확정됐는지 확인한다.
         assertThat(analysisCaseRepository.findById(fixture.analysisCase().getAnalysisCaseId()).orElseThrow().getStatus())
                 .isEqualTo(AnalysisCaseStatus.COMPLETED);
-        assertThat(aiCallLogRepository.findAll()).filteredOn(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
-                .extracting(log -> log.getExecutionStage()).containsExactlyInAnyOrder(
-                        AiExecutionStage.JOB_POSTING_ANALYSIS, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
-                        AiExecutionStage.CUSTOMIZED_SYNTHESIS);
-        assertThat(aiCallLogRepository.findAll()).filteredOn(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
+        var snapshotLogs = aiCallLogRepository.findAll().stream()
+                .filter(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
+                .toList();
+        assertThat(snapshotLogs).extracting(log -> log.getExecutionStage()).containsExactlyInAnyOrder(
+                AiExecutionStage.JOB_POSTING_ANALYSIS,
+                AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
+                AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
+                AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        // JSON-02 partition 호출과 최종 DTO 호환용 aggregate root는 서로 다른 역할의 로그다.
+        assertThat(snapshotLogs).filteredOn(log -> log.getExecutionStage() == AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
+                .extracting(log -> log.getCallRole())
+                .containsExactlyInAnyOrder(AiCallLogRole.PROVIDER_CALL, AiCallLogRole.AGGREGATE_RESULT);
+        assertThat(snapshotLogs)
                 .allSatisfy(log -> assertThat(log.getStatus()).isEqualTo(AiCallLogStatus.SUCCEEDED));
 
         // CATEGORY ACTIVE 가이드가 JSON-04 context로 고정되고 candidate retrieval이 저장돼야 한다.
@@ -158,10 +167,16 @@ class AnalysisPipelineDatabaseIntegrationTest {
                 com.example.jobpuzzle.guide.entity.GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,
                 String.valueOf(snapshot.getSnapshotId()))).isEmpty();
         assertThat(retrievalResultRepository.findBySnapshot_SnapshotIdOrderByRetrievalResultIdAsc(snapshot.getSnapshotId())).isEmpty();
-        assertThat(aiCallLogRepository.findAll()).filteredOn(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
-                .extracting(log -> log.getExecutionStage())
-                .containsExactlyInAnyOrder(AiExecutionStage.JOB_POSTING_ANALYSIS, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
+        var snapshotLogs = aiCallLogRepository.findAll().stream()
+                .filter(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
+                .toList();
+        assertThat(snapshotLogs).extracting(log -> log.getExecutionStage())
+                .containsExactlyInAnyOrder(AiExecutionStage.JOB_POSTING_ANALYSIS,
+                        AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
                 .doesNotContain(AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        assertThat(snapshotLogs).filteredOn(log -> log.getExecutionStage() == AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
+                .extracting(log -> log.getCallRole())
+                .containsExactlyInAnyOrder(AiCallLogRole.PROVIDER_CALL, AiCallLogRole.AGGREGATE_RESULT);
     }
 
     @Test
@@ -223,10 +238,17 @@ class AnalysisPipelineDatabaseIntegrationTest {
                 com.example.jobpuzzle.guide.entity.GuideContextInputReferenceType.ANALYSIS_SNAPSHOT,
                 String.valueOf(snapshot.getSnapshotId()))).isPresent();
         assertThat(retrievalResultRepository.findBySnapshot_SnapshotIdOrderByRetrievalResultIdAsc(snapshot.getSnapshotId())).hasSize(2);
-        assertThat(aiCallLogRepository.findAll()).filteredOn(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
-                .extracting(log -> log.getExecutionStage())
-                .containsExactlyInAnyOrder(AiExecutionStage.JOB_POSTING_ANALYSIS, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
+        var snapshotLogs = aiCallLogRepository.findAll().stream()
+                .filter(log -> log.getInputReferenceId().equals(String.valueOf(snapshot.getSnapshotId())))
+                .toList();
+        assertThat(snapshotLogs).extracting(log -> log.getExecutionStage())
+                .containsExactlyInAnyOrder(AiExecutionStage.JOB_POSTING_ANALYSIS,
+                        AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
                         AiExecutionStage.CUSTOMIZED_SYNTHESIS, AiExecutionStage.CUSTOMIZED_SYNTHESIS);
+        // 재실행은 성공한 JSON-02 partition/root를 재사용하므로 로그가 추가되지 않아야 한다.
+        assertThat(snapshotLogs).filteredOn(log -> log.getExecutionStage() == AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS)
+                .extracting(log -> log.getCallRole())
+                .containsExactlyInAnyOrder(AiCallLogRole.PROVIDER_CALL, AiCallLogRole.AGGREGATE_RESULT);
         verify(vectorSearchAdapter, never()).search(any());
     }
 

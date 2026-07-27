@@ -3,6 +3,7 @@ package com.example.jobpuzzle.ai.client;
 import com.example.jobpuzzle.ai.config.AiGenerationProperties;
 import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
 import com.example.jobpuzzle.ai.validation.AiProcessingException;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,9 +53,11 @@ class AnthropicClientTest {
         properties.getAnthropic().getMaxOutputTokens().setJson02(222);
         properties.getAnthropic().getMaxOutputTokens().setJson05(333);
 
-        expectMessage("claude-test-sonnet", 111, "JSON-01 prompt");
-        expectMessage("claude-test-sonnet", 222, "JSON-02 prompt");
-        expectMessage("claude-test-sonnet", 333, "JSON-05 prompt");
+        properties.getThinkingByStage().put(com.example.jobpuzzle.ai.log.AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS,
+                AiGenerationProperties.ThinkingMode.DISABLED);
+        expectMessage("claude-test-sonnet", 111, "JSON-01 prompt", false);
+        expectMessage("claude-test-sonnet", 222, "JSON-02 prompt", true);
+        expectMessage("claude-test-sonnet", 333, "JSON-05 prompt", false);
 
         assertThat(client.analyzeJobPosting("JSON-01 prompt")).isEqualTo("{}");
         assertThat(client.analyzeCandidateMaterial("JSON-02 prompt")).isEqualTo("{}");
@@ -70,19 +73,113 @@ class AnthropicClientTest {
                           {"type":"text","text":"first"},
                           {"type":"tool_use","id":"ignored"},
                           {"type":"text","text":"-second"}
-                        ]}
-                        """, MediaType.APPLICATION_JSON));
+                        ],"stop_reason":"end_turn","usage":{"input_tokens":12,"output_tokens":34}}
+                        """, MediaType.APPLICATION_JSON).header("request-id", "req_safe_123"));
 
         assertThat(client.analyzeJobPosting("prompt")).isEqualTo("first-second");
+        var metadata = client.consumeCompletionMetadata();
+        assertThat(metadata.stopReason()).isEqualTo("end_turn");
+        assertThat(metadata.contentBlockTypes()).containsExactly("text", "tool_use");
+        assertThat(metadata.textBlockPresent()).isTrue();
+        assertThat(metadata.inputTokens()).isEqualTo(12);
+        assertThat(metadata.outputTokens()).isEqualTo(34);
+        assertThat(metadata.requestId()).isEqualTo("req_safe_123");
+        assertThat(client.consumeCompletionMetadata()).isNull();
         server.verify();
     }
 
     @Test
     void responseWithoutTextBlockFailsAsEmptyResponse() {
         server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
-                .andRespond(withSuccess("{" + "\"content\":[{\"type\":\"tool_use\"}]}" , MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{" + "\"content\":[{\"type\":\"tool_use\"}],\"stop_reason\":\"end_turn\"}" , MediaType.APPLICATION_JSON));
 
-        assertFailure(() -> client.analyzeJobPosting("prompt"), AiCallLogErrorType.EMPTY_RESPONSE);
+        assertThatThrownBy(() -> client.analyzeJobPosting("prompt"))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getErrorType()).isEqualTo(AiCallLogErrorType.EMPTY_RESPONSE);
+                    assertThat(value.getMessage()).contains("contentTypes=tool_use", "stopReason=end_turn")
+                            .doesNotContain(DUMMY_KEY);
+                });
+        server.verify();
+    }
+
+    @Test
+    void addsStructuredOutputOnlyForDocumentTypedJson02Request() {
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.output_config.format.schema.additionalProperties").value(false))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.availableDocumentTypes.items.enum[0]").value("RESUME"))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.coverLetter.type").value("null"))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.resume.type").value("object"))
+                .andExpect(jsonPath("$.output_config.format.schema").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasKey("evidenceText"))))
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}", MediaType.APPLICATION_JSON));
+        assertThat(client.analyzeCandidateMaterial("prompt", UserDocumentType.RESUME)).isEqualTo("{}");
+        server.verify();
+    }
+
+    @Test
+    void addsStructuredOutputForJson05WithoutChangingJson01RequestBody() {
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andExpect(jsonPath("$.output_config").doesNotExist())
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.output_config.format.schema.properties.questions.items.properties.reviewStatus.enum[0]").value("PASS"))
+                .andExpect(jsonPath("$.output_config.format.schema.$defs.sourceReference.additionalProperties").value(false))
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.analyzeJobPosting("JSON-01 prompt")).isEqualTo("{}");
+        assertThat(client.generateCustomizedAnalysis("JSON-05 prompt")).isEqualTo("{}");
+        server.verify();
+    }
+
+    @Test
+    void usesCallerSuppliedV13SchemaWithoutLegacyPromptSchemaInference() {
+        var schema = new ObjectMapper().createObjectNode()
+                .put("type", "object")
+                .put("additionalProperties", false);
+        schema.set("properties", new ObjectMapper().createObjectNode());
+        schema.set("required", new ObjectMapper().createArrayNode());
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andExpect(jsonPath("$.output_config.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.output_config.format.schema.type").value("object"))
+                .andExpect(jsonPath("$.output_config.format.schema.additionalProperties").value(false))
+                .andExpect(jsonPath("$.output_config.format.schema.$defs").doesNotExist())
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.generateCustomizedAnalysisV13("v1.3 prompt", schema)).isEqualTo("{}");
+        server.verify();
+    }
+
+    @Test
+    void responseStoppedAtMaxTokensFailsBeforeJsonContractProcessing() {
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andRespond(withSuccess("{" + "\"content\":[{\"type\":\"text\",\"text\":\"partial\"}],\"stop_reason\":\"max_tokens\"}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.analyzeCandidateMaterial("prompt"))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> {
+                    AiProcessingException value = (AiProcessingException) error;
+                    assertThat(value.getErrorType()).isEqualTo(AiCallLogErrorType.OUTPUT_LIMIT_EXCEEDED);
+                    assertThat(value.getMessage()).contains("reached max_tokens", "contentTypes=text", "stopReason=max_tokens")
+                            .doesNotContain(DUMMY_KEY);
+                    assertThat(value.getCompletionMetadata()).isNotNull();
+                    assertThat(value.getCompletionMetadata().stopReason()).isEqualTo("max_tokens");
+                    assertThat(value.getCompletionMetadata().failureKind())
+                            .isEqualTo(com.example.jobpuzzle.ai.log.AiFailureKind.OUTPUT_LIMIT_EXCEEDED);
+                });
+        server.verify();
+    }
+
+    @Test
+    void refusalIsRecordedAsDedicatedInternalFailureKind() {
+        server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"refused\"}],\"stop_reason\":\"refusal\"}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.analyzeCandidateMaterial("prompt", UserDocumentType.RESUME))
+                .isInstanceOf(AiProcessingException.class)
+                .satisfies(error -> assertThat(((AiProcessingException) error).getCompletionMetadata().failureKind())
+                        .isEqualTo(com.example.jobpuzzle.ai.log.AiFailureKind.REFUSAL));
         server.verify();
     }
 
@@ -176,7 +273,7 @@ class AnthropicClientTest {
                 });
     }
 
-    private void expectMessage(String model, int maxTokens, String prompt) {
+    private void expectMessage(String model, int maxTokens, String prompt, boolean thinkingDisabled) {
         server.expect(once(), requestTo(BASE_URL + "/v1/messages"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -186,6 +283,9 @@ class AnthropicClientTest {
                 .andExpect(jsonPath("$.max_tokens").value(maxTokens))
                 .andExpect(jsonPath("$.messages[0].role").value("user"))
                 .andExpect(jsonPath("$.messages[0].content").value(prompt))
+                .andExpect(thinkingDisabled
+                        ? jsonPath("$.thinking.type").value("disabled")
+                        : jsonPath("$.thinking").doesNotExist())
                 .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}", MediaType.APPLICATION_JSON));
     }
 

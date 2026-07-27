@@ -4,16 +4,23 @@ import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.config.AiGenerationProperties;
 import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
+import com.example.jobpuzzle.ai.log.AiFailureKind;
 import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.ai.log.AiProvider;
 import com.example.jobpuzzle.ai.validation.AiProcessingException;
+import com.example.jobpuzzle.analysis.service.CandidateMaterialPartitionSchemaFactory;
+import com.example.jobpuzzle.analysis.service.CustomizedSynthesisSchemaFactory;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -21,6 +28,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Component
@@ -28,19 +36,31 @@ public class AnthropicClient implements AiClient {
 
     private static final int PROVIDER_ERROR_DETAIL_LIMIT = 500;
     private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
+    private static final Pattern SAFE_ENVELOPE_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,100}");
 
     private final AiGenerationProperties properties;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final CandidateMaterialPartitionSchemaFactory partitionSchemas;
+    private final CustomizedSynthesisSchemaFactory customizedSynthesisSchema;
+    private final ThreadLocal<AiProviderCompletionMetadata> completionMetadata = new ThreadLocal<>();
 
+    public AnthropicClient(
+            AiGenerationProperties properties, @Qualifier("anthropicRestClient") RestClient restClient, ObjectMapper objectMapper
+    ) { this(properties, restClient, objectMapper, new CandidateMaterialPartitionSchemaFactory(objectMapper), new CustomizedSynthesisSchemaFactory(objectMapper)); }
+
+    @Autowired
     public AnthropicClient(
             AiGenerationProperties properties,
             @Qualifier("anthropicRestClient") RestClient restClient,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper, CandidateMaterialPartitionSchemaFactory partitionSchemas,
+            CustomizedSynthesisSchemaFactory customizedSynthesisSchema
     ) {
         this.properties = properties;
         this.restClient = restClient;
         this.objectMapper = objectMapper;
+        this.partitionSchemas = partitionSchemas;
+        this.customizedSynthesisSchema = customizedSynthesisSchema;
     }
 
     @Override
@@ -54,8 +74,21 @@ public class AnthropicClient implements AiClient {
     }
 
     @Override
+    public String analyzeCandidateMaterial(String prompt, UserDocumentType documentType) {
+        return message(AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS, prompt, documentType);
+    }
+
+    @Override
     public String generateCustomizedAnalysis(String renderedPrompt) {
         return message(AiExecutionStage.CUSTOMIZED_SYNTHESIS, renderedPrompt);
+    }
+
+    @Override
+    public String generateCustomizedAnalysisV13(String renderedPrompt, com.fasterxml.jackson.databind.JsonNode outputSchema) {
+        if (outputSchema == null || !outputSchema.isObject()) {
+            throw new IllegalArgumentException("JSON-05 v1.3 output schema is required");
+        }
+        return message(AiExecutionStage.CUSTOMIZED_SYNTHESIS, renderedPrompt, null, outputSchema);
     }
 
     @Override
@@ -88,6 +121,14 @@ public class AnthropicClient implements AiClient {
      * 인증값과 Provider 원시 오류 본문은 예외 메시지·로그에 포함하지 않는다.
      */
     private String message(AiExecutionStage stage, String prompt) {
+        return message(stage, prompt, null);
+    }
+    private String message(AiExecutionStage stage, String prompt, UserDocumentType documentType) {
+        return message(stage, prompt, documentType, null);
+    }
+    private String message(AiExecutionStage stage, String prompt, UserDocumentType documentType,
+                           com.fasterxml.jackson.databind.JsonNode explicitOutputSchema) {
+        completionMetadata.remove();
         validateSelectedConfiguration();
         if (prompt == null || prompt.isBlank()) throw failure(AiCallLogErrorType.EMPTY_RESPONSE, "AI prompt is empty");
 
@@ -95,19 +136,30 @@ public class AnthropicClient implements AiClient {
         Request request = new Request(
                 anthropic.getModel(),
                 anthropic.getMaxOutputTokens().forStage(stage),
-                List.of(new Message("user", prompt))
+                List.of(new Message("user", prompt)),
+                properties.thinkingFor(stage) == AiGenerationProperties.ThinkingMode.DISABLED
+                        ? new Thinking("disabled") : null,
+                explicitOutputSchema != null
+                        ? new OutputConfig(new Format("json_schema", explicitOutputSchema))
+                        : stage == AiExecutionStage.CANDIDATE_MATERIAL_ANALYSIS && documentType != null
+                        ? new OutputConfig(new Format("json_schema", partitionSchemas.schema(documentType)))
+                        : stage == AiExecutionStage.CUSTOMIZED_SYNTHESIS
+                        ? new OutputConfig(new Format("json_schema", customizedSynthesisSchema.schemaForPrompt(prompt))) : null
         );
 
         final String rawEnvelope;
+        final String requestId;
         try {
-            rawEnvelope = restClient.post()
+            ResponseEntity<String> providerResponse = restClient.post()
                     .uri("/v1/messages")
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("x-api-key", anthropic.getApiKey())
                     .header("anthropic-version", anthropic.getApiVersion())
                     .body(request)
                     .retrieve()
-                    .body(String.class);
+                    .toEntity(String.class);
+            rawEnvelope = providerResponse.getBody();
+            requestId = safeRequestId(providerResponse.getHeaders().getFirst("request-id"));
         } catch (RestClientResponseException exception) {
             // Provider 원문은 저장하지 않는다. 재현에 필요한 상태·안전한 error 필드·request-id만 AiCallLog에 남긴다.
             throw failure(httpErrorType(exception.getStatusCode().value()), providerFailureMessage(exception));
@@ -129,7 +181,29 @@ public class AnthropicClient implements AiClient {
                     .filter(block -> block != null && "text".equals(block.type()) && block.text() != null)
                     .map(ContentBlock::text)
                     .reduce("", String::concat);
-            if (text.isBlank()) throw failure(AiCallLogErrorType.EMPTY_RESPONSE, "Anthropic response has no text block");
+            AiProviderCompletionMetadata metadata = metadataOf(response, requestId, !text.isBlank());
+            if ("refusal".equals(response.stopReason())) {
+                throw failure(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED,
+                        "Anthropic response was refused; " + responseShape(response),
+                        metadata.withPostProcessing(null, null, null, false, AiFailureKind.REFUSAL));
+            }
+            // max_tokens라도 JSON 객체가 완결되면 기존 parser/validator가 계약 검증을 계속 수행한다.
+            // 미완결일 때만 adaptive split 후보로 구조화해 기록한다.
+            if ("max_tokens".equals(response.stopReason())) {
+                boolean jsonComplete = isCompleteJsonObject(text);
+                metadata = metadata.withPostProcessing(jsonComplete, null, null, !jsonComplete,
+                        jsonComplete ? AiFailureKind.NONE : AiFailureKind.OUTPUT_LIMIT_EXCEEDED);
+                if (!jsonComplete) {
+                    throw failure(AiCallLogErrorType.OUTPUT_LIMIT_EXCEEDED,
+                            "Anthropic response reached max_tokens; " + responseShape(response), metadata);
+                }
+            }
+            if (text.isBlank()) {
+                // 원문 content나 입력 prompt는 저장하지 않는다. 응답 형태만 남겨 실제 Provider의
+                // 빈 응답·비text 응답을 안전하게 구분할 수 있게 한다.
+                throw failure(AiCallLogErrorType.EMPTY_RESPONSE, emptyResponseMessage(response), metadata);
+            }
+            completionMetadata.set(metadata);
             return text;
         } catch (AiProcessingException exception) {
             throw exception;
@@ -164,7 +238,7 @@ public class AnthropicClient implements AiClient {
         }
         String type = sanitize(envelope == null || envelope.error() == null ? null : envelope.error().type());
         String message = sanitize(envelope == null || envelope.error() == null ? null : envelope.error().message());
-        String safeRequestId = requestId != null && REQUEST_ID.matcher(requestId).matches() ? requestId : null;
+        String safeRequestId = safeRequestId(requestId);
 
         StringBuilder detail = new StringBuilder("Anthropic request failed; httpStatus=")
                 .append(exception.getStatusCode().value());
@@ -172,6 +246,34 @@ public class AnthropicClient implements AiClient {
         if (message != null) detail.append("; providerMessage=").append(message);
         if (safeRequestId != null) detail.append("; requestId=").append(safeRequestId);
         return detail.toString();
+    }
+
+    @Override
+    public AiProviderCompletionMetadata consumeCompletionMetadata() {
+        AiProviderCompletionMetadata value = completionMetadata.get();
+        completionMetadata.remove();
+        return value;
+    }
+
+    private AiProviderCompletionMetadata metadataOf(Response response, String requestId, boolean textPresent) {
+        List<String> types = response.content() == null ? List.of() : response.content().stream()
+                .filter(Objects::nonNull).map(ContentBlock::type).map(this::safeEnvelopeValue)
+                .filter(Objects::nonNull).distinct().toList();
+        return new AiProviderCompletionMetadata(safeEnvelopeValue(response.stopReason()), types, textPresent,
+                response.usage() == null ? null : response.usage().inputTokens(),
+                response.usage() == null ? null : response.usage().outputTokens(), requestId,
+                null, null, null, null, AiFailureKind.NONE);
+    }
+
+    // DTO와 source reference 검증은 기존 AiResponseProcessor의 책임이다. 여기서는 JSON 문법 완결만 판단한다.
+    private boolean isCompleteJsonObject(String text) {
+        if (text == null || text.isBlank()) return false;
+        try { return objectMapper.readTree(text).isObject(); }
+        catch (JsonProcessingException exception) { return false; }
+    }
+
+    private String safeRequestId(String value) {
+        return value != null && REQUEST_ID.matcher(value).matches() ? value : null;
     }
 
     private String sanitize(String value) {
@@ -198,6 +300,29 @@ public class AnthropicClient implements AiClient {
         return cause == null ? detail : detail + "; cause=" + cause.getClass().getSimpleName();
     }
 
+    private String emptyResponseMessage(Response response) {
+        return "Anthropic response has no text block; " + responseShape(response);
+    }
+
+    private String responseShape(Response response) {
+        String stopReason = safeEnvelopeValue(response.stopReason());
+        String blockTypes = response.content() == null ? "none" : response.content().stream()
+                .filter(java.util.Objects::nonNull)
+                .map(ContentBlock::type)
+                .map(this::safeEnvelopeValue)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse("none");
+        StringBuilder message = new StringBuilder("contentTypes=").append(blockTypes);
+        if (stopReason != null) message.append("; stopReason=").append(stopReason);
+        return message.toString();
+    }
+
+    private String safeEnvelopeValue(String value) {
+        return value != null && SAFE_ENVELOPE_VALUE.matcher(value).matches() ? value : null;
+    }
+
     private boolean isTimeout(Throwable value) {
         Throwable current = value;
         while (current != null) {
@@ -208,17 +333,29 @@ public class AnthropicClient implements AiClient {
     }
 
     private AiProcessingException failure(AiCallLogErrorType errorType, String message) {
-        return new AiProcessingException(errorType, message);
+        return failure(errorType, message, null);
     }
 
-    private record Request(String model, @JsonProperty("max_tokens") int maxTokens, List<Message> messages) { }
+    private AiProcessingException failure(AiCallLogErrorType errorType, String message,
+                                          AiProviderCompletionMetadata metadata) {
+        return new AiProcessingException(errorType, message, metadata);
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record Request(String model, @JsonProperty("max_tokens") int maxTokens, List<Message> messages, Thinking thinking,
+                           @JsonProperty("output_config") OutputConfig outputConfig) { }
+    private record OutputConfig(Format format) { }
+    private record Format(String type, com.fasterxml.jackson.databind.JsonNode schema) { }
     private record Message(String role, String content) { }
+    private record Thinking(String type) { }
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SafeErrorEnvelope(SafeError error) { }
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SafeError(String type, String message) { }
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record Response(List<ContentBlock> content) { }
+    private record Response(List<ContentBlock> content, @JsonProperty("stop_reason") String stopReason, Usage usage) { }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record Usage(@JsonProperty("input_tokens") Long inputTokens, @JsonProperty("output_tokens") Long outputTokens) { }
 
     // Anthropic envelope에는 id·usage·tool input 등 adapter가 소유하지 않는 필드가 있으므로 text 추출에 필요한 값만 읽는다.
     @JsonIgnoreProperties(ignoreUnknown = true)

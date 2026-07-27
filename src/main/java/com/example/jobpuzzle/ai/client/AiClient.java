@@ -3,6 +3,8 @@ package com.example.jobpuzzle.ai.client;
 import com.example.jobpuzzle.ai.dto.FinalReportResult;
 import com.example.jobpuzzle.ai.dto.QuestionGenerationResult;
 import com.example.jobpuzzle.ai.log.AiProvider;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
+import com.fasterxml.jackson.databind.JsonNode;
 
 public interface AiClient {
 
@@ -10,7 +12,31 @@ public interface AiClient {
 
     String analyzeCandidateMaterial(String prompt);
 
+    default String analyzeCandidateMaterial(String prompt, UserDocumentType documentType) {
+        return analyzeCandidateMaterial(prompt);
+    }
+
     String generateCustomizedAnalysis(String renderedPrompt);
+
+    default String generateCustomizedAnalysisV13(String renderedPrompt, JsonNode outputSchema) {
+        return generateCustomizedAnalysis(renderedPrompt);
+    }
+
+    default String generateCustomizedAnalysisV15(String renderedPrompt, JsonNode outputSchema) {
+        return generateCustomizedAnalysisV13(renderedPrompt, outputSchema);
+    }
+
+    default String generateCustomizedAnalysisV16(String renderedPrompt, JsonNode outputSchema) {
+        return generateCustomizedAnalysisV13(renderedPrompt, outputSchema);
+    }
+
+    default String generateCustomizedAnalysisV17(String renderedPrompt, JsonNode outputSchema) {
+        return generateCustomizedAnalysisV13(renderedPrompt, outputSchema);
+    }
+
+    default String generateCustomizedAnalysisV18(String renderedPrompt, JsonNode outputSchema) {
+        return generateCustomizedAnalysisV13(renderedPrompt, outputSchema);
+    }
 
     QuestionGenerationResult generateQuestions(String prompt);
 
@@ -21,4 +47,9 @@ public interface AiClient {
     String getModel();
 
     String call(String prompt);
+
+    // 기존 문자열 반환 계약은 유지한다. metadata가 없는 provider는 null을 반환한다.
+    default AiProviderCompletionMetadata consumeCompletionMetadata() {
+        return null;
+    }
 }
