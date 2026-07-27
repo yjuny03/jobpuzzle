@@ -61,12 +61,22 @@ public class AnthropicClient implements AiClient {
     // interview 추가: 실제 Claude HTTP 연동 시 이 두 메서드의 반환값만 JSON-11/JSON-09로 교체한다.
     @Override
     public String generateBasicQuestions(String renderedPrompt) {
-        return call(renderedPrompt);
+        return message(AiExecutionStage.BASIC_QUESTION_GENERATION, renderedPrompt);
     }
 
     @Override
     public String generateWeaknessQuestions(String renderedPrompt) {
-        return call(renderedPrompt);
+        return message(AiExecutionStage.WEAKNESS_QUESTION_GENERATION, renderedPrompt);
+    }
+
+    @Override
+    public String evaluateAnswer(String renderedPrompt) {
+        return message(AiExecutionStage.ANSWER_EVALUATION, renderedPrompt);
+    }
+
+    @Override
+    public String evaluateWeaknessAnswer(String renderedPrompt) {
+        return message(AiExecutionStage.WEAKNESS_REEVALUATION, renderedPrompt);
     }
 
     @Override
@@ -76,7 +86,14 @@ public class AnthropicClient implements AiClient {
 
     @Override
     public FinalReportResult finalReport(String prompt) {
-        return null;
+        try {
+            return objectMapper.readValue(
+                    message(AiExecutionStage.FINAL_REPORT, prompt),
+                    FinalReportResult.class
+            );
+        } catch (JsonProcessingException exception) {
+            throw failure(AiCallLogErrorType.RESPONSE_PARSE_FAILED, "JSON-07 response is invalid");
+        }
     }
 
     @Override

@@ -375,6 +375,16 @@ public class MockAiClient implements AiClient {
         return json(new InterviewQuestionGenerationResult(questions));
     }
 
+    @Override
+    public String evaluateAnswer(String renderedPrompt) {
+        return "{}";
+    }
+
+    @Override
+    public String evaluateWeaknessAnswer(String renderedPrompt) {
+        return "{}";
+    }
+
     private InterviewQuestionGenerationResult.Question generatedQuestion(
             String questionId,
             InterviewQuestionType questionType,

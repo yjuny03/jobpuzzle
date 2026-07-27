@@ -1,6 +1,7 @@
 package com.example.jobpuzzle.analysis.service;
 
 import com.example.jobpuzzle.ai.log.*;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
 import com.example.jobpuzzle.ai.dto.InterviewQuestionGenerationResult;
 import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
@@ -220,9 +221,10 @@ public class QuestionGenerationService {
             String referenceId,
             String renderedPrompt
     ) {
+        GenerationClientSelection selection = aiClientService.resolve(stage);
         AiCallLog log = AiCallLog.pending(
-                aiClientService.getProvider(),
-                aiClientService.getModel(),
+                selection.provider(),
+                selection.model(),
                 stage,
                 referenceType,
                 referenceId,
@@ -231,8 +233,9 @@ public class QuestionGenerationService {
                 null,
                 null
         );
-        aiCallLogRepository.save(log);
         log.start();
+        // IDENTITY PK는 save 즉시 INSERT될 수 있으므로 필수 startedAt을 먼저 채운다.
+        aiCallLogRepository.save(log);
         return log;
     }
 
