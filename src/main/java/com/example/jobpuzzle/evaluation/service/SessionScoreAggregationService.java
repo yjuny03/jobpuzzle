@@ -9,6 +9,8 @@ import com.example.jobpuzzle.interview.entity.InterviewSession;
 import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
 import com.example.jobpuzzle.interview.entity.InterviewSessionQuestion;
 import com.example.jobpuzzle.interview.entity.InterviewSessionQuestionStatus;
+import com.example.jobpuzzle.interview.entity.InterviewMessageType;
+import com.example.jobpuzzle.interview.repository.InterviewMessageRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionQuestionRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class SessionScoreAggregationService {
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewSessionQuestionRepository sessionQuestionRepository;
     private final AnswerEvaluationRepository answerEvaluationRepository;
+    private final InterviewMessageRepository interviewMessageRepository;
 
     public SessionScoreSummary aggregate(Long userId, Long sessionId) {
         InterviewSession session = interviewSessionRepository
@@ -53,7 +56,18 @@ public class SessionScoreAggregationService {
                         .filter(Objects::nonNull)
                         .toList());
         int total = questions.size();
-        int submitted = questionScores.size();
+        int submitted = (int) questions.stream()
+                .filter(question -> interviewMessageRepository
+                        .findBySessionQuestion_SessionQuestionIdAndMessageType(
+                                question.getSessionQuestionId(),
+                                InterviewMessageType.ORIGINAL_ANSWER
+                        )
+                        .isPresent())
+                .count();
+        int evaluated = questionScores.size();
+        int evaluationFailed = (int) questions.stream()
+                .filter(this::hasFailedAnswerEvaluation)
+                .count();
         int skipped = (int) questions.stream()
                 .filter(question -> question.getStatus() == InterviewSessionQuestionStatus.SKIPPED)
                 .count();
@@ -65,36 +79,49 @@ public class SessionScoreAggregationService {
                 .categoryScores(categoryScores)
                 .totalQuestionCount(total)
                 .submittedQuestionCount(submitted)
-                .evaluatedQuestionCount(submitted)
+                .evaluatedQuestionCount(evaluated)
+                .evaluationFailedQuestionCount(evaluationFailed)
                 .skippedQuestionCount(skipped)
                 .completionRate(total == 0 ? 0 : (int) Math.round(submitted * 100.0 / total))
                 .questionScores(questionScores)
                 .build();
     }
 
+    private boolean hasFailedAnswerEvaluation(InterviewSessionQuestion question) {
+        return interviewMessageRepository
+                .findBySessionQuestion_SessionQuestionIdOrderByMessageIdAsc(
+                        question.getSessionQuestionId()
+                )
+                .stream()
+                .filter(message -> message.getMessageType() == InterviewMessageType.ORIGINAL_ANSWER
+                        || message.getMessageType() == InterviewMessageType.FOLLOW_UP_ANSWER)
+                .anyMatch(message -> answerEvaluationRepository
+                        .findByAnswerMessage_MessageId(message.getMessageId())
+                        .isEmpty());
+    }
+
     private SessionScoreSummary.QuestionScore questionScore(
             InterviewSessionQuestion question,
             List<AnswerEvaluation> evaluations
     ) {
-        Map<String, List<Integer>> dimensionValues = new LinkedHashMap<>();
-        for (AnswerEvaluation evaluation : evaluations) {
-            evaluation.getEvaluationDetail().forEach((dimension, detail) -> {
-                if (detail.getScore() != null) {
-                    dimensionValues.computeIfAbsent(dimension, ignored -> new ArrayList<>())
-                            .add(detail.getScore());
-                }
-            });
-        }
-        Map<String, Integer> dimensionScores = dimensionValues.entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> roundedAverage(entry.getValue()),
-                        (left, right) -> left,
-                        LinkedHashMap::new
-                ));
+        List<Map<String, Integer>> evaluationScores = evaluations.stream()
+                .map(evaluation -> {
+                    Map<String, Integer> scores = new LinkedHashMap<>();
+                    evaluation.getEvaluationDetail().forEach((dimension, detail) -> {
+                        if (detail.getScore() != null) {
+                            scores.put(dimension, detail.getScore());
+                        }
+                    });
+                    return scores;
+                })
+                .toList();
+        ScoreAggregationCalculator.Result dimensionResult =
+                ScoreAggregationCalculator.aggregate(evaluationScores);
+        Map<String, Integer> dimensionScores = dimensionResult.scores();
         return SessionScoreSummary.QuestionScore.builder()
                 .sessionQuestionId(question.getSessionQuestionId())
                 .dimensionScores(dimensionScores)
+                .dimensionEvaluationCounts(dimensionResult.counts())
                 .finalScore(roundedAverage(new ArrayList<>(dimensionScores.values())))
                 .build();
     }

@@ -3,6 +3,8 @@ package com.example.jobpuzzle.interview.service;
 import com.example.jobpuzzle.analysis.dto.CompanyFitQuestionSetResponse;
 import com.example.jobpuzzle.analysis.service.CompanyFitQuestionSetQueryService;
 import com.example.jobpuzzle.evaluation.service.AnswerEvaluationService;
+import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
+import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
 import com.example.jobpuzzle.evaluation.entity.WeaknessTagResolveStatus;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
 import com.example.jobpuzzle.global.error.CustomException;
@@ -32,6 +34,7 @@ public class InterviewSessionService {
     private final InterviewMessageRepository interviewMessageRepository;
     private final CompanyFitQuestionSetQueryService companyFitQuestionSetQueryService;
     private final AnswerEvaluationService answerEvaluationService;
+    private final AnswerEvaluationRepository answerEvaluationRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
 
     @Transactional(readOnly = true)
@@ -63,6 +66,54 @@ public class InterviewSessionService {
                                 .build()
                 ))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getUnresolvedWeaknessTags(Long userId) {
+        return weaknessTagStatusRepository
+                .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
+                .stream()
+                .sorted(Comparator.comparing(weakness -> weakness.getLastOccurredAt(), Comparator.reverseOrder()))
+                .map(weakness -> weakness.getTag())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SessionResponse getActiveSession(Long userId) {
+        return interviewSessionRepository
+                .findFirstByUser_UserIdAndStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        userId, UNFINISHED_STATUSES)
+                .map(session -> SessionResponse.from(
+                        session,
+                        Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(session.getSessionId())),
+                        hasAnyAnswer(session.getSessionId())
+                ))
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getActiveSessions(Long userId) {
+        return interviewSessionRepository
+                .findByUser_UserIdAndStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        userId, UNFINISHED_STATUSES)
+                .stream()
+                .map(this::toActiveSessionResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getCompletedSessions(Long userId) {
+        return interviewSessionRepository
+                .findByUser_UserIdAndStatusAndDeletedAtIsNullOrderByCompletedAtDesc(
+                        userId, InterviewSessionStatus.COMPLETED)
+                .stream()
+                .map(session -> SessionResponse.from(
+                        session,
+                        Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(
+                                session.getSessionId())),
+                        true
+                ))
+                .toList();
     }
 
     public SessionResponse createSession(Long userId, SessionCreateRequest request) {
@@ -116,7 +167,8 @@ public class InterviewSessionService {
         InterviewSession session = getOwnedSession(userId, sessionId);
         return SessionResponse.from(
                 session,
-                Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(sessionId))
+                Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(sessionId)),
+                hasAnyAnswer(sessionId)
         );
     }
 
@@ -125,7 +177,7 @@ public class InterviewSessionService {
         getOwnedSession(userId, sessionId);
         return sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId)
                 .stream()
-                .map(SessionQuestionResponse::from)
+                .map(this::toSessionQuestionResponse)
                 .toList();
     }
 
@@ -150,7 +202,7 @@ public class InterviewSessionService {
                                 InterviewSessionQuestionStatus.IN_PROGRESS
                         )
                 )
-                .map(SessionQuestionResponse::from)
+                .map(this::toSessionQuestionResponse)
                 .orElse(null);
     }
 
@@ -184,18 +236,21 @@ public class InterviewSessionService {
 
         AnswerEvaluationService.EvaluationOutcome outcome =
                 answerEvaluationService.evaluateAnswer(answer);
-        if (outcome.followUpMessage() == null) {
+        if (outcome.evaluationFailed() || outcome.followUpMessage() == null) {
             sessionQuestion.complete();
         }
 
-        SessionQuestionResponse nextQuestion = outcome.followUpMessage() == null
+        SessionQuestionResponse nextQuestion = outcome.evaluationFailed() || outcome.followUpMessage() == null
                 ? getNextQuestion(userId, session.getSessionId())
                 : SessionQuestionResponse.from(sessionQuestion);
         return AnswerSubmitResponse.builder()
                 .answerMessageId(answer.getMessageId())
-                .evaluationId(outcome.evaluation().getEvaluationId())
-                .score(outcome.evaluation().getScore())
-                .summary(outcome.evaluation().getSummary())
+                .evaluationId(outcome.evaluation() == null ? null : outcome.evaluation().getEvaluationId())
+                .score(outcome.evaluation() == null ? null : outcome.evaluation().getScore())
+                .summary(outcome.evaluation() == null
+                        ? "AI 평가에 실패했습니다. 답변은 저장되었고 점수 계산에서는 제외됩니다."
+                        : outcome.evaluation().getSummary())
+                .evaluationFailed(outcome.evaluationFailed())
                 .followUpQuestionMessageId(
                         outcome.followUpMessage() == null ? null : outcome.followUpMessage().getMessageId()
                 )
@@ -219,13 +274,21 @@ public class InterviewSessionService {
                                 InterviewMessageType.FOLLOW_UP_ANSWER
                         )
                 );
-        if (!hasAnswer || hasUnansweredFollowUp(sessionId)) {
+        if (!hasAnswer) {
             throw new CustomException(ErrorCode.SESSION_CANNOT_BE_COMPLETED);
         }
 
-        sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId)
-                .forEach(InterviewSessionQuestion::skip);
+        List<InterviewSessionQuestion> sessionQuestions =
+                sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId);
+        sessionQuestions.forEach(question -> {
+            if (hasOriginalAnswer(question.getSessionQuestionId())) {
+                question.complete();
+            } else {
+                question.skip();
+            }
+        });
         session.complete();
+        resolveWeaknessIfEligible(session, sessionQuestions);
 
         // 면접 기능 추가: 정상 완료된 QuestionSet은 미선택 질문까지 더 이상 재사용하지 않는다.
         session.getQuestionSet().archive();
@@ -233,6 +296,54 @@ public class InterviewSessionService {
                 session,
                 Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(sessionId))
         );
+    }
+
+    private void resolveWeaknessIfEligible(
+            InterviewSession session,
+            List<InterviewSessionQuestion> sessionQuestions
+    ) {
+        if (session.getMode() != InterviewSessionMode.WEAKNESS_REVIEW
+                || session.getTargetWeaknessTag() == null
+                || session.getTargetDimension() == null) {
+            return;
+        }
+        long generatedQuestionCount = interviewQuestionRepository
+                .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
+                        session.getQuestionSet().getQuestionSetId())
+                .stream()
+                .filter(question -> question.getReviewStatus() == InterviewQuestionReviewStatus.PASS)
+                .count();
+        if (generatedQuestionCount != sessionQuestions.size()
+                || sessionQuestions.stream().anyMatch(question ->
+                question.getStatus() != InterviewSessionQuestionStatus.COMPLETED)
+                || sessionQuestions.stream().anyMatch(question ->
+                !passesTargetDimension(question, session.getTargetDimension()))) {
+            return;
+        }
+        weaknessTagStatusRepository
+                .findByUser_UserIdAndTag(
+                        session.getUser().getUserId(),
+                        session.getTargetWeaknessTag())
+                .filter(status -> status.getStatus() == WeaknessTagResolveStatus.UNRESOLVED)
+                .ifPresent(status -> status.resolve(session));
+    }
+
+    private boolean passesTargetDimension(
+            InterviewSessionQuestion question,
+            String targetDimension
+    ) {
+        List<Integer> scores = answerEvaluationRepository
+                .findBySessionQuestion_SessionQuestionIdOrderByEvaluationIdAsc(
+                        question.getSessionQuestionId())
+                .stream()
+                .map(AnswerEvaluation::getEvaluationDetail)
+                .map(details -> details.get(targetDimension))
+                .filter(Objects::nonNull)
+                .map(AnswerEvaluation.DimensionEvaluation::getScore)
+                .filter(Objects::nonNull)
+                .toList();
+        return !scores.isEmpty()
+                && scores.stream().mapToInt(Integer::intValue).average().orElse(0) >= 70;
     }
 
     public SessionResponse cancelSession(Long userId, Long sessionId) {
@@ -314,16 +425,85 @@ public class InterviewSessionService {
         return parent;
     }
 
-    private boolean hasUnansweredFollowUp(Long sessionId) {
-        return sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId)
-                .stream()
-                .map(question -> interviewMessageRepository
+    private boolean hasOriginalAnswer(Long sessionQuestionId) {
+        return interviewMessageRepository
+                .findBySessionQuestion_SessionQuestionIdAndMessageType(
+                        sessionQuestionId,
+                        InterviewMessageType.ORIGINAL_ANSWER
+                )
+                .isPresent();
+    }
+
+    private boolean hasAnyAnswer(Long sessionId) {
+        return interviewMessageRepository
+                .existsBySessionQuestion_Session_SessionIdAndMessageTypeIn(
+                        sessionId,
+                        List.of(
+                                InterviewMessageType.ORIGINAL_ANSWER,
+                                InterviewMessageType.FOLLOW_UP_ANSWER
+                        )
+                );
+    }
+
+    private SessionResponse toActiveSessionResponse(InterviewSession session) {
+        List<InterviewSessionQuestion> sessionQuestions =
+                sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(
+                        session.getSessionId()
+                );
+        int completedQuestionCount = Math.toIntExact(sessionQuestions.stream()
+                .filter(question -> question.getStatus() == InterviewSessionQuestionStatus.COMPLETED)
+                .count());
+        InterviewSessionQuestion currentQuestion = sessionQuestions.stream()
+                .filter(question -> question.getStatus() == InterviewSessionQuestionStatus.PENDING
+                        || question.getStatus() == InterviewSessionQuestionStatus.IN_PROGRESS)
+                .findFirst()
+                .orElse(sessionQuestions.isEmpty() ? null : sessionQuestions.get(sessionQuestions.size() - 1));
+        int currentQuestionOrder = currentQuestion == null ? 0 : currentQuestion.getDisplayOrder();
+        int currentQaDepth = currentQuestion == null ? 0 : Math.toIntExact(
+                interviewMessageRepository
                         .findBySessionQuestion_SessionQuestionIdOrderByMessageIdAsc(
-                                question.getSessionQuestionId()
-                        ))
-                .filter(messages -> !messages.isEmpty())
-                .map(messages -> messages.get(messages.size() - 1))
-                .anyMatch(message -> message.getMessageType() == InterviewMessageType.FOLLOW_UP_QUESTION);
+                                currentQuestion.getSessionQuestionId()
+                        )
+                        .stream()
+                        .filter(message -> message.getMessageType() == InterviewMessageType.ORIGINAL_ANSWER
+                                || message.getMessageType() == InterviewMessageType.FOLLOW_UP_ANSWER)
+                        .count()
+        );
+        return SessionResponse.from(
+                session,
+                sessionQuestions.size(),
+                hasAnyAnswer(session.getSessionId()),
+                completedQuestionCount,
+                currentQuestionOrder,
+                currentQaDepth
+        );
+    }
+
+    private SessionQuestionResponse toSessionQuestionResponse(
+            InterviewSessionQuestion question
+    ) {
+        List<InterviewMessage> messages = interviewMessageRepository
+                .findBySessionQuestion_SessionQuestionIdOrderByMessageIdAsc(
+                        question.getSessionQuestionId()
+                );
+        InterviewMessage pendingFollowUp = messages.isEmpty()
+                ? null
+                : messages.get(messages.size() - 1);
+        boolean hasPendingFollowUp = pendingFollowUp != null
+                && pendingFollowUp.getMessageType() == InterviewMessageType.FOLLOW_UP_QUESTION;
+        boolean answerSubmitted = messages.stream()
+                .anyMatch(message -> message.getMessageType() == InterviewMessageType.ORIGINAL_ANSWER);
+        int followUpCount = Math.toIntExact(messages.stream()
+                .filter(message -> message.getMessageType() == InterviewMessageType.FOLLOW_UP_QUESTION)
+                .count());
+        return SessionQuestionResponse.from(
+                question,
+                answerSubmitted,
+                followUpCount,
+                hasPendingFollowUp ? pendingFollowUp.getMessageId() : null,
+                hasPendingFollowUp ? pendingFollowUp.getMessageText() : null,
+                messages
+        );
     }
 
     private InterviewSession getOwnedSession(Long userId, Long sessionId) {

@@ -1,9 +1,11 @@
 package com.example.jobpuzzle.interview.controller;
 
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.interview.dto.*;
 import com.example.jobpuzzle.interview.service.InterviewSessionService;
+import com.example.jobpuzzle.evaluation.dto.SessionScoreSummary;
+import com.example.jobpuzzle.evaluation.service.SessionScoreAggregationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,23 +20,24 @@ import java.util.List;
 public class InterviewSessionController {
 
     private final InterviewSessionService interviewSessionService;
+    private final SessionScoreAggregationService sessionScoreAggregationService;
 
     @GetMapping("/api/interview-modes/availability")
     public ResponseEntity<ApiResponse<InterviewModeAvailabilityResponse>> getAvailableModes(
-            @AuthenticationPrincipal CustomUserDetails user
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.getAvailableModes(user.getUser().getUserId())
+                interviewSessionService.getAvailableModes(user.getUserId())
         ));
     }
 
     @PostMapping("/api/interview-sessions")
     public ResponseEntity<ApiResponse<SessionResponse>> createSession(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @Valid @RequestBody SessionCreateRequest request
     ) {
         SessionResponse response = interviewSessionService.createSession(
-                user.getUser().getUserId(),
+                user.getUserId(),
                 request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
@@ -42,53 +45,53 @@ public class InterviewSessionController {
 
     @GetMapping("/api/interview-sessions/{sessionId}")
     public ResponseEntity<ApiResponse<SessionResponse>> getSession(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.getSession(user.getUser().getUserId(), sessionId)
+                interviewSessionService.getSession(user.getUserId(), sessionId)
         ));
     }
 
     @PostMapping("/api/interview-sessions/{sessionId}/start")
     public ResponseEntity<ApiResponse<SessionResponse>> startSession(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.startSession(user.getUser().getUserId(), sessionId)
+                interviewSessionService.startSession(user.getUserId(), sessionId)
         ));
     }
 
     @GetMapping("/api/interview-sessions/{sessionId}/questions")
     public ResponseEntity<ApiResponse<List<SessionQuestionResponse>>> getQuestions(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.getSessionQuestions(user.getUser().getUserId(), sessionId)
+                interviewSessionService.getSessionQuestions(user.getUserId(), sessionId)
         ));
     }
 
     @GetMapping("/api/interview-sessions/{sessionId}/questions/next")
     public ResponseEntity<ApiResponse<SessionQuestionResponse>> getNextQuestion(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.getNextQuestion(user.getUser().getUserId(), sessionId)
+                interviewSessionService.getNextQuestion(user.getUserId(), sessionId)
         ));
     }
 
     @PostMapping("/api/interview-session-questions/{sessionQuestionId}/answers")
     public ResponseEntity<ApiResponse<AnswerSubmitResponse>> submitAnswer(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionQuestionId,
             @Valid @RequestBody AnswerSubmitRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 interviewSessionService.submitAnswer(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         sessionQuestionId,
                         request
                 )
@@ -97,21 +100,68 @@ public class InterviewSessionController {
 
     @PostMapping("/api/interview-sessions/{sessionId}/complete")
     public ResponseEntity<ApiResponse<SessionResponse>> completeSession(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.completeSession(user.getUser().getUserId(), sessionId)
+                interviewSessionService.completeSession(user.getUserId(), sessionId)
         ));
     }
 
     @PostMapping("/api/interview-sessions/{sessionId}/cancel")
     public ResponseEntity<ApiResponse<SessionResponse>> cancelSession(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                interviewSessionService.cancelSession(user.getUser().getUserId(), sessionId)
+                interviewSessionService.cancelSession(user.getUserId(), sessionId)
+        ));
+    }
+
+    @GetMapping("/api/interview-weakness-tags")
+    public ResponseEntity<ApiResponse<List<String>>> getUnresolvedWeaknessTags(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getUnresolvedWeaknessTags(user.getUserId())
+        ));
+    }
+
+    @GetMapping("/api/interview-sessions/active")
+    public ResponseEntity<ApiResponse<SessionResponse>> getActiveSession(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getActiveSession(user.getUserId())
+        ));
+    }
+
+    @GetMapping("/api/interview-sessions/active-list")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> getActiveSessions(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getActiveSessions(user.getUserId())
+        ));
+    }
+
+    @GetMapping("/api/interview-sessions/history")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> getCompletedSessions(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getCompletedSessions(user.getUserId())
+        ));
+    }
+
+    // 면접 종료 직후 화면과 JSON-07 리포트 입력에서 함께 사용하는 확정 집계값
+    @GetMapping("/api/interview-sessions/{sessionId}/score")
+    public ResponseEntity<ApiResponse<SessionScoreSummary>> getScore(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable Long sessionId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionScoreAggregationService.aggregate(user.getUserId(), sessionId)
         ));
     }
 }

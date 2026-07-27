@@ -19,7 +19,7 @@ public class WeaknessTagStatus {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "weakness_status_id")
+    @Column(name = "status_id")
     private Long weaknessStatusId;
 
     @ManyToOne(fetch = FetchType.LAZY)

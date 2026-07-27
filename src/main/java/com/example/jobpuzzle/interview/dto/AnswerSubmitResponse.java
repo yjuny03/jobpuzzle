@@ -11,6 +11,7 @@ public class AnswerSubmitResponse {
     private Long evaluationId;
     private Integer score;
     private String summary;
+    private boolean evaluationFailed;
     private Long followUpQuestionMessageId;
     private String followUpQuestion;
     private InterviewSessionStatus sessionStatus;

@@ -17,6 +17,7 @@ public class SessionScoreSummary {
     private int totalQuestionCount;
     private int submittedQuestionCount;
     private int evaluatedQuestionCount;
+    private int evaluationFailedQuestionCount;
     private int skippedQuestionCount;
     private int completionRate;
     private List<QuestionScore> questionScores;
@@ -27,5 +28,6 @@ public class SessionScoreSummary {
         private Long sessionQuestionId;
         private Integer finalScore;
         private Map<String, Integer> dimensionScores;
+        private Map<String, Integer> dimensionEvaluationCounts;
     }
 }
