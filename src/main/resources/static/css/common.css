@@ -164,7 +164,9 @@ button {
 .site-header__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex-shrink: 0;
+  min-width: 190px;
 }
 
 .auth-guest {
