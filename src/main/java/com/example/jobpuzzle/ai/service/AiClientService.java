@@ -18,7 +18,7 @@ public class AiClientService {
     private final AiClient anthropicClient;
     private final AiGenerationProperties properties;
 
-    // app.ai.provider: MOCK(기본값) 또는 ANTHROPIC. 코드 수정 없이 설정만으로 전환
+    // app.ai.generation.default-provider: mock 또는 anthropic. 코드 수정 없이 설정만으로 전환
     public AiClientService(
             @Qualifier("mockAiClient") AiClient mockAiClient,
             @Qualifier("anthropicClient") AiClient anthropicClient,
@@ -74,6 +74,27 @@ public class AiClientService {
                 anthropic.getModel(), anthropic.getMaxOutputTokens().forStage(stage));
     }
 
+    // interview 추가: 호출자는 Mock/Anthropic 구현을 알지 않고 동일한 JSON 계약만 사용한다.
+    public String generateBasicQuestions(String renderedPrompt) {
+        GenerationClientSelection selection = resolve(AiExecutionStage.BASIC_QUESTION_GENERATION);
+        return selection.client().generateBasicQuestions(renderedPrompt);
+    }
+
+    public String generateWeaknessQuestions(String renderedPrompt) {
+        GenerationClientSelection selection = resolve(AiExecutionStage.WEAKNESS_QUESTION_GENERATION);
+        return selection.client().generateWeaknessQuestions(renderedPrompt);
+    }
+
+    public String evaluateAnswer(GenerationClientSelection selection, String renderedPrompt) {
+        requireStage(selection, AiExecutionStage.ANSWER_EVALUATION);
+        return selection.client().evaluateAnswer(renderedPrompt);
+    }
+
+    public String evaluateWeaknessAnswer(GenerationClientSelection selection, String renderedPrompt) {
+        requireStage(selection, AiExecutionStage.WEAKNESS_REEVALUATION);
+        return selection.client().evaluateWeaknessAnswer(renderedPrompt);
+    }
+
     private void requireStage(GenerationClientSelection selection, AiExecutionStage expected) {
         if (selection == null || selection.stage() != expected) {
             throw new IllegalArgumentException("generation client selection stage does not match call");
@@ -86,7 +107,16 @@ public class AiClientService {
 
     // 아래 두 API는 분석 외 모듈의 기존 호출 표면을 보존한다. stage 기반 분석 실행에는 사용하지 않는다.
     public QuestionGenerationResult generateQuestions(String prompt) { return mockAiClient.generateQuestions(prompt); }
-    public FinalReportResult finalReport(String prompt) { return mockAiClient.finalReport(prompt); }
+    public FinalReportResult finalReport(String prompt) {
+        return resolve(AiExecutionStage.FINAL_REPORT).client().finalReport(prompt);
+    }
+    public FinalReportResult finalReport(
+            GenerationClientSelection selection,
+            String prompt
+    ) {
+        requireStage(selection, AiExecutionStage.FINAL_REPORT);
+        return selection.client().finalReport(prompt);
+    }
     public AiProvider getProvider() {
         return mockAiClient.getProvider();
     }

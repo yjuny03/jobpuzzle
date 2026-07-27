@@ -1,117 +1,142 @@
 package com.example.jobpuzzle.evaluation.entity;
 
+import com.example.jobpuzzle.ai.log.AiCallLog;
+import com.example.jobpuzzle.global.common.BaseTimeEntity;
+import com.example.jobpuzzle.interview.entity.InterviewMessage;
+import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
+import com.example.jobpuzzle.interview.entity.InterviewSessionQuestion;
 import jakarta.persistence.*;
-import lombok.Builder;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Check;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 // 사용자 답변 메시지별 평가 결과. 원 답변과 꼬리답변을 각각 저장
 @Getter
 @Entity
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "answer_evaluation")
 @Check(constraints = "score >= 0 AND score <= 100")
-public class AnswerEvaluation {
+public class AnswerEvaluation extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "evaluation_id")
     private Long evaluationId;
 
-    // 평가 대상 ORIGINAL_ANSWER 또는 FOLLOW_UP_ANSWER 메시지 (UNIQUE)
-    @Column(nullable = false, unique = true)
-    private Long answerMessageId;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "answer_message_id", nullable = false, unique = true)
+    private InterviewMessage answerMessage;
 
-    @Column(nullable = false)
-    private Long sessionQuestionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_question_id", nullable = false)
+    private InterviewSessionQuestion sessionQuestion;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AnswerEvaluationMode evaluationMode;
+    @Column(name = "evaluation_mode", nullable = false, length = 30)
+    private InterviewSessionMode evaluationMode;
 
-    // 0~100 기준 충족도 점수
-    @Column(nullable = false)
-    private Integer score;
+    @Column(name = "score", nullable = false)
+    private int score;
 
-    // 약점 태그·해결 여부 판정에 실제 적용한 기준 점수. 평가 시점 값을 그대로 보존
-    @Column(nullable = false)
-    private Integer passThreshold;
+    @Column(name = "pass_threshold", nullable = false)
+    private int passThreshold;
 
-    // WEAKNESS_REVIEW 재평가는 null
+    @Column(name = "score_label", length = 100)
     private String scoreLabel;
 
-    // 8개 관점 또는 단일 targetDimension 점수·코멘트
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json")
-    private String evaluationDetail;
+    @Column(name = "evaluation_detail", columnDefinition = "json")
+    private Map<String, DimensionEvaluation> evaluationDetail;
 
-    // WEAKNESS_REVIEW 재평가 대상 태그
+    @Column(name = "target_weakness_tag", length = 100)
     private String targetWeaknessTag;
 
-    // WEAKNESS_REVIEW 재평가 단일 관점
+    @Column(name = "target_dimension", length = 50)
     private String targetDimension;
 
-    // JSON. COMPANY_FIT의 답변형 약점 태그. BASIC=[]·WEAKNESS_REVIEW=null
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json")
-    private String weaknessTags;
+    @Column(name = "weakness_tags", columnDefinition = "json")
+    private List<String> weaknessTags;
 
-    // 평가 요약 또는 단일 관점 코멘트
     @Lob
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
 
-    // JSON. 답변 보완 방향. 기본값 []
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String improvementDirection;
+    @Column(
+            name = "improvement_direction",
+            nullable = false,
+            columnDefinition = "json"
+    )
+    private List<String> improvementDirection;
 
-    // 성공한 호출 로그
-    @Column(nullable = false)
-    private Long aiCallLogId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ai_call_log_id", nullable = false)
+    private AiCallLog aiCallLog;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Builder
-    private AnswerEvaluation(
-            Long answerMessageId,
-            Long sessionQuestionId,
-            AnswerEvaluationMode evaluationMode,
-            Integer score,
-            Integer passThreshold,
+    public static AnswerEvaluation create(
+            InterviewMessage answerMessage,
+            InterviewSessionQuestion sessionQuestion,
+            InterviewSessionMode mode,
+            int score,
+            int passThreshold,
             String scoreLabel,
-            String evaluationDetail,
+            Map<String, DimensionEvaluation> evaluationDetail,
             String targetWeaknessTag,
             String targetDimension,
-            String weaknessTags,
+            List<String> weaknessTags,
             String summary,
-            String improvementDirection,
-            Long aiCallLogId
+            List<String> improvementDirection,
+            AiCallLog aiCallLog
     ) {
-        this.answerMessageId = answerMessageId;
-        this.sessionQuestionId = sessionQuestionId;
-        this.evaluationMode = evaluationMode;
-        this.score = score;
-        this.passThreshold = passThreshold;
-        this.scoreLabel = scoreLabel;
-        this.evaluationDetail = evaluationDetail;
-        this.targetWeaknessTag = targetWeaknessTag;
-        this.targetDimension = targetDimension;
-        this.weaknessTags = weaknessTags;
-        this.summary = summary;
-        this.improvementDirection = improvementDirection == null ? "[]" : improvementDirection;
-        this.aiCallLogId = aiCallLogId;
+        AnswerEvaluation evaluation = new AnswerEvaluation();
 
-        this.createdAt = LocalDateTime.now();
+        evaluation.answerMessage = answerMessage;
+        evaluation.sessionQuestion = sessionQuestion;
+        evaluation.evaluationMode = mode;
+        evaluation.score = score;
+        evaluation.passThreshold = passThreshold;
+        evaluation.scoreLabel = scoreLabel;
+        evaluation.evaluationDetail = evaluationDetail == null
+                ? Map.of()
+                : Map.copyOf(evaluationDetail);
+        evaluation.targetWeaknessTag = targetWeaknessTag;
+        evaluation.targetDimension = targetDimension;
+        evaluation.weaknessTags = weaknessTags == null
+                ? List.of()
+                : List.copyOf(weaknessTags);
+        evaluation.summary = summary;
+        evaluation.improvementDirection = improvementDirection == null
+                ? List.of()
+                : List.copyOf(improvementDirection);
+        evaluation.aiCallLog = aiCallLog;
+
+        return evaluation;
     }
 
-    // score >= passThreshold이면 통과
+    // 기존 면접·평가 코드에서 사용
+    public boolean passed() {
+        return score >= passThreshold;
+    }
+
+    // develop의 최종 리포트 코드와 이름을 맞추기 위한 호환 메서드
     public boolean isPassed() {
-        return score != null && passThreshold != null && score >= passThreshold;
+        return passed();
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DimensionEvaluation {
+
+        private Integer score;
+        private String comment;
     }
 }

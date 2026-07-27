@@ -1,10 +1,27 @@
 package com.example.jobpuzzle.interview.dto;
 
+import com.example.jobpuzzle.interview.entity.InterviewQuestion;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
-@NoArgsConstructor
+@Builder
 public class QuestionListResponse {
-    // TODO: 클래스 정의서 기준으로 필드 추가
+    private Long questionId;
+    private String questionType;
+    private String question;
+    private String relatedRequirementId;
+    private String reviewStatus;
+    private int displayOrder;
+
+    public static QuestionListResponse from(InterviewQuestion value) {
+        return QuestionListResponse.builder()
+                .questionId(value.getQuestionId())
+                .questionType(value.getQuestionType().name())
+                .question(value.getQuestion())
+                .relatedRequirementId(value.getRelatedRequirementId())
+                .reviewStatus(value.getReviewStatus().name())
+                .displayOrder(value.getDisplayOrder())
+                .build();
+    }
 }

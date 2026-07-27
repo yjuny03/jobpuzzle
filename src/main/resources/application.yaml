@@ -4,10 +4,9 @@ spring:
   application:
     name: jobpuzzle
   datasource:
-    url: jdbc:mariadb://localhost:3306/jobpuzzle
-    # 아이디/비밀번호는 application-local.yaml
-    username:
-    password:
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/jobpuzzle}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.mariadb.jdbc.Driver
   jpa:
     hibernate:
@@ -22,8 +21,8 @@ spring:
         registration:
           #카카오 API KEY
           kakao:
-            client-id:
-            client-secret:
+            client-id: ${KAKAO_CLIENT_ID:}
+            client-secret: ${KAKAO_CLIENT_SECRET:}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
@@ -32,6 +31,8 @@ spring:
               - account_email
             client-name: Kakao
           google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
             scope:
               - profile
               - email
@@ -44,14 +45,14 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
+      max-file-size: 15MB
       max-request-size: 20MB
 
   mail:
     host: smtp.naver.com
     port: 465
-    username:
-    password:
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -84,11 +85,6 @@ app:
 
   ai:
     running-timeout-seconds: 600
-    provider: MOCK
-    anthropic:
-      api-key:
-      model: claude-sonnet-5
-      max-tokens: 8000
     # 생성 AI와 RAG embedding은 역할·비용·장애 계약이 달라 별도 설정으로 유지한다.
     generation:
       # 운영 기본은 모든 생성 stage가 같은 provider를 사용한다. stage override는 ai-e2e profile에서만 둔다.
@@ -103,6 +99,11 @@ app:
           json-01: ${ANTHROPIC_JSON01_MAX_OUTPUT_TOKENS:4096}
           json-02: ${ANTHROPIC_JSON02_MAX_OUTPUT_TOKENS:6144}
           json-05: ${ANTHROPIC_JSON05_MAX_OUTPUT_TOKENS:8192}
+          json-06: ${ANTHROPIC_JSON06_MAX_OUTPUT_TOKENS:4096}
+          json-07: ${ANTHROPIC_JSON07_MAX_OUTPUT_TOKENS:6144}
+          json-09: ${ANTHROPIC_JSON09_MAX_OUTPUT_TOKENS:6144}
+          json-10: ${ANTHROPIC_JSON10_MAX_OUTPUT_TOKENS:2048}
+          json-11: ${ANTHROPIC_JSON11_MAX_OUTPUT_TOKENS:4096}
       input-limits:
         # fixture 8·9 실측보다 충분히 큰 기본값이다. 초과 입력은 자동 축약하지 않고 Provider 호출 전에 실패한다.
         json-01-rendered-prompt-chars: ${AI_JSON01_RENDERED_PROMPT_CHARS:40000}
