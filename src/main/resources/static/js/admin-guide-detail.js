@@ -88,6 +88,7 @@
       detailListField('질문 방향', g.questionDirection) +
       detailListField('피해야 할 질문', g.avoidQuestions) +
       detailField('자료 유형', esc(g.sourceType) + (g.hasFile ? ' (첨부파일 있음)' : '')) +
+      detailField('청크', g.chunkCount + '개') +
       detailField('등록자 / 등록일', esc(g.createdByLoginId) + ' / ' + (g.createdAt || '').slice(0, 10));
 
     renderActions(g);
@@ -149,7 +150,9 @@
   }
 
   function onSourceTypeChange() {
-    document.getElementById('gv-file-field').hidden = document.getElementById('gv-source-type').value !== 'PDF';
+    var isPdf = document.getElementById('gv-source-type').value === 'PDF';
+    document.getElementById('gv-file-field').hidden = !isPdf;
+    document.getElementById('gv-source-text-field').hidden = isPdf;
   }
 
   function openVersionForm(g) {
@@ -169,6 +172,7 @@
     document.getElementById('gv-avoid-questions').value = listToLines(g.avoidQuestions);
     document.getElementById('gv-source-type').value = g.sourceType === 'PDF' ? 'PDF' : 'DIRECT_INPUT';
     document.getElementById('gv-file').value = '';
+    document.getElementById('gv-source-text').value = '';
     onScopeTypeChange();
     onSourceTypeChange();
     document.getElementById('guide-version-form').hidden = false;
@@ -191,7 +195,8 @@
       evidenceRules: linesToList('gv-evidence-rules'),
       questionDirection: linesToList('gv-question-direction'),
       avoidQuestions: linesToList('gv-avoid-questions'),
-      sourceType: document.getElementById('gv-source-type').value
+      sourceType: document.getElementById('gv-source-type').value,
+      sourceText: document.getElementById('gv-source-text').value.trim()
     };
 
     if (!request.title || !request.applicableScope) {

@@ -42,4 +42,7 @@ public class AdminGuideCreateRequest {
 
     @NotNull(message = "자료 유형을 선택해주세요.")
     private JobGuideDocumentSourceType sourceType;
+
+    // sourceType=DIRECT_INPUT일 때 청크 분할 대상이 되는 원문 (PDF는 파일에서 자동 추출)
+    private String sourceText;
 }

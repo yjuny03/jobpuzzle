@@ -86,7 +86,9 @@
   }
 
   function onSourceTypeChange() {
-    document.getElementById('guide-file-field').hidden = document.getElementById('guide-source-type').value !== 'PDF';
+    var isPdf = document.getElementById('guide-source-type').value === 'PDF';
+    document.getElementById('guide-file-field').hidden = !isPdf;
+    document.getElementById('guide-source-text-field').hidden = isPdf;
   }
 
   function openForm() {
@@ -101,6 +103,7 @@
     document.getElementById('guide-avoid-questions').value = '';
     document.getElementById('guide-source-type').value = 'DIRECT_INPUT';
     document.getElementById('guide-file').value = '';
+    document.getElementById('guide-source-text').value = '';
     onScopeTypeChange();
     onSourceTypeChange();
     document.getElementById('guide-form').hidden = false;
@@ -123,7 +126,8 @@
       evidenceRules: linesToList('guide-evidence-rules'),
       questionDirection: linesToList('guide-question-direction'),
       avoidQuestions: linesToList('guide-avoid-questions'),
-      sourceType: document.getElementById('guide-source-type').value
+      sourceType: document.getElementById('guide-source-type').value,
+      sourceText: document.getElementById('guide-source-text').value.trim()
     };
 
     if (!request.guideCode || !request.title || !request.applicableScope) {

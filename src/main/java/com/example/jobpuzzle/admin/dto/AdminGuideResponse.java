@@ -33,6 +33,7 @@ public class AdminGuideResponse {
     private final List<String> avoidQuestions;
     private final String createdByLoginId;
     private final LocalDateTime createdAt;
+    private final long chunkCount;
 
     private AdminGuideResponse(
             Long guideId, Long previousGuideId, String guideCode, String title, GuideScopeType scopeType,
@@ -40,7 +41,7 @@ public class AdminGuideResponse {
             JobGuideDocumentStatus status, String version, JobGuideDocumentSourceType sourceType, boolean hasFile,
             String applicableScope, List<String> evaluationFocus, List<String> evidenceRules,
             List<String> questionDirection, List<String> avoidQuestions,
-            String createdByLoginId, LocalDateTime createdAt
+            String createdByLoginId, LocalDateTime createdAt, long chunkCount
     ) {
         this.guideId = guideId;
         this.previousGuideId = previousGuideId;
@@ -62,9 +63,10 @@ public class AdminGuideResponse {
         this.avoidQuestions = avoidQuestions;
         this.createdByLoginId = createdByLoginId;
         this.createdAt = createdAt;
+        this.chunkCount = chunkCount;
     }
 
-    public static AdminGuideResponse from(JobGuideDocument guide) {
+    public static AdminGuideResponse from(JobGuideDocument guide, long chunkCount) {
         return new AdminGuideResponse(
                 guide.getGuideId(),
                 guide.getPreviousGuide() != null ? guide.getPreviousGuide().getGuideId() : null,
@@ -85,7 +87,8 @@ public class AdminGuideResponse {
                 guide.getQuestionDirection(),
                 guide.getAvoidQuestions(),
                 guide.getCreatedBy().getLoginId(),
-                guide.getCreatedAt()
+                guide.getCreatedAt(),
+                chunkCount
         );
     }
 }

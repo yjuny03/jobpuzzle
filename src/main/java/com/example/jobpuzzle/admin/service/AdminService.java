@@ -7,14 +7,21 @@ import com.example.jobpuzzle.admin.dto.AdminGuideUsageResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
+import com.example.jobpuzzle.admin.support.GuideTextChunker;
 import com.example.jobpuzzle.ai.log.AiCallLogRepository;
 import com.example.jobpuzzle.ai.log.AiCallLogStatus;
+import com.example.jobpuzzle.document.extraction.PdfExtractionResult;
+import com.example.jobpuzzle.document.extraction.PdfPageResult;
+import com.example.jobpuzzle.document.extraction.PdfTextExtractor;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.entity.JobGuideChunk;
 import com.example.jobpuzzle.guide.entity.JobGuideDocument;
+import com.example.jobpuzzle.guide.entity.JobGuideDocumentSourceType;
 import com.example.jobpuzzle.guide.entity.JobGuideDocumentStatus;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
+import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
@@ -31,6 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,6 +56,8 @@ public class AdminService {
     private final GuideContextResultRepository guideContextResultRepository;
     private final AiCallLogRepository aiCallLogRepository;
     private final JobGuideDocumentRepository jobGuideDocumentRepository;
+    private final JobGuideChunkRepository jobGuideChunkRepository;
+    private final PdfTextExtractor pdfTextExtractor;
 
     @Value("${app.storage.local.base-dir}")
     private String storageBaseDir;
@@ -112,15 +122,20 @@ public class AdminService {
     // 가이드 목록 조회
     public List<AdminGuideResponse> getGuides() {
         return jobGuideDocumentRepository.findAll().stream()
-                .map(AdminGuideResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     // 가이드 단건 조회
     public AdminGuideResponse getGuide(Long guideId) {
-        return jobGuideDocumentRepository.findById(guideId)
-                .map(AdminGuideResponse::from)
+        JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+        return toResponse(guide);
+    }
+
+    private AdminGuideResponse toResponse(JobGuideDocument guide) {
+        long chunkCount = jobGuideChunkRepository.countByGuide_GuideId(guide.getGuideId());
+        return AdminGuideResponse.from(guide, chunkCount);
     }
 
     // 가이드 등록 - file은 sourceType=PDF일 때만 사용
@@ -132,8 +147,8 @@ public class AdminService {
         if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(request.getGuideCode(), version)) {
             throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
         }
-        JobGuideDocument guide = buildGuide(request, file, admin, request.getGuideCode(), version, null);
-        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+        JobGuideDocument guide = buildGuideAndChunks(request, file, admin, request.getGuideCode(), version, null);
+        return toResponse(guide);
     }
 
     // 가이드 새 버전 생성 - guideCode는 이전 버전에서 상속하고 버전만 자동 증가
@@ -146,11 +161,12 @@ public class AdminService {
             throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
         }
 
-        JobGuideDocument guide = buildGuide(request, file, admin, previous.getGuideCode(), nextVersion, previous);
-        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+        JobGuideDocument guide = buildGuideAndChunks(request, file, admin, previous.getGuideCode(), nextVersion, previous);
+        return toResponse(guide);
     }
 
-    private JobGuideDocument buildGuide(
+    // 가이드 저장 + (원문이 있으면) 텍스트 추출과 청크 분할까지 한 트랜잭션으로 처리
+    private JobGuideDocument buildGuideAndChunks(
             AdminGuideCreateRequest request, MultipartFile file, User admin,
             String guideCode, String version, JobGuideDocument previousGuide
     ) {
@@ -159,9 +175,9 @@ public class AdminService {
                         .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND))
                 : null;
 
-        String filePath = (file != null && !file.isEmpty()) ? storeGuideFile(file) : null;
+        GuideSourceMaterial source = resolveSourceMaterial(request, file);
 
-        return JobGuideDocument.builder()
+        JobGuideDocument guide = JobGuideDocument.builder()
                 .guideCode(guideCode)
                 .previousGuide(previousGuide)
                 .scopeType(request.getScopeType())
@@ -169,7 +185,7 @@ public class AdminService {
                 .scopeMainCategory(request.getScopeMainCategory())
                 .title(request.getTitle())
                 .sourceType(request.getSourceType())
-                .filePath(filePath)
+                .filePath(source.filePath())
                 .version(version)
                 .createdBy(admin)
                 .applicableScope(request.getApplicableScope())
@@ -178,6 +194,58 @@ public class AdminService {
                 .questionDirection(request.getQuestionDirection())
                 .avoidQuestions(request.getAvoidQuestions())
                 .build();
+        jobGuideDocumentRepository.save(guide);
+
+        saveChunks(guide, source.text());
+        return guide;
+    }
+
+    // PDF면 파일을 저장하고 그 자리에서 텍스트를 추출, 직접입력이면 입력받은 원문을 그대로 사용
+    private GuideSourceMaterial resolveSourceMaterial(AdminGuideCreateRequest request, MultipartFile file) {
+        if (request.getSourceType() == JobGuideDocumentSourceType.PDF && file != null && !file.isEmpty()) {
+            byte[] bytes = readBytes(file);
+            String filePath = storeGuideFile(bytes, file.getOriginalFilename());
+            String extractedText = extractPdfText(bytes);
+            return new GuideSourceMaterial(filePath, extractedText);
+        }
+        return new GuideSourceMaterial(null, request.getSourceText());
+    }
+
+    private void saveChunks(JobGuideDocument guide, String text) {
+        List<String> pieces = GuideTextChunker.split(text);
+        if (pieces.isEmpty()) {
+            return;
+        }
+        List<JobGuideChunk> chunks = new java.util.ArrayList<>();
+        for (int index = 0; index < pieces.size(); index++) {
+            chunks.add(JobGuideChunk.builder()
+                    .guide(guide)
+                    .chunkIndex(index)
+                    .content(pieces.get(index))
+                    .build());
+        }
+        jobGuideChunkRepository.saveAll(chunks);
+    }
+
+    private String extractPdfText(byte[] bytes) {
+        PdfExtractionResult result = pdfTextExtractor.extract(new ByteArrayInputStream(bytes));
+        StringBuilder text = new StringBuilder();
+        for (PdfPageResult page : result.pages()) {
+            text.append('[').append(page.pageNumber()).append("페이지]\n");
+            text.append(page.text() == null ? "" : page.text()).append("\n\n");
+        }
+        return text.toString();
+    }
+
+    private byte[] readBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+    }
+
+    private record GuideSourceMaterial(String filePath, String text) {
     }
 
     // "v1.0" -> "v1.1" 처럼 minor 버전만 증가
@@ -206,7 +274,7 @@ public class AdminService {
 
         conflicts.forEach(JobGuideDocument::deactivate);
         guide.activate();
-        return AdminGuideResponse.from(guide);
+        return toResponse(guide);
     }
 
     // 가이드 비활성화
@@ -214,7 +282,7 @@ public class AdminService {
         JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
         guide.deactivate();
-        return AdminGuideResponse.from(guide);
+        return toResponse(guide);
     }
 
     // 같은 검색 범위(scope)에서 이 가이드를 제외하고 이미 ACTIVE인 가이드를 찾는다
@@ -236,15 +304,15 @@ public class AdminService {
         return found.stream().filter(g -> !g.getGuideId().equals(guide.getGuideId())).toList();
     }
 
-    private String storeGuideFile(MultipartFile file) {
+    private String storeGuideFile(byte[] bytes, String originalFileName) {
         Path baseDir = Paths.get(storageBaseDir).toAbsolutePath().normalize().resolve("guides");
-        String extension = extractExtension(file.getOriginalFilename());
+        String extension = extractExtension(originalFileName);
         String relativePath = "guides/" + UUID.randomUUID() + extension;
         Path targetPath = baseDir.resolve(relativePath.substring("guides/".length()));
 
         try {
             Files.createDirectories(baseDir);
-            file.transferTo(targetPath);
+            Files.write(targetPath, bytes);
         } catch (IOException e) {
             throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
         }
