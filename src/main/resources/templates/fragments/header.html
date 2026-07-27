@@ -15,14 +15,13 @@
 
       <nav class="site-header__nav">
         <a href="/dashboard.html" th:href="@{/dashboard.html}">대시보드</a>
-        <a href="/my-data.html" th:href="@{/my-data.html}">내 자료</a>
-        <a href="/job-analysis.html" th:href="@{/job-analysis.html}">공고 분석</a>
+        <a href="/my-data.html" th:href="@{/my-data.html}">자료 관리</a>
         <a href="/interview.html" th:href="@{/interview.html}">면접 준비</a>
         <a href="/reports.html" th:href="@{/reports.html}">리포트</a>
       </nav>
 
       <div class="site-header__actions">
-        <div class="auth-guest" id="auth-guest">
+        <div class="auth-guest" id="auth-guest" hidden>
           <a class="btn btn--ghost" href="/login" th:href="@{/login}">로그인</a>
           <a class="btn btn--primary" href="/join" th:href="@{/join}">회원가입</a>
         </div>
@@ -84,13 +83,7 @@
           href="/my-data.html"
           th:href="@{/my-data.html}"
           th:classappend="${activePage == 'mydata'} ? 'is-active' : ''"
-          >지원 자료</a
-        >
-        <a
-          href="/job-analysis.html"
-          th:href="@{/job-analysis.html}"
-          th:classappend="${activePage == 'jobanalysis'} ? 'is-active' : ''"
-          >회사 자료</a
+          >자료 관리</a
         >
         <a
           href="/interview.html"

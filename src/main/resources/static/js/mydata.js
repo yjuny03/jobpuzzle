@@ -18,6 +18,7 @@
     selectedDocumentId: null,
     registerCategory: null,
     registerMethod: 'file',
+    registerFiles: [],
     scaleAction: null,
     scaleScale: 'minor',
     deleteDocId: null
@@ -177,7 +178,8 @@
     renderRegisterCategoryGrid();
     document.getElementById('register-name').value = '';
     document.getElementById('register-file').value = '';
-    document.getElementById('register-file-list').textContent = '';
+    state.registerFiles = [];
+    renderRegisterFileList();
     document.getElementById('register-content').value = '';
     document.getElementById('register-keep-original').checked = false;
     document.querySelectorAll('#register-modal [data-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.method === 'file'); });
@@ -213,12 +215,32 @@
     }
   }
 
+  // 선택할 때마다 누적되는 파일 목록을 칩 형태로 그려주고, 칩의 × 버튼으로 개별 삭제
+  function renderRegisterFileList() {
+    var listEl = document.getElementById('register-file-list');
+    listEl.innerHTML = state.registerFiles.map(function (f, idx) {
+      return '<span class="file-chip">' + esc(f.name) +
+        '<button type="button" class="file-chip__remove" data-remove-file="' + idx + '">&times;</button></span>';
+    }).join('');
+    listEl.querySelectorAll('[data-remove-file]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.registerFiles.splice(parseInt(btn.dataset.removeFile, 10), 1);
+        renderRegisterFileList();
+      });
+    });
+  }
+
   function bindRegisterModal() {
     document.getElementById('open-register').addEventListener('click', openRegisterModal);
     document.getElementById('register-close').addEventListener('click', function () { document.getElementById('register-modal').hidden = true; });
     document.getElementById('register-cancel').addEventListener('click', function () { document.getElementById('register-modal').hidden = true; });
+    document.getElementById('register-file-add').addEventListener('click', function () {
+      document.getElementById('register-file').click();
+    });
     document.getElementById('register-file').addEventListener('change', function () {
-      document.getElementById('register-file-list').textContent = DF.describeSelectedFiles(this.files);
+      state.registerFiles = state.registerFiles.concat(Array.prototype.slice.call(this.files));
+      this.value = '';
+      renderRegisterFileList();
     });
     document.querySelectorAll('#register-modal [data-method]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -235,7 +257,7 @@
       if (!category || !name) { alert('자료 종류와 자료명을 입력해주세요.'); return; }
 
       if (state.registerMethod === 'file') {
-        var files = document.getElementById('register-file').files;
+        var files = state.registerFiles;
         if (!files.length) { alert('파일을 선택해주세요.'); return; }
         var keepOriginal = document.getElementById('register-keep-original').checked;
         DF.registerDocument({ method: 'file', category: category, name: name, files: files, keepOriginal: keepOriginal })
