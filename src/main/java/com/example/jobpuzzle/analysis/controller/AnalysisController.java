@@ -10,7 +10,7 @@ import com.example.jobpuzzle.analysis.service.AnalysisService;
 import com.example.jobpuzzle.analysis.service.AnalysisStatusQueryService;
 import com.example.jobpuzzle.analysis.service.CompanyFitQuestionSetQueryService;
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,23 +27,23 @@ public class AnalysisController {
     private final CompanyFitQuestionSetQueryService questionSetQueryService;
 
     @PostMapping("/cases/{analysisCaseId}/run")
-    public ResponseEntity<ApiResponse<AnalysisCaseResponse>> run(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails user) {
-        analysisService.runCustomizedAnalysis(user.getUser().getUserId(), analysisCaseId);
-        return ResponseEntity.ok(ApiResponse.success(analysisCaseService.getCase(user.getUser().getUserId(), analysisCaseId)));
+    public ResponseEntity<ApiResponse<AnalysisCaseResponse>> run(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
+        analysisService.runCustomizedAnalysis(user.getUserId(), analysisCaseId);
+        return ResponseEntity.ok(ApiResponse.success(analysisCaseService.getCase(user.getUserId(), analysisCaseId)));
     }
 
     @GetMapping("/cases/{analysisCaseId}/result")
-    public ResponseEntity<ApiResponse<AnalysisResultResponse>> result(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(ApiResponse.success(queryService.getResult(user.getUser().getUserId(), analysisCaseId)));
+    public ResponseEntity<ApiResponse<AnalysisResultResponse>> result(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
+        return ResponseEntity.ok(ApiResponse.success(queryService.getResult(user.getUserId(), analysisCaseId)));
     }
 
     @GetMapping("/cases/{analysisCaseId}/status")
-    public ResponseEntity<ApiResponse<AnalysisStatusResponse>> status(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(ApiResponse.success(statusQueryService.getStatus(user.getUser().getUserId(), analysisCaseId)));
+    public ResponseEntity<ApiResponse<AnalysisStatusResponse>> status(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
+        return ResponseEntity.ok(ApiResponse.success(statusQueryService.getStatus(user.getUserId(), analysisCaseId)));
     }
 
     @GetMapping("/cases/{analysisCaseId}/question-set")
-    public ResponseEntity<ApiResponse<CompanyFitQuestionSetResponse>> questionSet(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(ApiResponse.success(questionSetQueryService.getCompanyFitQuestionSet(user.getUser().getUserId(), analysisCaseId)));
+    public ResponseEntity<ApiResponse<CompanyFitQuestionSetResponse>> questionSet(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
+        return ResponseEntity.ok(ApiResponse.success(questionSetQueryService.getCompanyFitQuestionSet(user.getUserId(), analysisCaseId)));
     }
 }

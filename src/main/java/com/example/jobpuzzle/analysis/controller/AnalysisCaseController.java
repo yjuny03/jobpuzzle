@@ -9,7 +9,7 @@ import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.service.AnalysisCaseService;
 import com.example.jobpuzzle.analysis.rag.service.AnalysisVectorIndexService;
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,10 +34,10 @@ public class AnalysisCaseController {
     @PostMapping("/api/analysis-cases")
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> createCase(
             @RequestBody(required = false) AnalysisCaseCreateRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisCaseResponse response = analysisCaseService.createCase(
-                userDetails.getUser().getUserId(),
+                user.getUserId(),
                 request != null ? request : new AnalysisCaseCreateRequest()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
@@ -48,10 +48,10 @@ public class AnalysisCaseController {
     @GetMapping("/api/analysis-cases/{analysisCaseId}")
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> getCase(
             @PathVariable Long analysisCaseId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisCaseResponse response =
-                analysisCaseService.getCase(userDetails.getUser().getUserId(), analysisCaseId);
+                analysisCaseService.getCase(user.getUserId(), analysisCaseId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -61,10 +61,10 @@ public class AnalysisCaseController {
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> changeJobCategory(
             @PathVariable Long analysisCaseId,
             @RequestBody AnalysisCaseJobCategoryUpdateRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisCaseResponse response = analysisCaseService.changeJobCategory(
-                userDetails.getUser().getUserId(), analysisCaseId, request
+                user.getUserId(), analysisCaseId, request
         );
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -75,10 +75,10 @@ public class AnalysisCaseController {
     public ResponseEntity<ApiResponse<AnalysisCaseSourceResponse>> addSource(
             @PathVariable Long analysisCaseId,
             @RequestBody AnalysisCaseSourceAddRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisCaseSourceResponse response = analysisCaseService.addSource(
-                userDetails.getUser().getUserId(), analysisCaseId, request
+                user.getUserId(), analysisCaseId, request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
@@ -89,10 +89,10 @@ public class AnalysisCaseController {
     public ResponseEntity<Void> removeSource(
             @PathVariable Long analysisCaseId,
             @PathVariable Long analysisCaseSourceId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         analysisCaseService.removeSource(
-                userDetails.getUser().getUserId(), analysisCaseId, analysisCaseSourceId
+                user.getUserId(), analysisCaseId, analysisCaseSourceId
         );
         return ResponseEntity.noContent().build();
     }
@@ -102,16 +102,16 @@ public class AnalysisCaseController {
     @PostMapping("/api/analysis-cases/{analysisCaseId}/confirm")
     public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> confirmInput(
             @PathVariable Long analysisCaseId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisInputSnapshotResponse response =
-                analysisCaseService.confirmInput(userDetails.getUser().getUserId(), analysisCaseId);
+                analysisCaseService.confirmInput(user.getUserId(), analysisCaseId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
     @PostMapping("/api/analysis-cases/{analysisCaseId}/index")
-    public ResponseEntity<ApiResponse<Void>> index(@PathVariable Long analysisCaseId, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        vectorIndexService.index(userDetails.getUser().getUserId(), analysisCaseId);
+    public ResponseEntity<ApiResponse<Void>> index(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
+        vectorIndexService.index(user.getUserId(), analysisCaseId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -120,10 +120,10 @@ public class AnalysisCaseController {
     @GetMapping("/api/analysis-cases/{analysisCaseId}/snapshot")
     public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> getSnapshot(
             @PathVariable Long analysisCaseId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         AnalysisInputSnapshotResponse response =
-                analysisCaseService.getSnapshot(userDetails.getUser().getUserId(), analysisCaseId);
+                analysisCaseService.getSnapshot(user.getUserId(), analysisCaseId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

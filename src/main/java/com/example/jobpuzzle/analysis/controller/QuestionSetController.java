@@ -5,7 +5,7 @@ import com.example.jobpuzzle.analysis.dto.QuestionSetResponse;
 import com.example.jobpuzzle.analysis.dto.WeaknessQuestionRequest;
 import com.example.jobpuzzle.analysis.service.QuestionGenerationService;
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.interview.dto.QuestionListResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,12 +25,12 @@ public class QuestionSetController {
 
     @PostMapping("/basic")
     public ResponseEntity<ApiResponse<QuestionSetResponse>> generateBasic(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @Valid @RequestBody BasicQuestionRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 questionGenerationService.generateBasicQuestionSet(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         request
                 )
         ));
@@ -38,12 +38,12 @@ public class QuestionSetController {
 
     @PostMapping("/weakness")
     public ResponseEntity<ApiResponse<QuestionSetResponse>> generateWeakness(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @Valid @RequestBody WeaknessQuestionRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 questionGenerationService.generateWeaknessQuestionSet(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         request
                 )
         ));
@@ -51,12 +51,12 @@ public class QuestionSetController {
 
     @GetMapping("/{questionSetId}")
     public ResponseEntity<ApiResponse<QuestionSetResponse>> getQuestionSet(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long questionSetId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 questionGenerationService.getQuestionSet(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         questionSetId
                 )
         ));
@@ -64,12 +64,12 @@ public class QuestionSetController {
 
     @GetMapping("/{questionSetId}/questions")
     public ResponseEntity<ApiResponse<List<QuestionListResponse>>> getQuestions(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long questionSetId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 questionGenerationService.getQuestionList(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         questionSetId
                 )
         ));

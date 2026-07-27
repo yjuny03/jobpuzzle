@@ -14,7 +14,7 @@ import com.example.jobpuzzle.document.service.DocumentExtractionService;
 import com.example.jobpuzzle.document.service.DocumentService;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -50,10 +50,10 @@ public class DocumentController {
             @RequestParam("documentType") UserDocumentType documentType,
             @RequestParam("displayName") String displayName,
             @RequestParam(value = "keepOriginal", defaultValue = "false") boolean keepOriginal,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         DocumentUploadRequest request = new DocumentUploadRequest(documentType, files, displayName, keepOriginal);
-        DocumentResponse response = documentService.uploadDocument(userDetails.getUser().getUserId(), request);
+        DocumentResponse response = documentService.uploadDocument(user.getUserId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
@@ -62,10 +62,10 @@ public class DocumentController {
     @PostMapping("/api/documents/text")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> registerTextDocument(
             @Valid @RequestBody DirectDocumentRegisterRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         ExtractionVersionResponse response =
-                documentService.registerTextDocument(userDetails.getUser().getUserId(), request);
+                documentService.registerTextDocument(user.getUserId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
@@ -74,10 +74,10 @@ public class DocumentController {
     @PostMapping("/api/documents/{documentId}/extractions")
     public ResponseEntity<ApiResponse<ExtractionJobResponse>> extractDocumentText(
             @PathVariable Long documentId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         ExtractionJobResponse response =
-                documentExtractionService.extractDocumentText(userDetails.getUser().getUserId(), documentId);
+                documentExtractionService.extractDocumentText(user.getUserId(), documentId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success(response));
     }
 
@@ -87,10 +87,10 @@ public class DocumentController {
     public ResponseEntity<ApiResponse<PageResponse<DocumentListResponse>>> getDocumentList(
             @RequestParam(required = false) UserDocumentType documentType,
             Pageable pageable,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         PageResponse<DocumentListResponse> response =
-                documentService.getDocumentList(userDetails.getUser().getUserId(), documentType, pageable);
+                documentService.getDocumentList(user.getUserId(), documentType, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -99,10 +99,10 @@ public class DocumentController {
     @GetMapping("/api/documents/{documentId}")
     public ResponseEntity<ApiResponse<DocumentDetailResponse>> getDocumentDetail(
             @PathVariable Long documentId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         DocumentDetailResponse response =
-                documentService.getDocumentDetail(userDetails.getUser().getUserId(), documentId);
+                documentService.getDocumentDetail(user.getUserId(), documentId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -111,10 +111,10 @@ public class DocumentController {
     @GetMapping("/api/documents/{documentId}/extractions")
     public ResponseEntity<ApiResponse<List<ExtractionVersionResponse>>> getDocumentVersions(
             @PathVariable Long documentId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         List<ExtractionVersionResponse> response =
-                documentExtractionService.getDocumentVersions(userDetails.getUser().getUserId(), documentId);
+                documentExtractionService.getDocumentVersions(user.getUserId(), documentId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -124,9 +124,9 @@ public class DocumentController {
     public ResponseEntity<ApiResponse<Void>> updateOriginalFileRetention(
             @PathVariable Long documentId,
             @RequestBody OriginalFileRetentionRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
-        documentService.updateOriginalFileRetention(userDetails.getUser().getUserId(), documentId, request.isKeepOriginal());
+        documentService.updateOriginalFileRetention(user.getUserId(), documentId, request.isKeepOriginal());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -135,9 +135,9 @@ public class DocumentController {
     @DeleteMapping("/api/documents/{documentId}")
     public ResponseEntity<Void> deleteDocument(
             @PathVariable Long documentId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
-        documentService.deleteDocument(userDetails.getUser().getUserId(), documentId);
+        documentService.deleteDocument(user.getUserId(), documentId);
         return ResponseEntity.noContent().build();
     }
 
@@ -146,10 +146,10 @@ public class DocumentController {
     @GetMapping("/api/document-extractions/{extractionId}")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> getExtractionVersion(
             @PathVariable Long extractionId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         ExtractionVersionResponse response =
-                documentExtractionService.getExtractionVersion(userDetails.getUser().getUserId(), extractionId);
+                documentExtractionService.getExtractionVersion(user.getUserId(), extractionId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -159,10 +159,10 @@ public class DocumentController {
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> saveEditedVersion(
             @PathVariable Long baseExtractionId,
             @Valid @RequestBody ExtractionEditRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         ExtractionVersionResponse response = documentExtractionService.saveEditedVersion(
-                userDetails.getUser().getUserId(), baseExtractionId, request
+                user.getUserId(), baseExtractionId, request
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
@@ -172,10 +172,10 @@ public class DocumentController {
     @PostMapping("/api/document-extractions/{extractionId}/confirm")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> confirmExtraction(
             @PathVariable Long extractionId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal(expression = "user") User user
     ) {
         ExtractionVersionResponse response =
-                documentExtractionService.confirmExtraction(userDetails.getUser().getUserId(), extractionId);
+                documentExtractionService.confirmExtraction(user.getUserId(), extractionId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

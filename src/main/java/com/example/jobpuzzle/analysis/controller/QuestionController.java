@@ -2,7 +2,7 @@ package com.example.jobpuzzle.analysis.controller;
 
 import com.example.jobpuzzle.analysis.service.QuestionGenerationService;
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.interview.dto.QuestionHintResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +18,12 @@ public class QuestionController {
 
     @GetMapping("/{questionId}/hint")
     public ResponseEntity<ApiResponse<QuestionHintResponse>> getHint(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long questionId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 questionGenerationService.getQuestionHint(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         questionId
                 )
         ));

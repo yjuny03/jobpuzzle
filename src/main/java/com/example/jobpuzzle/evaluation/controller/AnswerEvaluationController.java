@@ -3,7 +3,7 @@ package com.example.jobpuzzle.evaluation.controller;
 import com.example.jobpuzzle.evaluation.dto.AnswerEvaluationResponse;
 import com.example.jobpuzzle.evaluation.service.AnswerEvaluationService;
 import com.example.jobpuzzle.global.common.ApiResponse;
-import com.example.jobpuzzle.global.security.CustomUserDetails;
+import com.example.jobpuzzle.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,12 +18,12 @@ public class AnswerEvaluationController {
 
     @GetMapping("/{evaluationId}")
     public ResponseEntity<ApiResponse<AnswerEvaluationResponse>> getEvaluation(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long evaluationId
     ) {
         return ResponseEntity.ok(ApiResponse.success(AnswerEvaluationResponse.from(
                 answerEvaluationService.getEvaluation(
-                        user.getUser().getUserId(),
+                        user.getUserId(),
                         evaluationId
                 )
         )));
