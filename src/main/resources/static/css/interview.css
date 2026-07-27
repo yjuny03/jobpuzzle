@@ -59,8 +59,8 @@
 
 .material-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 24px;
   align-items: start;
 }
 @media (max-width: 800px) {
@@ -68,9 +68,15 @@
 }
 .material-category {
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #fff;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.material-category:has(.material-doc-row.is-checked) {
+  border-color: #9ec7e7;
+  box-shadow: 0 8px 24px rgba(30, 102, 160, .08);
 }
 .material-doc-row {
   display: flex;
@@ -97,6 +103,15 @@
 .material-doc-row.is-checked .material-checkbox {
   border-color: var(--color-primary);
   background: var(--color-primary);
+}
+.material-doc-row.is-checked .material-checkbox::after {
+  content: "✓";
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 12px;
 }
 .material-register-btn {
   font-size: 11.5px;
@@ -288,6 +303,85 @@
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 14px;
+}
+
+.active-analysis-section {
+  margin-top: 28px;
+  padding-top: 26px;
+  border-top: 1px solid #dce4ed;
+}
+.active-analysis-list { display:grid; gap:12px; }
+.active-analysis-card {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:18px;
+  padding:18px 20px;
+  border:1px solid #cfe0ef;
+  border-radius:16px;
+  background:linear-gradient(105deg,#f5faff,#fff);
+  box-shadow:0 10px 30px rgba(26,91,143,.07);
+}
+.active-analysis-card.is-failed { border-color:#edc8c2; background:#fff8f6; }
+.active-analysis-visual {
+  position:relative;
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  color:#1765a4;
+  background:#e5f2fc;
+  font-size:12px;
+  font-weight:900;
+}
+.active-analysis-visual i {
+  position:absolute;
+  inset:5px;
+  border:2px solid transparent;
+  border-top-color:#2678b7;
+  border-radius:50%;
+  animation:active-analysis-spin 2s linear infinite;
+}
+@keyframes active-analysis-spin { to { transform:rotate(360deg); } }
+.active-analysis-copy>span { color:#2474b1; font-size:10.5px; font-weight:800; letter-spacing:.4px; }
+.active-analysis-copy h3 { margin:4px 0; font-size:14px; }
+.active-analysis-copy p { margin:0 0 10px; color:#788595; font-size:11.5px; }
+.active-analysis-progress { height:5px; max-width:520px; overflow:hidden; border-radius:99px; background:#e8eef4; }
+.active-analysis-progress i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#1d66a4,#61b4e5); }
+@media(max-width:680px){
+  .active-analysis-card { grid-template-columns:auto 1fr; }
+  .active-analysis-card>a { grid-column:1/-1; text-align:center; }
+}
+
+#step-root > .material-select-card {
+  padding: 26px 28px 0;
+  overflow: hidden;
+}
+.material-select-card .material-columns > div:first-child,
+.material-select-card .material-columns > div:last-child {
+  min-width: 0;
+}
+.material-select-card > .flex-row:last-child {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin: 12px -28px 0 !important;
+  padding: 16px 28px;
+  border-top: 1px solid #e0e7ef;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 -10px 25px rgba(24,52,78,.06);
+  backdrop-filter: blur(10px);
+}
+.material-select-card #material-select-next {
+  min-width: 176px;
+  box-shadow: 0 8px 18px rgba(25,101,165,.18);
+}
+.material-job-note {
+  margin: 10px 0 0;
+  color: #66778a;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 /* 질문 선택은 면접 준비 화면의 맥락을 유지하는 모달로 표시한다. */

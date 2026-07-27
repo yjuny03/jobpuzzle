@@ -3,19 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>맞춤 분석 — JobPuzzle</title>
+  <title>맞춤 분석 | JobPuzzle</title>
   <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
   <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
   <link rel="stylesheet" href="/css/analysis.css" th:href="@{/css/analysis.css}">
 </head>
 <body>
 <div th:replace="~{fragments/header :: appHeader('interview')}"></div>
-<main class="app-shell"><div class="app-container">
-  <p class="eyebrow-label">면접 준비</p>
-  <h1 class="page-title">맞춤 분석 결과</h1>
-  <p class="page-subtitle">확정한 공고와 지원 자료를 바탕으로 한 읽기 전용 분석입니다.</p>
-  <div id="analysis-root" aria-live="polite"></div>
-</div></main>
+<main class="app-shell">
+  <div class="app-container analysis-page">
+    <div class="analysis-page__heading">
+      <div>
+        <p class="eyebrow-label">면접 준비</p>
+        <h1 class="page-title">회사 맞춤 분석</h1>
+        <p class="page-subtitle">공고의 요구사항과 내 경험을 연결해 면접에서 확인할 핵심을 찾습니다.</p>
+      </div>
+      <a class="analysis-back-link" href="/interview.html">면접 준비로 돌아가기</a>
+    </div>
+    <div id="analysis-root" aria-live="polite"></div>
+  </div>
+</main>
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>

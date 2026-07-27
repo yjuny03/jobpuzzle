@@ -1,63 +1,204 @@
-// analysis.js — 확정된 분석 작업의 실행 상태와 읽기 전용 결과 표시
 (function () {
   'use strict';
-  var root = document.getElementById('analysis-root');
-  var caseId = (location.pathname.match(/^\/analysis\/(\d+)$/) || [])[1];
-  var state = { disposed: false, statusLoading: false, running: false, resultLoaded: false, result: null, status: null, runError: null, controller: null };
-  var stageDefs = [
-    ['jobPostingAnalysisStatus', '채용공고 분석'], ['candidateMaterialAnalysisStatus', '지원자 자료 분석'],
-    ['guideContextStatus', '직무 가이드 적용'], ['customizedAnalysisStatus', '맞춤 분석 생성']
-  ];
-  var stageLabels = { NOT_STARTED: '분석 대기', RUNNING: '분석 중', SUCCEEDED: '분석 완료', FAILED: '분석 실패' };
-  var errorLabels = { ANALYSIS_002: '분석 작업을 찾을 수 없거나 접근 권한이 없습니다.', ANALYSIS_009: '분석을 시작할 준비가 아직 완료되지 않았습니다.', ANALYSIS_010: 'JSON-05 무결성 검증 실패', AI_001: '분석 결과를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.', AI_002: '현재 분석을 준비할 수 없습니다. 관리자에게 문의해주세요.' };
 
-  function el(tag, text, className) { var node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; }
-  function card(title) { var node = el('section', null, 'card card--pad-lg analysis-card'); node.appendChild(el('h2', title)); return node; }
-  function appendDetail(parent, label, value) { if (value == null || value === '' || (Array.isArray(value) && !value.length)) return; var box = el('div', null, 'analysis-detail'); box.appendChild(el('p', label, 'analysis-detail__label')); if (Array.isArray(value)) { var list = el('ul', null, 'analysis-list'); value.forEach(function (x) { if (x != null && x !== '') list.appendChild(el('li', typeof x === 'string' ? x : JSON.stringify(x))); }); box.appendChild(list); } else box.appendChild(el('p', String(value), 'analysis-detail__value')); parent.appendChild(box); }
-  function clear() { if (!state.disposed) root.replaceChildren(); }
-  function safeError(err) { if (err && err.name === 'AbortError') return ''; if (err && err.code && errorLabels[err.code]) return errorLabels[err.code]; if (err && err.status === 401) return '로그인 후 이용해주세요.'; if (err && err.status === 403) return '이 분석 결과에 접근할 권한이 없습니다.'; if (err && err.message) return err.message; return '네트워크 또는 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'; }
-  // 실행 API 오류를 코드·사용자용 라벨·서버 메시지로 분리해 상태 카드 아래에 표시한다.
-  function renderRunError(err) {
-    var box = el('div', null, 'analysis-message analysis-message--error');
-    appendDetail(box, '오류 코드', err && err.code ? err.code : '확인 불가');
-    appendDetail(box, '오류 유형', safeError(err));
-    appendDetail(box, '서버 메시지', err && err.message ? err.message : '서버에서 오류 메시지를 반환하지 않았습니다.');
-    return box;
+  var root = document.getElementById('analysis-root');
+  var caseId = Number((location.pathname.match(/^\/analysis\/(\d+)$/) || [])[1]);
+  var running = false;
+  var stageTimer = null;
+  var visualStage = 0;
+  var stageDefinitions = [
+    { key: 'jobPostingAnalysisStatus', title: '채용공고 이해', copy: '업무와 필수·우대 요건을 구조화합니다.' },
+    { key: 'candidateMaterialAnalysisStatus', title: '지원자 경험 정리', copy: '이력과 프로젝트에서 답변 근거를 찾습니다.' },
+    { key: 'guideContextStatus', title: '직무 기준 적용', copy: '선택한 직무와 경력에 맞는 기준을 적용합니다.' },
+    { key: 'customizedAnalysisStatus', title: '맞춤 질문 설계', copy: '공고와 경험의 연결 지점으로 질문을 만듭니다.' }
+  ];
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function request(path, opts) {
-    opts = opts || {}; var headers = opts.headers || {}; var init = { method: opts.method || 'GET', credentials: 'same-origin', headers: headers, signal: state.controller && state.controller.signal };
-    return fetch('/api/analysis/cases/' + caseId + path, init).then(function (res) { return res.json().catch(function () { return {}; }).then(function (body) { if (!res.ok || !body.success) { var e = new Error((body && body.message) || '요청에 실패했습니다.'); e.code = body && body.code; e.status = res.status; throw e; } return body.data; }); });
+
+  function api(path, options) {
+    options = options || {};
+    return fetch('/api/analysis/cases/' + caseId + path, {
+      method: options.method || 'GET',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        if (!response.ok || !body.success) {
+          var error = new Error(body.message || '요청을 처리하지 못했습니다.');
+          error.code = body.code;
+          error.status = response.status;
+          throw error;
+        }
+        return body.data;
+      });
+    });
   }
-  function message(text, error) { clear(); var box = el('div', null, 'analysis-message' + (error ? ' analysis-message--error' : '')); box.appendChild(el('p', text)); root.appendChild(box); }
-  function button(text, onClick, primary, disabled) { var b = el('button', text, primary ? 'btn btn--primary' : 'btn btn--ghost'); b.type = 'button'; b.disabled = !!disabled; b.addEventListener('click', onClick); return b; }
-  function renderStages(status) { var section = card('분석 진행 상태'); var stages = el('div', null, 'analysis-stages'); stageDefs.forEach(function (def) { var value = status[def[0]] || 'NOT_STARTED'; var box = el('div', null, 'analysis-stage analysis-stage--' + value); box.appendChild(el('p', def[1], 'analysis-stage__name')); box.appendChild(el('p', stageLabels[value] || '상태 확인 중', 'analysis-stage__status')); stages.appendChild(box); }); section.appendChild(stages); if (status.latestFailureStage || status.latestFailureMessage) { var fail = el('div', null, 'analysis-message analysis-message--error'); appendDetail(fail, '실패 단계', status.latestFailureStage); appendDetail(fail, '실패 유형', status.latestFailureType); appendDetail(fail, '안내', status.latestFailureMessage || '분석 처리 중 문제가 발생했습니다.'); section.appendChild(fail); } return section; }
-  // 현재 단계와 실행 오류를 함께 렌더링해 재조회 동작을 유지한다.
-  function renderStatus() {
-    clear(); var s = state.status; root.appendChild(renderStages(s)); var actions = el('div', null, 'analysis-actions');
-    // /run 실패 정보는 실행 버튼이 속한 상태 카드 바로 다음에 유지한다.
-    if (state.runError) root.appendChild(renderRunError(state.runError));
-    if (s.analysisCaseStatus === 'INPUT_CONFIRMED' || s.analysisCaseStatus === 'FAILED') { root.appendChild(el('p', s.analysisCaseStatus === 'FAILED' ? '이전 분석에 실패했습니다. 자료는 그대로 두고 다시 실행할 수 있습니다.' : '자료가 확정되었습니다. 준비되면 분석을 시작해주세요.', 'analysis-empty')); actions.appendChild(button(s.analysisCaseStatus === 'FAILED' ? '분석 다시 시도' : '분석 시작', runAnalysis, true, state.running)); }
-    else if (s.analysisCaseStatus === 'ANALYZING') { root.appendChild(el('p', '분석이 진행 중입니다. 완료되면 결과를 다시 조회해주세요.', 'analysis-empty')); actions.appendChild(button('상태 다시 조회', loadStatus, false, state.statusLoading)); }
-    else { root.appendChild(el('p', '현재 분석 상태를 확인해주세요.', 'analysis-empty')); actions.appendChild(button('상태 다시 조회', loadStatus, false, state.statusLoading)); }
-    root.appendChild(actions);
+
+  function rememberAnalysis(status) {
+    var key = 'jobpuzzle_analysis_cases';
+    var items;
+    try { items = JSON.parse(localStorage.getItem(key) || '[]'); } catch (ignore) { items = []; }
+    var previous = items.filter(function (item) {
+      return String(item.analysisCaseId) === String(caseId);
+    })[0] || {};
+    items = items.filter(function (item) { return String(item.analysisCaseId) !== String(caseId); });
+    if (status !== 'COMPLETED') {
+      previous.analysisCaseId = caseId;
+      previous.status = status;
+      previous.updatedAt = new Date().toISOString();
+      items.unshift(previous);
+    }
+    localStorage.setItem(key, JSON.stringify(items.slice(0, 10)));
   }
-  function listTexts(items, mapper) { return (items || []).map(mapper).filter(Boolean); }
+
+  function statusClass(value, index, analysisStatus) {
+    if (value === 'SUCCEEDED') return 'is-done';
+    if (value === 'FAILED') return 'is-failed';
+    if (value === 'RUNNING') return 'is-active';
+    if (analysisStatus === 'ANALYZING' && index === visualStage) return 'is-active';
+    return '';
+  }
+
+  function statusLabel(value, index, analysisStatus) {
+    if (value === 'SUCCEEDED') return '완료';
+    if (value === 'FAILED') return '확인 필요';
+    if (value === 'RUNNING' || (analysisStatus === 'ANALYZING' && index === visualStage)) return '진행 중';
+    return '대기';
+  }
+
+  function renderProgress(status) {
+    var stages = stageDefinitions.map(function (stage, index) {
+      var value = status[stage.key] || 'NOT_STARTED';
+      var css = statusClass(value, index, status.analysisCaseStatus);
+      return '<article class="analysis-progress-step ' + css + '">' +
+        '<div class="analysis-progress-step__index">' + (css === 'is-done' ? '✓' : index + 1) + '</div>' +
+        '<div><strong>' + stage.title + '</strong><p>' + stage.copy + '</p>' +
+        '<span>' + statusLabel(value, index, status.analysisCaseStatus) + '</span></div></article>';
+    }).join('');
+
+    var failure = status.latestFailureMessage
+      ? '<div class="analysis-alert"><strong>분석을 이어가지 못했습니다.</strong><p>' +
+        escapeHtml(status.latestFailureMessage) + '</p></div>' : '';
+    var action = '';
+    if (status.analysisCaseStatus === 'INPUT_CONFIRMED' || status.analysisCaseStatus === 'FAILED') {
+      action = '<button type="button" class="btn btn--primary analysis-run-button" id="analysis-run">' +
+        (status.analysisCaseStatus === 'FAILED' ? '분석 다시 시작' : '맞춤 분석 시작') + '</button>';
+    }
+
+    root.innerHTML =
+      '<section class="analysis-hero">' +
+      '<div class="analysis-orbit" aria-hidden="true"><i></i><span>AI</span></div>' +
+      '<div><span class="analysis-kicker">COMPANY FIT</span>' +
+      '<h2>' + (status.analysisCaseStatus === 'ANALYZING' ? '자료를 면접 질문으로 연결하고 있어요' : '맞춤 면접을 준비할 자료가 확정됐어요') + '</h2>' +
+      '<p>페이지를 나가도 분석은 유지됩니다. 면접 준비 화면에서 언제든 진행 상태를 확인할 수 있어요.</p></div>' +
+      '</section><section class="analysis-progress-panel"><header><div><span>분석 진행률</span>' +
+      '<strong>' + completedPercent(status) + '%</strong></div><div class="analysis-progress-bar"><i style="width:' +
+      completedPercent(status) + '%"></i></div></header><div class="analysis-progress-grid">' + stages +
+      '</div>' + failure + '<div class="analysis-progress-actions">' + action + '</div></section>';
+
+    var button = document.getElementById('analysis-run');
+    if (button) button.addEventListener('click', runAnalysis);
+  }
+
+  function completedPercent(status) {
+    var done = stageDefinitions.filter(function (stage) { return status[stage.key] === 'SUCCEEDED'; }).length;
+    if (status.analysisCaseStatus === 'COMPLETED') return 100;
+    if (status.analysisCaseStatus === 'ANALYZING') return Math.max(12, Math.round((done + .45) / 4 * 100));
+    return done * 25;
+  }
+
+  function compactList(items, selector, emptyText) {
+    var values = (items || []).map(selector).filter(Boolean).slice(0, 4);
+    if (!values.length) return '<p class="analysis-summary-empty">' + emptyText + '</p>';
+    return '<ul>' + values.map(function (value) { return '<li>' + escapeHtml(value) + '</li>'; }).join('') + '</ul>';
+  }
+
   function renderResult(result) {
-    clear(); var base = card('분석 기준'); var grid = el('div', null, 'analysis-grid'); appendDetail(grid, '대분류 직무', result.jobCategory && result.jobCategory.mainCategory); appendDetail(grid, '세부 직무', result.jobCategory && result.jobCategory.subCategory); appendDetail(grid, '경력 수준', result.jobCategory && result.jobCategory.careerLevel); appendDetail(grid, '분석 상태', result.status); base.appendChild(grid); root.appendChild(base);
-    var jp = result.jobPostingAnalysis || {}; var posting = card('채용공고 분석'); appendDetail(posting, '주요 업무', listTexts(jp.mainTasks, function (x) { return x.text; })); appendDetail(posting, '필수 요구사항', listTexts(jp.requirements, function (x) { return x.text; })); appendDetail(posting, '우대 요구사항', listTexts(jp.preferred, function (x) { return x.text; })); appendDetail(posting, '요구 역량', listTexts(jp.coreCompetencies, function (x) { return x.text; })); appendDetail(posting, '부족한 근거', listTexts(jp.missingEvidence, function (x) { return x.item + (x.reason ? ': ' + x.reason : ''); })); appendDetail(posting, '충돌 정보', listTexts(jp.conflicts, function (x) { return x.field + ': ' + (x.appliedValue || x.postingValue || '확인 필요'); })); root.appendChild(posting);
-    var cm = result.candidateMaterialAnalysis || {}, resume = cm.resume || {}, portfolio = cm.portfolio || {}, note = cm.experienceNote || {}; var candidate = card('지원자 자료 분석'); appendDetail(candidate, '확인된 경험', listTexts(resume.experiences, function (x) { return x.title + (x.summary ? ': ' + x.summary : ''); })); appendDetail(candidate, '기술', listTexts(resume.skills, function (x) { return x.skill + (x.usageContext ? ': ' + x.usageContext : ''); })); appendDetail(candidate, '프로젝트', listTexts(portfolio.projects, function (x) { return x.projectName + (x.role ? ' · ' + x.role : ''); })); appendDetail(candidate, '역할', listTexts(resume.roles, function (x) { return x.role + (x.context ? ': ' + x.context : ''); })); appendDetail(candidate, '성과', listTexts(resume.results, function (x) { return x.result; })); appendDetail(candidate, 'STAR 후보', listTexts(note.starCandidates, function (x) { return [x.situation, x.task, x.action, x.result].filter(Boolean).join(' / '); })); appendDetail(candidate, '부족한 근거', listTexts(cm.missingEvidence, function (x) { return x.item + (x.reason ? ': ' + x.reason : ''); })); root.appendChild(candidate);
-    var guide = result.guideContext || {}, guideCard = card('가이드 적용 결과'); appendDetail(guideCard, '가이드 제목', guide.title); appendDetail(guideCard, '버전', guide.version); appendDetail(guideCard, '매칭 방식', guide.matchType); appendDetail(guideCard, 'fallback 적용', guide.fallbackApplied ? '적용됨' : '적용되지 않음'); appendDetail(guideCard, '적용 범위', guide.applicableScope); appendDetail(guideCard, '평가 기준', guide.evaluationFocus); appendDetail(guideCard, '질문 방향', guide.questionDirection); appendDetail(guideCard, '피해야 할 질문', guide.avoidQuestions); if (guide.matchType === 'NONE' || guide.fallbackApplied) guideCard.appendChild(el('p', '정확한 직무 가이드가 없어 공통 기준으로 분석되었습니다.', 'analysis-empty')); root.appendChild(guideCard);
-    var ready = result.readiness || {}, readyCard = card('준비도'); appendDetail(readyCard, '준비 상태', ready.status); appendDetail(readyCard, '질문 생성 가능 여부', ready.canGenerateQuestions ? '가능' : '어려움'); appendDetail(readyCard, '사유', ready.reason); appendDetail(readyCard, '제한 사항', ready.limitations); root.appendChild(readyCard);
-    var matches = card('요구사항별 연결 결과'); if (!(result.requirementMatches || []).length) matches.appendChild(el('p', '연결 결과가 없습니다.', 'analysis-empty')); (result.requirementMatches || []).forEach(function (m) { var box = el('article', null, 'analysis-match'); box.appendChild(el('h3', m.requirement || '요구사항')); var badge = el('span', (m.requirementType || '') + ' · ' + (m.matchLevel || ''), 'analysis-badge'); box.appendChild(badge); appendDetail(box, '지원자 근거', m.candidateEvidence); appendDetail(box, '판단 이유', m.reason); appendDetail(box, '부족한 부분', m.missingPoint); matches.appendChild(box); }); root.appendChild(matches);
-    var plans = card('보완 과제'); if (!(result.actionPlans || []).length) plans.appendChild(el('p', '등록된 보완 과제가 없습니다.', 'analysis-empty')); (result.actionPlans || []).forEach(function (p) { var box = el('article', null, 'analysis-match'); appendDetail(box, '부족한 요구사항', p.missingPoint); appendDetail(box, '보완 방향', p.suggestion); appendDetail(box, '상태', p.status); appendDetail(box, '완료 예정일', p.deadline); plans.appendChild(box); }); root.appendChild(plans);
-    renderQuestions(ready);
+    rememberAnalysis('COMPLETED');
+    var matches = result.requirementMatches || [];
+    var strengths = matches.filter(function (item) { return item.matchLevel === 'HIGH'; });
+    var gaps = matches.filter(function (item) { return item.matchLevel !== 'HIGH'; });
+    var questions = result.questionSet && result.questionSet.questions || [];
+    var guide = result.guideContext || {};
+
+    root.innerHTML =
+      '<section class="analysis-complete-hero"><div><span class="analysis-complete-check">✓</span>' +
+      '<span class="analysis-kicker">분석 완료</span><h2>면접에서 확인할 핵심이 정리됐어요</h2>' +
+      '<p>' + escapeHtml(result.jobCategory.mainCategory + ' · ' + result.jobCategory.subCategory) +
+      ' 기준으로 공고와 내 경험을 비교했습니다.</p></div>' +
+      '<button type="button" class="btn btn--primary" id="open-company-questions">생성된 질문 ' +
+      questions.length + '개 확인</button></section>' +
+      '<section class="analysis-summary-grid">' +
+      '<article class="analysis-summary-card is-primary"><span>연결된 강점</span><h3>답변에서 살릴 경험</h3>' +
+      compactList(strengths, function (item) { return item.requirement; }, '명확하게 연결된 강점을 정리 중입니다.') + '</article>' +
+      '<article class="analysis-summary-card is-warn"><span>보완할 지점</span><h3>면접에서 대비할 부분</h3>' +
+      compactList(gaps, function (item) { return item.missingPoint || item.requirement; }, '추가로 보완할 항목이 없습니다.') + '</article>' +
+      '<article class="analysis-summary-card"><span>적용 기준</span><h3>' + escapeHtml(guide.title || '직무 공통 면접 가이드') + '</h3>' +
+      '<p>' + (guide.fallbackApplied ? '세부 가이드가 없어 상위 직무 공통 기준을 적용했습니다.' : '선택한 직무·경력에 정확히 맞는 기준을 적용했습니다.') +
+      '</p><small>' + escapeHtml(guide.matchType || '') + '</small></article></section>' +
+      '<section class="analysis-next-card"><div><span>다음 단계</span><h3>원하는 질문을 골라 바로 연습하세요</h3>' +
+      '<p>질문 의도와 평가 관점은 세션을 시작할 때 함께 저장됩니다.</p></div>' +
+      '<button type="button" class="btn btn--primary" id="open-company-questions-bottom">질문 선택하기</button></section>';
+
+    function goToQuestions() {
+      location.href = '/interview.html?analysisCaseId=' + encodeURIComponent(caseId);
+    }
+    document.getElementById('open-company-questions').addEventListener('click', goToQuestions);
+    document.getElementById('open-company-questions-bottom').addEventListener('click', goToQuestions);
   }
-  function renderQuestions(readiness) { var section = card('질문 세트'); root.appendChild(section); request('/question-set').then(function (set) { if (state.disposed) return; if (!set.canGenerateQuestions) { section.appendChild(el('p', '현재 자료로는 질문을 생성하기 어렵습니다.', 'analysis-empty')); appendDetail(section, '사유', readiness.reason); appendDetail(section, '제한 사항', readiness.limitations); return; } var questions = (set.questions || []).slice().sort(function (a, b) { return a.displayOrder - b.displayOrder; }); if (!questions.length) { section.appendChild(el('p', '표시할 질문이 없습니다.', 'analysis-empty')); return; } questions.forEach(function (q) { var box = el('article', null, 'analysis-question'); box.appendChild(el('span', q.displayOrder + '. ' + (q.questionType || ''), 'analysis-badge')); appendDetail(box, '질문', q.question); appendDetail(box, '질문 의도', q.intent); appendDetail(box, '평가 포인트', q.evaluationFocus); section.appendChild(box); }); var link = el('a', '질문을 선택하고 면접 시작', 'btn btn--primary'); link.href = '/interview.html?analysisCaseId=' + encodeURIComponent(analysisCaseId); link.style.marginTop = '16px'; link.style.textDecoration = 'none'; section.appendChild(link); }).catch(function (err) { if (!state.disposed) section.appendChild(el('p', safeError(err), 'analysis-empty')); }); }
-  function loadResult() { if (state.resultLoaded) return Promise.resolve(state.result); return request('/result').then(function (result) { state.resultLoaded = true; state.result = result; renderResult(result); return result; }); }
-  function loadStatus() { if (state.statusLoading) return; state.statusLoading = true; message('분석 상태를 확인하고 있습니다.'); request('/status').then(function (status) { if (state.disposed) return; state.status = status; state.statusLoading = false; if (status.analysisCaseStatus === 'COMPLETED') return loadResult(); renderStatus(); }).catch(function (err) { state.statusLoading = false; if (!state.disposed) message(safeError(err), true); }); }
-  // 분석 실행 결과를 갱신하고 실패하면 서버 오류 정보를 상태 화면에 보존한다.
-  function runAnalysis() { if (state.running) return; state.running = true; state.runError = null; message('분석을 실행하고 있습니다. 완료될 때까지 잠시 기다려주세요.'); request('/run', { method: 'POST' }).then(function () { state.running = false; state.resultLoaded = false; state.runError = null; return loadStatus(); }).catch(function (err) { state.running = false; if (!state.disposed) { // /run 오류 분기에서는 코드와 서버 메시지를 숨기지 않고 상태 카드 아래에 렌더링한다.
-      state.runError = err; renderStatus();
-    } }); }
-  if (!caseId || Number(caseId) <= 0) message('유효하지 않은 분석 작업 주소입니다.', true); else { state.controller = new AbortController(); window.addEventListener('pagehide', function () { state.disposed = true; state.controller.abort(); }, { once: true }); loadStatus(); }
+
+  function startVisualProgress() {
+    clearInterval(stageTimer);
+    visualStage = 0;
+    stageTimer = setInterval(function () {
+      visualStage = Math.min(3, visualStage + 1);
+    }, 4500);
+  }
+
+  function runAnalysis() {
+    if (running) return;
+    running = true;
+    startVisualProgress();
+    loadStatus();
+    api('/run', { method: 'POST' }).then(function () {
+      running = false;
+      clearInterval(stageTimer);
+      stageTimer = null;
+      loadStatus();
+    }).catch(function () {
+      running = false;
+      clearInterval(stageTimer);
+      stageTimer = null;
+      loadStatus();
+    });
+  }
+
+  function loadStatus() {
+    api('/status').then(function (status) {
+      rememberAnalysis(status.analysisCaseStatus);
+      if (status.analysisCaseStatus === 'COMPLETED') {
+        clearInterval(stageTimer);
+        stageTimer = null;
+        return api('/result').then(renderResult);
+      }
+      renderProgress(status);
+      if (status.analysisCaseStatus === 'ANALYZING') {
+        if (!stageTimer) startVisualProgress();
+        setTimeout(loadStatus, 2500);
+      }
+    }).catch(function (error) {
+      root.innerHTML = '<div class="analysis-alert"><strong>분석 상태를 확인하지 못했습니다.</strong><p>' +
+        escapeHtml(error.message) + '</p><a href="/interview.html">면접 준비로 돌아가기</a></div>';
+    });
+  }
+
+  if (!caseId) {
+    root.innerHTML = '<div class="analysis-alert"><strong>올바르지 않은 분석 주소입니다.</strong></div>';
+  } else {
+    loadStatus();
+  }
 })();

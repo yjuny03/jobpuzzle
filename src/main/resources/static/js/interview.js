@@ -220,7 +220,7 @@
         return '<option value="' + c.jobCategoryId + '"' + (String(c.jobCategoryId) === String(state.selectedJobCategoryId) ? ' selected' : '') + '>' + (CAREER_LEVEL_LABEL[c.careerLevel] || c.careerLevel) + '</option>';
       }).join('');
 
-    return '<div class="card card--pad-lg">' +
+    return '<div class="card card--pad-lg material-select-card">' +
       backBtn('backToMode', '모드 다시 선택') +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">면접에 사용할 자료를 선택하세요</p>' +
       '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
@@ -235,7 +235,7 @@
               '<select id="material-main-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + mainOpts + '</select>' +
               '<select id="material-sub-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (state.selectedMainCategory ? '' : ' disabled') + '>' + subOpts + '</select>' +
               '<select id="material-level-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (levelMatches.length ? '' : ' disabled') + '>' + levelOpts + '</select>' +
-            '</div></div>' +
+            '</div><p class="material-job-note">선택한 직무·경력을 면접 기준으로 사용합니다. 공고의 요구 경력과 다르면 분석 결과에서 차이를 안내해드려요.</p></div>' +
           '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
           CANDIDATE_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
@@ -313,6 +313,23 @@
         return DF.api('/analysis-cases/' + state.analysisCaseId + '/confirm', { method: 'POST' });
       })
       .then(function () {
+        var tracked;
+        try {
+          tracked = JSON.parse(localStorage.getItem('jobpuzzle_analysis_cases') || '[]');
+        } catch (ignore) {
+          tracked = [];
+        }
+        tracked = tracked.filter(function (item) {
+          return String(item.analysisCaseId) !== String(state.analysisCaseId);
+        });
+        tracked.unshift({
+          analysisCaseId: state.analysisCaseId,
+          status: 'INPUT_CONFIRMED',
+          mainCategory: state.selectedMainCategory,
+          subCategory: state.selectedSubCategory,
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('jobpuzzle_analysis_cases', JSON.stringify(tracked.slice(0, 10)));
         state.step = 'submitted';
         render();
       })
