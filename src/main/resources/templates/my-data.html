@@ -75,9 +75,10 @@
     </div>
 
     <div data-method-panel="file">
-      <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input" id="register-file" multiple>
+      <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input" id="register-file" multiple hidden>
+      <button type="button" class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="register-file-add">이미지 파일 추가하기</button>
       <p class="file-name-preview">PDF는 1개, 이미지는 여러 장(최대 20장)을 한 번에 선택할 수 있습니다. 파일당 최대 10MB, 전체 20MB까지 업로드할 수 있습니다.</p>
-      <p class="file-name-preview" id="register-file-list"></p>
+      <div id="register-file-list" class="file-chip-list"></div>
       <label class="flex-row gap-8" style="font-size:12.5px; color:var(--color-text-muted); cursor:pointer;">
         <input type="checkbox" id="register-keep-original"> 원본 파일 보관하기
       </label>

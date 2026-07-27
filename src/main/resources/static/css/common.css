@@ -302,6 +302,13 @@ button {
     color: var(--color-primary);
     font-weight: 700;
 }
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  min-width: 190px;
+}
 
 /* 우측 사용자 액션 */
 .site-header__actions {
