@@ -73,6 +73,8 @@ public enum ErrorCode {
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
     GUIDE_SCOPE_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_002", "가이드 적용 범위와 분류 값 조합이 올바르지 않습니다."),
     GUIDE_ACTIVE_NOT_FOUND(HttpStatus.CONFLICT, "GUIDE_003", "해당 직무에 사용할 활성 분석 가이드가 없습니다."),
+    GUIDE_CODE_VERSION_DUPLICATE(HttpStatus.CONFLICT, "GUIDE_004", "이미 등록된 가이드 코드·버전 조합입니다."),
+    GUIDE_NOT_FOUND(HttpStatus.NOT_FOUND, "GUIDE_005", "존재하지 않는 가이드입니다."),
 
 
     // interview - 면접 세션·질문 선택·답변 진행

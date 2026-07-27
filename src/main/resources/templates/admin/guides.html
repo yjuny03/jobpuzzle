@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가이드 관리 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <h1 class="page-title">가이드 관리</h1>
+    <p class="page-subtitle">직무별 분석 가이드 문서를 등록하고 관리할 수 있어요</p>
+
+    <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
+      <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
+      <a class="tabbar__btn is-active" href="/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
+    </div>
+
+    <div class="flex-row" style="justify-content:flex-end; margin-bottom:12px;">
+      <button class="btn btn--primary" id="guide-add-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        새 가이드 등록
+      </button>
+    </div>
+
+    <div class="card card--pad-lg" id="guide-form" style="margin-bottom:20px;" hidden>
+      <p class="field-label--section">새 가이드 등록</p>
+
+      <div class="flex-row" style="gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <label class="field-label">가이드 코드</label>
+          <input class="text-input" id="guide-code" style="width:180px;" placeholder="예) BACKEND_NEW">
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">제목</label>
+          <input class="text-input" id="guide-title" style="width:100%;">
+        </div>
+      </div>
+
+      <div class="flex-row" style="gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end;">
+        <div>
+          <label class="field-label">적용 범위</label>
+          <select class="select-input" id="guide-scope-type" style="width:160px;">
+            <option value="CATEGORY">특정 직무분류</option>
+            <option value="PARENT_CATEGORY">상위 대분류 전체</option>
+            <option value="GLOBAL_COMMON">전체 공통</option>
+          </select>
+        </div>
+        <div id="guide-scope-category-field">
+          <label class="field-label">직무분류</label>
+          <select class="select-input" id="guide-job-category" style="width:220px;"></select>
+        </div>
+        <div id="guide-scope-main-field" hidden>
+          <label class="field-label">대분류명</label>
+          <input class="text-input" id="guide-scope-main" style="width:180px;" placeholder="예) IT·개발">
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label class="field-label">적용 범위 설명</label>
+        <textarea class="textarea-input" id="guide-applicable-scope" style="width:100%; height:60px;" placeholder="이 가이드가 어떤 상황에 적용되는지 설명"></textarea>
+      </div>
+
+      <div class="flex-row" style="gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">평가 중점 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="guide-evaluation-focus" style="width:100%; height:80px;"></textarea>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">근거 판단 기준 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="guide-evidence-rules" style="width:100%; height:80px;"></textarea>
+        </div>
+      </div>
+      <div class="flex-row" style="gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">질문 방향 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="guide-question-direction" style="width:100%; height:80px;"></textarea>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">피해야 할 질문 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="guide-avoid-questions" style="width:100%; height:80px;"></textarea>
+        </div>
+      </div>
+
+      <div class="flex-row" style="gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+        <div>
+          <label class="field-label">자료 유형</label>
+          <select class="select-input" id="guide-source-type" style="width:140px;">
+            <option value="DIRECT_INPUT">직접 입력</option>
+            <option value="PDF">PDF 업로드</option>
+          </select>
+        </div>
+        <div id="guide-file-field" hidden>
+          <label class="field-label">PDF 파일</label>
+          <input type="file" id="guide-file" accept=".pdf" class="text-input">
+        </div>
+      </div>
+
+      <div class="flex-row gap-10">
+        <button class="btn btn--primary" id="guide-save-btn">등록하기</button>
+        <button class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="guide-cancel-btn">취소</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:1fr 1.6fr 1fr 0.8fr 0.6fr 1fr;">
+        <span>코드</span><span>제목</span><span>범위</span><span>상태</span><span>버전</span><span>등록일</span>
+      </div>
+      <div id="guide-rows"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-guides.js" th:src="@{/js/admin-guides.js}"></script>
+
+</body>
+</html>

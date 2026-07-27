@@ -16,4 +16,7 @@ public interface JobGuideDocumentRepository extends JpaRepository<JobGuideDocume
             GuideScopeType scopeType, String scopeMainCategory, JobGuideDocumentStatus status);
 
     List<JobGuideDocument> findByScopeTypeAndStatus(GuideScopeType scopeType, JobGuideDocumentStatus status);
+
+    // 관리자 가이드 등록 시 가이드 코드·버전 중복 확인
+    boolean existsByGuideCodeAndVersion(String guideCode, String version);
 }

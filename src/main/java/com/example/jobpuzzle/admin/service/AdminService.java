@@ -1,6 +1,8 @@
 package com.example.jobpuzzle.admin.service;
 
 import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
+import com.example.jobpuzzle.admin.dto.AdminGuideCreateRequest;
+import com.example.jobpuzzle.admin.dto.AdminGuideResponse;
 import com.example.jobpuzzle.admin.dto.AdminGuideUsageResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
@@ -10,20 +12,30 @@ import com.example.jobpuzzle.ai.log.AiCallLogStatus;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.entity.JobGuideDocument;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
+import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
+import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.entity.UserStatus;
 import com.example.jobpuzzle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +46,10 @@ public class AdminService {
     private final JobCategoryRepository jobCategoryRepository;
     private final GuideContextResultRepository guideContextResultRepository;
     private final AiCallLogRepository aiCallLogRepository;
+    private final JobGuideDocumentRepository jobGuideDocumentRepository;
+
+    @Value("${app.storage.local.base-dir}")
+    private String storageBaseDir;
 
     // 회원 목록/검색
     public PageResponse<AdminUserListResponse> getUserList(
@@ -92,8 +108,76 @@ public class AdminService {
         }
     }
 
-    public void manageQuestionTemplate() {
-        // TODO: 클래스 정의서 기준으로 구현
+    // 가이드 목록 조회
+    public List<AdminGuideResponse> getGuides() {
+        return jobGuideDocumentRepository.findAll().stream()
+                .map(AdminGuideResponse::from)
+                .toList();
+    }
+
+    // 가이드 단건 조회
+    public AdminGuideResponse getGuide(Long guideId) {
+        return jobGuideDocumentRepository.findById(guideId)
+                .map(AdminGuideResponse::from)
+                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+    }
+
+    // 가이드 등록 - file은 sourceType=PDF일 때만 사용
+    public AdminGuideResponse createGuide(AdminGuideCreateRequest request, MultipartFile file, User admin) {
+        String version = "v1.0";
+        if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(request.getGuideCode(), version)) {
+            throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
+        }
+
+        JobCategory jobCategory = request.getJobCategoryId() != null
+                ? jobCategoryRepository.findById(request.getJobCategoryId())
+                        .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND))
+                : null;
+
+        String filePath = (file != null && !file.isEmpty()) ? storeGuideFile(file) : null;
+
+        JobGuideDocument guide = JobGuideDocument.builder()
+                .guideCode(request.getGuideCode())
+                .previousGuide(null)
+                .scopeType(request.getScopeType())
+                .jobCategory(jobCategory)
+                .scopeMainCategory(request.getScopeMainCategory())
+                .title(request.getTitle())
+                .sourceType(request.getSourceType())
+                .filePath(filePath)
+                .version(version)
+                .createdBy(admin)
+                .applicableScope(request.getApplicableScope())
+                .evaluationFocus(request.getEvaluationFocus())
+                .evidenceRules(request.getEvidenceRules())
+                .questionDirection(request.getQuestionDirection())
+                .avoidQuestions(request.getAvoidQuestions())
+                .build();
+
+        return AdminGuideResponse.from(jobGuideDocumentRepository.save(guide));
+    }
+
+    private String storeGuideFile(MultipartFile file) {
+        Path baseDir = Paths.get(storageBaseDir).toAbsolutePath().normalize().resolve("guides");
+        String extension = extractExtension(file.getOriginalFilename());
+        String relativePath = "guides/" + UUID.randomUUID() + extension;
+        Path targetPath = baseDir.resolve(relativePath.substring("guides/".length()));
+
+        try {
+            Files.createDirectories(baseDir);
+            file.transferTo(targetPath);
+        } catch (IOException e) {
+            throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+        return relativePath;
+    }
+
+    private String extractExtension(String originalFileName) {
+        if (originalFileName == null) {
+            return "";
+        }
+        int dotIndex = originalFileName.lastIndexOf('.');
+        return dotIndex >= 0 ? originalFileName.substring(dotIndex) : "";
     }
 
     public void getPostingCountByCategory() {

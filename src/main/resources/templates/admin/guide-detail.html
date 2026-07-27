@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가이드 상세 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container app-container--narrow">
+
+    <a href="/admin/guides" th:href="@{/admin/guides}" style="font-size:13px; color:#5B6370; text-decoration:none; display:inline-block; margin-bottom:14px;">← 가이드 목록으로</a>
+
+    <div id="guide-detail-header" style="margin-bottom:20px;">
+      <h1 class="page-title" id="guide-detail-title">불러오는 중...</h1>
+    </div>
+
+    <div class="card card--pad-lg" style="display:flex; flex-direction:column; gap:16px;" id="guide-detail-body"></div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-guide-detail.js" th:src="@{/js/admin-guide-detail.js}"></script>
+
+</body>
+</html>
