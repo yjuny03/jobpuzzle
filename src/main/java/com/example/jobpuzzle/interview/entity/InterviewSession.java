@@ -1,133 +1,201 @@
 package com.example.jobpuzzle.interview.entity;
 
+import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.CandidateMaterialAnalysis;
+import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
+import com.example.jobpuzzle.global.common.BaseTimeEntity;
+import com.example.jobpuzzle.guide.entity.GuideContextResult;
+import com.example.jobpuzzle.guide.entity.JobGuideDocument;
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
+import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
+import com.example.jobpuzzle.user.entity.User;
 import jakarta.persistence.*;
-import lombok.Builder;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 // 사용자가 선택한 질문으로 생성하는 면접 세션과 모드별 불변 기준 저장
 @Getter
 @Entity
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "interview_session")
-public class InterviewSession {
+public class InterviewSession extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "session_id")
     private Long sessionId;
 
-    @Column(nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     // 질문 선택의 원본 묶음
-    @Column(nullable = false)
-    private Long questionSetId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_set_id", nullable = false)
+    private QuestionSet questionSet;
+
+    // COMPANY_FIT에서 사용한 분석 입력 스냅샷
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "snapshot_id")
+    private AnalysisInputSnapshot snapshot;
+
+    // COMPANY_FIT 세션에서 사용한 공고 분석 결과
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_posting_analysis_id")
+    private JobPostingAnalysis jobPostingAnalysis;
+
+    // COMPANY_FIT 세션에서 사용한 사용자 자료 분석 결과
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidate_analysis_id")
+    private CandidateMaterialAnalysis candidateAnalysis;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "mode", nullable = false, length = 30)
     private InterviewSessionMode mode;
 
-    // COMPANY_FIT에서 필수. 동일 스냅샷으로 여러 세션 생성 가능
-    private Long snapshotId;
-
-    private Long jobPostingAnalysisId;
-
-    private Long candidateAnalysisId;
-
     // 세션 생성 당시 직무 기준
-    @Column(nullable = false)
-    private Long jobCategoryId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_category_id", nullable = false)
+    private JobCategory jobCategory;
 
-    // 세션 질문 생성에 사용한 가이드 컨텍스트
-    private Long guideContextId;
+    // 세션 생성 당시 경력 기준
+    @Enumerated(EnumType.STRING)
+    @Column(name = "career_level", nullable = false, length = 20)
+    private JobCategoryCareerLevel careerLevel;
 
-    private Long guideId;
+    // 질문 생성에 사용한 가이드 컨텍스트
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "guide_context_id")
+    private GuideContextResult guideContextResult;
 
+    // 실제 사용한 가이드
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "guide_id")
+    private JobGuideDocument guideDocument;
+
+    @Column(name = "guide_version", length = 20)
     private String guideVersion;
 
-    // AI 질문 생성 프롬프트 버전. fallback 템플릿 질문 세션은 NULL
+    // AI 질문 생성 프롬프트 버전
+    @Column(name = "prompt_version", length = 20)
     private String promptVersion;
 
-    // WEAKNESS_REVIEW 모드 약점 태그
+    // WEAKNESS_REVIEW 대상 약점 태그
+    @Column(name = "target_weakness_tag", length = 100)
     private String targetWeaknessTag;
 
-    // WEAKNESS_REVIEW 질문 생성에 사용한 기준 평가 ID 목록(JSON). 다른 모드는 빈 배열
+    // WEAKNESS_REVIEW 질문 생성에 사용한 평가 ID 목록
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String basisEvaluationIds;
+    @Column(
+            name = "basis_evaluation_ids",
+            nullable = false,
+            columnDefinition = "json"
+    )
+    private List<Long> basisEvaluationIds;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 20)
     private InterviewSessionStatus status;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
+    @Column(name = "started_at")
     private LocalDateTime startedAt;
 
+    @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @Builder
-    private InterviewSession(
-            Long userId,
-            Long questionSetId,
-            InterviewSessionMode mode,
-            Long snapshotId,
-            Long jobPostingAnalysisId,
-            Long candidateAnalysisId,
-            Long jobCategoryId,
-            Long guideContextId,
-            Long guideId,
-            String guideVersion,
-            String promptVersion,
-            String targetWeaknessTag,
-            String basisEvaluationIds
-    ) {
-        this.userId = userId;
-        this.questionSetId = questionSetId;
-        this.mode = mode;
-        this.snapshotId = snapshotId;
-        this.jobPostingAnalysisId = jobPostingAnalysisId;
-        this.candidateAnalysisId = candidateAnalysisId;
-        this.jobCategoryId = jobCategoryId;
-        this.guideContextId = guideContextId;
-        this.guideId = guideId;
-        this.guideVersion = guideVersion;
-        this.promptVersion = promptVersion;
-        this.targetWeaknessTag = targetWeaknessTag;
-        this.basisEvaluationIds = basisEvaluationIds == null ? "[]" : basisEvaluationIds;
-
-        this.status = InterviewSessionStatus.CREATED;
-        this.createdAt = LocalDateTime.now();
+    /**
+     * BASIC·WEAKNESS_REVIEW와 기존 호출부에서 사용하는 생성 메서드.
+     * COMPANY_FIT 분석 Entity 연결은 전체 충돌 해결 후 서비스에서 추가한다.
+     */
+    public static InterviewSession create(QuestionSet questionSet) {
+        return create(questionSet, null, null);
     }
 
-    // 최초 원 질문 답변 제출 시 전환
+    /**
+     * COMPANY_FIT 세션 생성 시 분석 결과까지 고정해서 저장하는 생성 메서드.
+     */
+    public static InterviewSession create(
+            QuestionSet questionSet,
+            JobPostingAnalysis jobPostingAnalysis,
+            CandidateMaterialAnalysis candidateAnalysis
+    ) {
+        InterviewSession session = new InterviewSession();
+
+        session.user = questionSet.getUser();
+        session.questionSet = questionSet;
+        session.snapshot = questionSet.getSnapshot();
+        session.jobPostingAnalysis = jobPostingAnalysis;
+        session.candidateAnalysis = candidateAnalysis;
+        session.mode = questionSet.getInterviewMode();
+        session.jobCategory = questionSet.getJobCategory();
+        session.careerLevel = questionSet.getCareerLevel();
+        session.guideContextResult = questionSet.getGuideContextResult();
+
+        if (questionSet.getGuideContextResult() != null) {
+            session.guideDocument =
+                    questionSet.getGuideContextResult().getGuide();
+            session.guideVersion =
+                    questionSet.getGuideContextResult().getGuideVersion();
+        }
+
+        session.promptVersion = questionSet.getPromptVersion();
+        session.targetWeaknessTag = questionSet.getTargetWeaknessTag();
+        session.basisEvaluationIds =
+                questionSet.getBasisEvaluationIds() == null
+                        ? List.of()
+                        : List.copyOf(questionSet.getBasisEvaluationIds());
+
+        session.status = InterviewSessionStatus.CREATED;
+
+        return session;
+    }
+
+    // targetDimension은 INTERVIEW_SESSION 컬럼이 아니므로 QuestionSet에서 조회
+    public String getTargetDimension() {
+        return questionSet.getTargetDimension();
+    }
+
+    // 최초 답변 제출 시 IN_PROGRESS로 전환
     public void start() {
-        if (this.status == InterviewSessionStatus.CREATED) {
-            this.status = InterviewSessionStatus.IN_PROGRESS;
-            this.startedAt = LocalDateTime.now();
+        if (status == InterviewSessionStatus.CREATED) {
+            status = InterviewSessionStatus.IN_PROGRESS;
+            startedAt = LocalDateTime.now();
         }
     }
 
     public void complete() {
-        this.status = InterviewSessionStatus.COMPLETED;
-        this.completedAt = LocalDateTime.now();
+        status = InterviewSessionStatus.COMPLETED;
+        completedAt = LocalDateTime.now();
     }
 
     public void cancel() {
-        this.status = InterviewSessionStatus.CANCELED;
-        this.canceledAt = LocalDateTime.now();
+        status = InterviewSessionStatus.CANCELED;
+        canceledAt = LocalDateTime.now();
     }
 
+    public boolean isEditable() {
+        return status == InterviewSessionStatus.CREATED
+                || status == InterviewSessionStatus.IN_PROGRESS;
+    }
+
+    // 최종 리포트 팀 코드와 상태 확인 시 사용 가능
     public boolean isCompleted() {
-        return this.status == InterviewSessionStatus.COMPLETED;
+        return status == InterviewSessionStatus.COMPLETED;
+    }
+
+    public void softDelete() {
+        deletedAt = LocalDateTime.now();
     }
 }

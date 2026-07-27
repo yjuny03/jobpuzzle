@@ -10,8 +10,11 @@ import com.example.jobpuzzle.ai.log.AiInputReferenceType;
 import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.service.AiClientService;
+import com.example.jobpuzzle.ai.service.GenerationClientSelection;
 import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
+import com.example.jobpuzzle.evaluation.dto.SessionScoreSummary;
 import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
+import com.example.jobpuzzle.evaluation.service.SessionScoreAggregationService;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.interview.entity.InterviewMessage;
@@ -50,6 +53,7 @@ public class FinalReportService {
     private final InterviewSessionQuestionRepository interviewSessionQuestionRepository;
     private final InterviewMessageRepository interviewMessageRepository;
     private final AnswerEvaluationRepository answerEvaluationRepository;
+    private final SessionScoreAggregationService sessionScoreAggregationService;
     private final FinalReportRepository finalReportRepository;
     private final ImprovementSuggestionRepository improvementSuggestionRepository;
     private final AiCallLogRepository aiCallLogRepository;
@@ -62,6 +66,7 @@ public class FinalReportService {
             InterviewSessionQuestionRepository interviewSessionQuestionRepository,
             InterviewMessageRepository interviewMessageRepository,
             AnswerEvaluationRepository answerEvaluationRepository,
+            SessionScoreAggregationService sessionScoreAggregationService,
             FinalReportRepository finalReportRepository,
             ImprovementSuggestionRepository improvementSuggestionRepository,
             AiCallLogRepository aiCallLogRepository,
@@ -73,6 +78,7 @@ public class FinalReportService {
         this.interviewSessionQuestionRepository = interviewSessionQuestionRepository;
         this.interviewMessageRepository = interviewMessageRepository;
         this.answerEvaluationRepository = answerEvaluationRepository;
+        this.sessionScoreAggregationService = sessionScoreAggregationService;
         this.finalReportRepository = finalReportRepository;
         this.improvementSuggestionRepository = improvementSuggestionRepository;
         this.aiCallLogRepository = aiCallLogRepository;
@@ -92,7 +98,7 @@ public class FinalReportService {
 
         try {
             String prompt = buildPrompt(lease);
-            FinalReportResult result = aiClientService.finalReport(prompt);
+            FinalReportResult result = aiClientService.finalReport(lease.selection(), prompt);
             saveSuccess(lease, result);
         } catch (RuntimeException exception) {
             recordFailure(lease.aiCallLogId(), exception);
@@ -134,8 +140,12 @@ public class FinalReportService {
             if (aggregate.evaluatedQuestionCount() == 0) {
                 throw new CustomException(ErrorCode.FINAL_REPORT_NOT_GENERATABLE);
             }
+            SessionScoreSummary scoreSummary =
+                    sessionScoreAggregationService.aggregate(session.getUser().getUserId(), sessionId);
 
             PromptTemplate promptTemplate = findActivePromptTemplate();
+            GenerationClientSelection selection =
+                    aiClientService.resolve(AiExecutionStage.FINAL_REPORT);
             String inputReferenceId = String.valueOf(sessionId);
 
             Optional<AiCallLog> latest = aiCallLogRepository
@@ -155,8 +165,8 @@ public class FinalReportService {
             }
 
             AiCallLog log = AiCallLog.pending(
-                    aiClientService.getProvider(),
-                    aiClientService.getModel(),
+                    selection.provider(),
+                    selection.model(),
                     AiExecutionStage.FINAL_REPORT,
                     AiInputReferenceType.INTERVIEW_SESSION,
                     inputReferenceId,
@@ -168,7 +178,8 @@ public class FinalReportService {
             log.start();
             aiCallLogRepository.saveAndFlush(log);
 
-            return new ReportLease(sessionId, log.getAiCallLogId(), session, aggregate);
+            return new ReportLease(
+                    sessionId, log.getAiCallLogId(), session, aggregate, scoreSummary, selection);
         });
     }
 
@@ -216,14 +227,17 @@ public class FinalReportService {
     // Mock은 내용을 보지 않으므로 지금은 평가 요약을 간단한 문자열로 조립하는 정도로 충분하다.
     private String buildPrompt(ReportLease lease) {
         QuestionAggregate aggregate = lease.aggregate();
+        SessionScoreSummary score = lease.scoreSummary();
         StringBuilder prompt = new StringBuilder();
         prompt.append("세션 ").append(lease.sessionId())
                 .append(" 모드=").append(lease.session().getMode())
-                .append(" 총질문=").append(aggregate.totalQuestionCount())
-                .append(" 제출=").append(aggregate.submittedQuestionCount())
-                .append(" 평가성공=").append(aggregate.evaluatedQuestionCount())
-                .append(" 평가실패=").append(aggregate.evaluationFailedQuestionCount())
-                .append(" 미답변=").append(aggregate.skippedQuestionCount())
+                .append(" 총질문=").append(score.getTotalQuestionCount())
+                .append(" 제출=").append(score.getSubmittedQuestionCount())
+                .append(" 평가성공=").append(score.getEvaluatedQuestionCount())
+                .append(" 평가실패=").append(score.getEvaluationFailedQuestionCount())
+                .append(" 미답변=").append(score.getSkippedQuestionCount())
+                .append(" overallScore=").append(score.getOverallScore())
+                .append(" categoryScores=").append(score.getCategoryScores())
                 .append('\n');
         for (AnswerEvaluation evaluation : aggregate.evaluations()) {
             prompt.append("- score=").append(evaluation.getScore())
@@ -243,20 +257,22 @@ public class FinalReportService {
             }
 
             InterviewSession session = findSession(lease.sessionId());
-            QuestionAggregate aggregate = lease.aggregate();
+            SessionScoreSummary score = lease.scoreSummary();
 
             FinalReport report = FinalReport.builder()
                     .session(session)
                     .interviewMode(session.getMode())
-                    .totalQuestionCount(aggregate.totalQuestionCount())
-                    .submittedQuestionCount(aggregate.submittedQuestionCount())
-                    .evaluatedQuestionCount(aggregate.evaluatedQuestionCount())
-                    .evaluationFailedQuestionCount(aggregate.evaluationFailedQuestionCount())
-                    .skippedQuestionCount(aggregate.skippedQuestionCount())
-                    .completionRate(aggregate.completionRate())
-                    .overallScore(result.getOverallScore())
+                    .totalQuestionCount(score.getTotalQuestionCount())
+                    .submittedQuestionCount(score.getSubmittedQuestionCount())
+                    .evaluatedQuestionCount(score.getEvaluatedQuestionCount())
+                    .evaluationFailedQuestionCount(score.getEvaluationFailedQuestionCount())
+                    .skippedQuestionCount(score.getSkippedQuestionCount())
+                    .completionRate(score.getCompletionRate())
+                    .overallScore(score.getOverallScore() == null
+                            ? result.getOverallScore()
+                            : score.getOverallScore())
                     .scoreLabel(result.getScoreLabel())
-                    .categoryScores(toCategoryScores(result.getCategoryScores()))
+                    .categoryScores(toCategoryScores(score.getCategoryScores()))
                     .basisSummary(toBasisSummary(result.getBasisSummary()))
                     .weaknessTagSummary(toWeaknessTagSummaries(result.getWeaknessTagSummary()))
                     .nextPracticeRecommendation(toNextPracticeRecommendations(result.getNextPracticeRecommendation()))
@@ -351,6 +367,24 @@ public class FinalReportService {
                 .build();
     }
 
+    private FinalReport.CategoryScores toCategoryScores(
+            java.util.Map<String, Integer> source
+    ) {
+        if (source == null) {
+            return FinalReport.CategoryScores.builder().build();
+        }
+        return FinalReport.CategoryScores.builder()
+                .intentMatch(source.get("intentMatch"))
+                .specificity(source.get("specificity"))
+                .ownRole(source.get("ownRole"))
+                .problemSolving(source.get("problemSolving"))
+                .resultExpression(source.get("resultExpression"))
+                .requirementConnection(source.get("requirementConnection"))
+                .guideAlignment(source.get("guideAlignment"))
+                .deliveryClarity(source.get("deliveryClarity"))
+                .build();
+    }
+
     private FinalReport.BasisSummary toBasisSummary(FinalReportResult.BasisSummary source) {
         if (source == null) {
             return null;
@@ -418,7 +452,9 @@ public class FinalReportService {
             Long sessionId,
             Long aiCallLogId,
             InterviewSession session,
-            QuestionAggregate aggregate
+            QuestionAggregate aggregate,
+            SessionScoreSummary scoreSummary,
+            GenerationClientSelection selection
     ) {
     }
 }

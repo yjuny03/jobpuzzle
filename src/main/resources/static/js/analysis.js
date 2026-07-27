@@ -332,6 +332,12 @@
       list.appendChild(item);
     });
     card.appendChild(list);
+    var actions = el('div', 'report-actions');
+    var interviewLink = el('a', 'btn btn--primary', '질문을 선택하고 면접 시작');
+    interviewLink.href = '/interview.html?analysisCaseId=' + encodeURIComponent(caseId);
+    interviewLink.style.textDecoration = 'none';
+    actions.appendChild(interviewLink);
+    card.appendChild(actions);
     return card;
   }
 

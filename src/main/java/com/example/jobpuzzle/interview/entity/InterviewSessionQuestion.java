@@ -1,100 +1,145 @@
 package com.example.jobpuzzle.interview.entity;
 
+import com.example.jobpuzzle.analysis.entity.AnalysisSourceReference;
+import com.example.jobpuzzle.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.Builder;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 // 사용자가 세션에 선택한 질문의 당시 내용·순서·평가기준을 불변 복사
 @Getter
 @Entity
-@NoArgsConstructor
-@Table(name = "interview_session_question", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_session_question", columnNames = {"session_id", "question_id"}),
-        @UniqueConstraint(name = "uk_session_display_order", columnNames = {"session_id", "display_order"})
-})
-public class InterviewSessionQuestion {
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(
+        name = "interview_session_question",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_session_question",
+                        columnNames = {"session_id", "question_id"}
+                ),
+                @UniqueConstraint(
+                        name = "uk_session_display_order",
+                        columnNames = {"session_id", "display_order"}
+                )
+        }
+)
+public class InterviewSessionQuestion extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "session_question_id")
     private Long sessionQuestionId;
 
-    @Column(nullable = false)
-    private Long sessionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id", nullable = false)
+    private InterviewSession session;
 
     // 원본 생성 질문
-    @Column(nullable = false)
-    private Long questionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", nullable = false)
+    private InterviewQuestion question;
 
+    // 세션 생성 당시 질문 본문
     @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(
+            name = "question_text_snapshot",
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
     private String questionTextSnapshot;
 
+    // 세션 생성 당시 출제 의도
     @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(
+            name = "intent_snapshot",
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
     private String intentSnapshot;
 
-    // JSON
+    // 세션 생성 당시 평가 관점
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String evaluationFocusSnapshot;
+    @Column(
+            name = "evaluation_focus_snapshot",
+            nullable = false,
+            columnDefinition = "json"
+    )
+    private List<InterviewQuestionEvaluationFocus> evaluationFocusSnapshot;
 
+    // 세션 생성 당시 연결 요구사항
+    @Column(name = "related_requirement_id", length = 100)
     private String relatedRequirementId;
 
-    // JSON, 기본값 []
+    // 세션 생성 당시 질문 근거
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "json", nullable = false)
-    private String sourceRefsSnapshot;
+    @Column(
+            name = "source_refs_snapshot",
+            nullable = false,
+            columnDefinition = "json"
+    )
+    private List<AnalysisSourceReference> sourceRefsSnapshot;
 
-    @Column(nullable = false)
-    private Integer displayOrder;
+    // 세션 진행 순서
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 20)
     private InterviewSessionQuestionStatus status;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Builder
-    private InterviewSessionQuestion(
-            Long sessionId,
-            Long questionId,
-            String questionTextSnapshot,
-            String intentSnapshot,
-            String evaluationFocusSnapshot,
-            String relatedRequirementId,
-            String sourceRefsSnapshot,
-            Integer displayOrder
+    public static InterviewSessionQuestion snapshot(
+            InterviewSession session,
+            InterviewQuestion question,
+            int displayOrder
     ) {
-        this.sessionId = sessionId;
-        this.questionId = questionId;
-        this.questionTextSnapshot = questionTextSnapshot;
-        this.intentSnapshot = intentSnapshot;
-        this.evaluationFocusSnapshot = evaluationFocusSnapshot;
-        this.relatedRequirementId = relatedRequirementId;
-        this.sourceRefsSnapshot = sourceRefsSnapshot == null ? "[]" : sourceRefsSnapshot;
-        this.displayOrder = displayOrder == null ? 0 : displayOrder;
+        InterviewSessionQuestion snapshot =
+                new InterviewSessionQuestion();
 
-        this.status = InterviewSessionQuestionStatus.PENDING;
-        this.createdAt = LocalDateTime.now();
+        snapshot.session = session;
+        snapshot.question = question;
+        snapshot.questionTextSnapshot = question.getQuestion();
+        snapshot.intentSnapshot = question.getIntent();
+
+        snapshot.evaluationFocusSnapshot =
+                question.getEvaluationFocus() == null
+                        ? List.of()
+                        : List.copyOf(question.getEvaluationFocus());
+
+        snapshot.relatedRequirementId =
+                question.getRelatedRequirementId();
+
+        snapshot.sourceRefsSnapshot =
+                question.getSourceRefs() == null
+                        ? List.of()
+                        : List.copyOf(question.getSourceRefs());
+
+        snapshot.displayOrder = displayOrder;
+        snapshot.status = InterviewSessionQuestionStatus.PENDING;
+
+        return snapshot;
     }
 
-    // 원 질문 답변 제출 시 전환. 이후 평가·꼬리질문 진행이 남아있는 동안 유지
-    public void startProgress() {
-        this.status = InterviewSessionQuestionStatus.IN_PROGRESS;
+    // 원 질문 답변 제출 시 IN_PROGRESS로 전환
+    public void start() {
+        if (status == InterviewSessionQuestionStatus.PENDING) {
+            status = InterviewSessionQuestionStatus.IN_PROGRESS;
+        }
     }
 
-    // 질문 흐름 종료(원 질문 답변 미제출로 세션 완료 시 SKIPPED, 그 외 평가 종결 시 COMPLETED)
+    // 원 질문과 필요한 꼬리질문 흐름이 모두 끝났을 때 호출
     public void complete() {
-        this.status = InterviewSessionQuestionStatus.COMPLETED;
+        status = InterviewSessionQuestionStatus.COMPLETED;
     }
 
+    // 세션 완료 시 원 질문 답변을 제출하지 않은 질문만 SKIPPED 처리
     public void skip() {
-        this.status = InterviewSessionQuestionStatus.SKIPPED;
+        if (status == InterviewSessionQuestionStatus.PENDING) {
+            status = InterviewSessionQuestionStatus.SKIPPED;
+        }
     }
 }

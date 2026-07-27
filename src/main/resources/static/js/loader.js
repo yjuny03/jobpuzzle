@@ -2,8 +2,14 @@
   "use strict";
   var loader = document.getElementById("jp-loader");
   if (!loader) return;
+  function notifyHomeReady() {
+    if (window.__jobPuzzleLoaderFinished) return;
+    window.__jobPuzzleLoaderFinished = true;
+    document.dispatchEvent(new CustomEvent("jobpuzzle:loaderclosed"));
+  }
   if (loader.dataset.enabled !== "true") {
     loader.remove();
+    setTimeout(notifyHomeReady, 0);
     return;
   }
   var key = "jobpuzzle_loader_flow_jigsaw_v10",
@@ -13,6 +19,7 @@
   } catch (error) {}
   if (seen) {
     loader.className = "jp-loader jp-hidden";
+    setTimeout(notifyHomeReady, 0);
     return;
   }
   var copy = document.getElementById("jp-loader-copy"),
@@ -260,6 +267,7 @@
     loader.classList.add("jp-opening");
     setTimeout(function () {
       loader.className = "jp-loader jp-hidden";
+      notifyHomeReady();
     }, 980);
   }
   function frame(now) {

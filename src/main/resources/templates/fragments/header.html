@@ -2,32 +2,28 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
   <body>
     <!-- Landing-page header: guest/user areas are switched by landing.js dummy state. -->
-    <header th:fragment="landingHeader" class="site-header">
+    <header th:fragment="landingHeader" class="site-header header--dark" data-dynamic-header>
+      <div class="site-scroll-progress" aria-hidden="true"><i></i></div>
       <a href="/index.html" th:href="@{/index.html}" class="site-header__brand">
-        <img
-          src="/images/logo.png"
-          th:src="@{/images/logo.png}"
-          alt="JobPuzzle"
-          class="site-header__logo"
-        />
+        <img src="/images/logoB.png" th:src="@{/images/logoB.png}" alt="JobPuzzle" class="site-header__logo site-header__logo--light" />
+        <img src="/images/logoD.png" th:src="@{/images/logoD.png}" alt="" class="site-header__logo site-header__logo--dark" aria-hidden="true" />
         <span class="site-header__name">JobPuzzle</span>
       </a>
 
       <nav class="site-header__nav">
         <a href="/dashboard.html" th:href="@{/dashboard.html}">대시보드</a>
-        <a href="/my-data.html" th:href="@{/my-data.html}">내 자료</a>
-        <a href="/job-analysis.html" th:href="@{/job-analysis.html}">공고 분석</a>
+        <a href="/my-data.html" th:href="@{/my-data.html}">자료 관리</a>
         <a href="/interview.html" th:href="@{/interview.html}">면접 준비</a>
         <a href="/reports.html" th:href="@{/reports.html}">리포트</a>
       </nav>
 
       <div class="site-header__actions">
-        <div class="auth-guest" id="auth-guest">
+        <div class="auth-guest" id="auth-guest" hidden>
           <a class="btn btn--ghost" href="/login" th:href="@{/login}">로그인</a>
           <a class="btn btn--primary" href="/join" th:href="@{/join}">회원가입</a>
         </div>
         <div class="auth-user" id="auth-user" hidden>
-          <div class="user-chip" id="user-chip">
+          <button class="user-chip" id="user-chip" type="button" data-user-menu-trigger="user-menu" aria-controls="user-menu" aria-expanded="false">
             <span class="user-chip__avatar" id="user-avatar">김</span>
             <span class="user-chip__name" id="user-name">김지원님</span>
             <svg
@@ -40,7 +36,7 @@
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
-          </div>
+          </button>
           <div class="user-menu" id="user-menu" hidden>
             <a
               href="/settings.html"
@@ -61,15 +57,12 @@
       </div>
     </header>
 
-    <!-- Logged-in application header. header.js가 /api/user/me로 실제 로그인 사용자 정보를 채워넣음 -->
-    <header th:fragment="appHeader(activePage)" class="site-header">
+    <!-- Logged-in application header. Dummy user values stay hardcoded until backend owners bind them. -->
+    <header th:fragment="appHeader(activePage)" class="site-header header--light" data-dynamic-header>
+      <div class="site-scroll-progress" aria-hidden="true"><i></i></div>
       <a href="/index.html" th:href="@{/index.html}" class="site-header__brand">
-        <img
-          src="/images/logo.png"
-          th:src="@{/images/logo.png}"
-          alt="JobPuzzle"
-          class="site-header__logo"
-        />
+        <img src="/images/logoB.png" th:src="@{/images/logoB.png}" alt="JobPuzzle" class="site-header__logo site-header__logo--light" />
+        <img src="/images/logoD.png" th:src="@{/images/logoD.png}" alt="" class="site-header__logo site-header__logo--dark" aria-hidden="true" />
         <span class="site-header__name">JobPuzzle</span>
       </a>
 
@@ -84,13 +77,7 @@
           href="/my-data.html"
           th:href="@{/my-data.html}"
           th:classappend="${activePage == 'mydata'} ? 'is-active' : ''"
-          >지원 자료</a
-        >
-        <a
-          href="/job-analysis.html"
-          th:href="@{/job-analysis.html}"
-          th:classappend="${activePage == 'jobanalysis'} ? 'is-active' : ''"
-          >회사 자료</a
+          >자료 관리</a
         >
         <a
           href="/interview.html"
@@ -108,7 +95,7 @@
 
       <div class="site-header__actions">
         <div class="auth-user">
-          <div class="user-chip" id="app-user-chip">
+          <button class="user-chip" id="app-user-chip" type="button" data-user-menu-trigger="app-user-menu" aria-controls="app-user-menu" aria-expanded="false">
             <span class="user-chip__avatar" id="app-user-avatar">김</span>
             <span class="user-chip__name" id="app-user-name">김지원님</span>
             <svg
@@ -121,7 +108,7 @@
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
-          </div>
+          </button>
           <div class="user-menu" id="app-user-menu" hidden>
             <a
               href="/settings.html"

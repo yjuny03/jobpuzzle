@@ -3,6 +3,9 @@ package com.example.jobpuzzle.ai.validation;
 import com.example.jobpuzzle.ai.dto.CandidateMaterialAnalysisResult;
 import com.example.jobpuzzle.ai.dto.JobPostingAnalysisResult;
 import com.example.jobpuzzle.ai.dto.CustomizedAnalysisGenerationResult;
+import com.example.jobpuzzle.ai.dto.InterviewQuestionGenerationResult;
+import com.example.jobpuzzle.ai.dto.AnswerEvaluationResult;
+import com.example.jobpuzzle.ai.dto.WeaknessAnswerEvaluationResult;
 import com.example.jobpuzzle.ai.dto.SourceReference;
 import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
@@ -334,6 +337,22 @@ public class AiResponseProcessor {
         } catch (JsonProcessingException exception) {
             throw parseFailure("JSON-05 match normalization failed: " + exception.getClass().getSimpleName());
         }
+    }
+
+    // interview 추가: JSON-09/11도 기존 AI 응답과 동일하게 알 수 없는 필드를 거부한다.
+    public InterviewQuestionGenerationResult parseInterviewQuestions(
+            String rawJson,
+            String contractName
+    ) {
+        return parse(rawJson, InterviewQuestionGenerationResult.class, contractName);
+    }
+
+    public AnswerEvaluationResult parseAnswerEvaluation(String rawJson) {
+        return parse(rawJson, AnswerEvaluationResult.class, "JSON-06");
+    }
+
+    public WeaknessAnswerEvaluationResult parseWeaknessAnswerEvaluation(String rawJson) {
+        return parse(rawJson, WeaknessAnswerEvaluationResult.class, "JSON-10");
     }
 
     // 응답 전체가 json 코드 블록인 경우만 제거하고 그 밖의 복구는 하지 않는다.
