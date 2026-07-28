@@ -29,6 +29,7 @@ import com.example.jobpuzzle.guide.entity.GuideMatchType;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
+import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -391,17 +392,22 @@ public class MockAiClient implements AiClient {
                     evidenced ? evidenceText.get(selected) : "",
                     evidenced ? "" : "관련 경험 근거를 보완하세요."));
         }
-        CustomizedSynthesisV16ProviderResult.QuestionSlot question = null;
-        if (input.generationPolicy().questionGenerationEnabled()) {
-            question = new CustomizedSynthesisV16ProviderResult.QuestionSlot(
-                    "", InterviewQuestionType.COMPANY_FIT, "지원 직무와 연결되는 경험을 설명해주세요.",
-                    "지원자 근거와 직무 적합성 확인",
-                    com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
-                    input.evidenceCatalog().evidence().get(0).evidenceId());
-        }
+        List<CustomizedSynthesisV16ProviderResult.QuestionSlot> questions =
+                input.generationPolicy().questionGenerationEnabled()
+                        ? input.requirementCatalog().stream()
+                        .filter(requirement -> !requirement.allowedCandidateEvidenceIds().isEmpty())
+                        .limit(3)
+                        .map(requirement -> new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                                requirement.requirementId(), InterviewQuestionType.COMPANY_FIT,
+                                requirement.requirementText() + "과 연결되는 경험을 설명해주세요.",
+                                "지원자 근거와 직무 적합성 확인",
+                                com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
+                                requirement.allowedCandidateEvidenceIds().get(0)))
+                        .toList()
+                        : null;
         return json(new CustomizedSynthesisV18ProviderResult(
                 new CustomizedSynthesisV16ProviderResult.Readiness("입력 구조화 결과 기준 준비도", List.of()),
-                decisions, narratives, question));
+                decisions, narratives, questions));
     }
 
     private ReadinessResultStatus readiness(List<RequirementInput> requirements, List<SourceReference> candidateRefs, String guideMatchType) {
@@ -733,15 +739,23 @@ public class MockAiClient implements AiClient {
         return FinalReportResult.builder()
                 .overallScore(78)
                 .scoreLabel("세션 종합 기준 충족도")
+                .overallAssessment("전반적으로 기준 점수를 충족했으며, 결과 표현과 문제 해결 과정에서 보완이 필요합니다.")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
+                                .intentMatch(81)
                                 .requirementConnection(75)
                                 .specificity(70)
                                 .ownRole(85)
                                 .problemSolving(68)
-                                .resultExpression(62).build())
+                                .resultExpression(62)
+                                .guideAlignment(72)
+                                .deliveryClarity(82).build())
                 .basisSummary(
                         FinalReportResult.BasisSummary.builder()
+                                .jobCategory("IT·개발 / 백엔드")
+                                .careerLevel(JobCategoryCareerLevel.NEW)
+                                .evaluationPassThreshold(70)
+                                .originEvaluationIds(List.of())
                                 .requirementConnections(List.of(
                                         FinalReportResult.RequirementConnections.builder()
                                                 .requirement("Spring Boot 기반 백엔드 개발 경험")

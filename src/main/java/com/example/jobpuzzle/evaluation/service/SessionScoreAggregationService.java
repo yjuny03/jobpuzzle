@@ -118,11 +118,18 @@ public class SessionScoreAggregationService {
         ScoreAggregationCalculator.Result dimensionResult =
                 ScoreAggregationCalculator.aggregate(evaluationScores);
         Map<String, Integer> dimensionScores = dimensionResult.scores();
+        List<String> weaknessTags = evaluations.stream()
+                .flatMap(evaluation -> evaluation.getWeaknessTags() == null
+                        ? java.util.stream.Stream.<String>empty()
+                        : evaluation.getWeaknessTags().stream())
+                .distinct()
+                .toList();
         return SessionScoreSummary.QuestionScore.builder()
                 .sessionQuestionId(question.getSessionQuestionId())
                 .dimensionScores(dimensionScores)
                 .dimensionEvaluationCounts(dimensionResult.counts())
                 .finalScore(roundedAverage(new ArrayList<>(dimensionScores.values())))
+                .weaknessTags(weaknessTags)
                 .build();
     }
 

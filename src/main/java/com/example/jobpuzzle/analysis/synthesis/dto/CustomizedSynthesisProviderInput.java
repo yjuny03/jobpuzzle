@@ -81,11 +81,11 @@ public record CustomizedSynthesisProviderInput(
 
     public record GenerationPolicy(
             boolean questionGenerationEnabled,
-            int requiredQuestionCount
+            int maximumQuestionCount
     ) {
         public GenerationPolicy {
-            if (requiredQuestionCount < 0 || requiredQuestionCount > 1
-                    || questionGenerationEnabled != (requiredQuestionCount == 1)) {
+            if (maximumQuestionCount < 0 || maximumQuestionCount > 10
+                    || questionGenerationEnabled != (maximumQuestionCount > 0)) {
                 throw new IllegalArgumentException("invalid JSON-05 generation policy");
             }
         }

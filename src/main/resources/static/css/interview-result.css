@@ -700,7 +700,6 @@
   color: var(--color-text-muted);
   font-size: 12px;
 }
-
 .interim-actions {
   display: flex;
   align-items: center;
@@ -813,6 +812,93 @@
   gap: 15px;
   border-top: 1px solid #E6EDF4;
   padding: 18px 28px 22px;
+}
+
+.final-report-panel {
+  padding: 26px;
+  min-height: 430px;
+}
+.final-report-panel h2 {
+  font-size: 17px;
+  margin: 0 0 6px;
+}
+.final-assessment {
+  background: #F2F7FC;
+  border: 1px solid #DCE9F5;
+  border-radius: 12px;
+  color: #174F83;
+  font-size: 13.5px;
+  line-height: 1.75;
+  margin: 0 0 22px;
+  padding: 16px 18px;
+}
+.final-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.final-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FDF0E4;
+  border: 1px solid transparent;
+  color: #8A5A22;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.final-tag-chip:hover {
+  border-color: #E8CB98;
+}
+.final-tag-chip em {
+  font-style: normal;
+  color: #B08A4E;
+  font-size: 10.5px;
+}
+.final-recommend-list {
+  display: grid;
+  gap: 10px;
+}
+.final-recommend-card {
+  background: #F7F9FC;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.final-recommend-card p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+.final-suggestion-list {
+  display: grid;
+  gap: 14px;
+}
+.final-suggestion-group strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.final-suggestion-group ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.final-suggestion-group li {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #3E4652;
+}
+.final-learning-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.final-learning-list li {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #3E4652;
 }
 @media (max-width: 700px) {
   .eval-list { grid-template-columns: 1fr; }

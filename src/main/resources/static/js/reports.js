@@ -3,38 +3,29 @@
 (function () {
   'use strict';
 
-  var PAST_REPORTS = [
-    { id: 'r3', title: '백엔드 개발자 모의면접 #3', date: '2026.07.07', score: 82 },
-    { id: 'r2', title: '백엔드 개발자 모의면접 #2', date: '2026.06.28', score: 74 },
-    { id: 'r1', title: '백엔드 개발자 모의면접 #1', date: '2026.06.20', score: 68 }
-  ];
+  function api(path) {
+    return fetch(path, { credentials: 'same-origin' }).then(function (response) {
+      return response.json().then(function (body) {
+        if (!response.ok || !body.success) {
+          throw new Error(body.message || '결과를 불러오지 못했습니다.');
+        }
+        return body.data;
+      });
+    });
+  }
 
-  var CONNECTION_BY_ID = {
-    r3: { level: 'HIGH', pct: 100, desc: '공고 요구사항과 이력서·포트폴리오 경험이 대부분 일치했어요. 자료 보완 없이 실제 요구사항 기반 질문으로 진행됐어요.', weakSpots: [],
-      breakdown: [
-        { label: '대규모 트래픽 처리 경험', level: 'HIGH', fit: '포트폴리오에 캐싱·큐 도입으로 응답속도와 동시접속 처리량을 개선한 수치가 구체적으로 정리되어 있어요.', gap: '' },
-        { label: 'RESTful API 설계 경험', level: 'HIGH', fit: '포트폴리오에 API 엔드포인트 구조와 설계 원칙이 구체적인 프로젝트 사례로 남아있어요.', gap: '' },
-        { label: '협업 커뮤니케이션 능력', level: 'HIGH', fit: '자기소개서와 경험정리 자료의 조율 과정이 구체적으로 서술되어 있어요.', gap: '' },
-        { label: '장애 대응·운영 경험', level: 'HIGH', fit: '경험정리 자료에 장애 감지부터 복구, 재발 방지까지의 과정이 구체적으로 정리되어 있어요.', gap: '' },
-        { label: '직무 관련 성과·문제해결 경험', level: 'HIGH', fit: '이력서·포트폴리오·경험정리 모두 성과 수치와 함께 정리되어 있어요.', gap: '' }
-      ] },
-    r2: { level: 'MEDIUM', pct: 75, desc: '핵심 요구사항은 충족했지만, 장애 대응·모니터링 경험 자료가 부족해 일부는 과제로 보완한 뒤 질문이 생성됐어요.', weakSpots: ['장애 대응·모니터링 경험을 뒷받침할 이력서·포트폴리오 자료가 부족해요', '클라우드 인프라 운영 경험에 대한 근거 자료가 일부 누락돼 있어요'],
-      breakdown: [
-        { label: '대규모 트래픽 처리 경험', level: 'MEDIUM', fit: '포트폴리오에 트래픽 처리 관련 프로젝트 사례가 있어요.', gap: '경험정리 자료에 트래픽 급증 대응 경험이 정리되어 있지 않아요.' },
-        { label: 'RESTful API 설계 경험', level: 'HIGH', fit: '포트폴리오에 API 엔드포인트 구조와 설계 원칙이 구체적으로 남아있어요.', gap: '' },
-        { label: '장애 대응·운영 경험', level: 'LOW', fit: '', gap: '경험정리 자료에 장애 감지·대응·재발방지 관련 경험이 담겨있지 않아요.' },
-        { label: '직무 관련 성과·문제해결 경험', level: 'MEDIUM', fit: '이력서와 포트폴리오에 성과가 담긴 프로젝트 사례가 있어요.', gap: '경험정리 자료에 문제 해결 과정이 정리되어 있지 않아요.' }
-      ] },
-    r1: { level: 'LOW', pct: 50, desc: '자격 요건 중 클라우드 인프라 운영 경험 관련 자료가 부족해 여러 항목이 과제로 대체됐어요.', weakSpots: ['AWS 등 클라우드 인프라 운영 경험 관련 자료가 거의 없어요', '대규모 트래픽 처리 경험을 구체적으로 뒷받침할 자료가 부족해요', '협업 경험 자료가 본인 역할 중심으로 정리되어 있지 않아요'],
-      breakdown: [
-        { label: '대규모 트래픽 처리 경험', level: 'LOW', fit: '', gap: '포트폴리오와 경험정리 모두에 트래픽 처리량이나 성능 개선 수치가 없어요.' },
-        { label: 'RESTful API 설계 경험', level: 'MEDIUM', fit: '포트폴리오에 관련 프로젝트 설명이 일부 있어요.', gap: '구체적인 엔드포인트 설계 기준은 드러나지 않아요.' },
-        { label: '협업 커뮤니케이션 능력', level: 'LOW', fit: '', gap: '자기소개서와 경험정리 모두에 협업·갈등 해결 경험 서술이 없어요.' },
-        { label: '장애 대응·운영 경험', level: 'NONE', fit: '', gap: '경험정리 자료에 장애 관련 내용이 전혀 담겨있지 않아요.' },
-        { label: '직무 관련 성과·문제해결 경험', level: 'LOW', fit: '이력서에 프로젝트 경력이 간략히 적혀 있어요.', gap: '포트폴리오와 경험정리에 문제 해결 과정과 성과 수치가 구체적으로 담겨있지 않아요.' }
-      ] }
-  };
-  var LEVEL_COLOR = { HIGH: '#1E7A4C', MEDIUM: '#185FA5', LOW: '#B5622E', INSUFFICIENT: '#B5433D', NONE: '#8A93A3' };
+  function reportModeLabel(mode) {
+    if (mode === 'BASIC') return '기본 모의면접';
+    if (mode === 'COMPANY_FIT') return '회사 맞춤 면접';
+    return '약점 보완 면접';
+  }
+
+  function formatReportDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('ko-KR', {
+      year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
 
   var JOB_MAJOR_OPTIONS = ['IT·개발', '경영·사무', '디자인'];
   var JOB_MINOR_BY_MAJOR = {
@@ -68,7 +59,7 @@
     { company: 'DevRoute', title: '백엔드 개발자 (신입/경력)', location: '서울 · 정규직', match: 78 }
   ];
 
-  var state = { tab: 'report', selectedId: 'r3', reportStep: 'connection', guideMajor: 'IT·개발', guideMinor: '백엔드 개발', guideCareer: '신입' };
+  var state = { tab: 'report', sessions: [], sessionsLoaded: false, selectedSessionId: null, guideMajor: 'IT·개발', guideMinor: '백엔드 개발', guideCareer: '신입' };
 
   function renderTabs() {
     bindTabGroup({
@@ -80,71 +71,47 @@
     });
   }
 
-  function donut(pct, size, innerLabelHtml, color) {
-    color = color || '#185FA5';
-    var deg = Math.round(pct / 100 * 360);
-    return '<div class="donut" style="width:' + size + 'px; height:' + size + 'px; background:conic-gradient(' + color + ' ' + deg + 'deg, #E3E7ED 0);">' +
-      '<div class="donut__inner" style="width:' + Math.round(size * 0.73) + 'px; height:' + Math.round(size * 0.73) + 'px;">' + innerLabelHtml + '</div></div>';
-  }
-
   function renderReportList() {
-    document.getElementById('report-list').innerHTML = PAST_REPORTS.map(function (r) {
-      var selected = r.id === state.selectedId;
-      return '<div class="report-list-item' + (selected ? ' is-active' : '') + '" data-select-report="' + r.id + '">' +
-        '<p class="report-list-item__title">' + r.title + '</p><p class="report-list-item__date">' + r.date + '</p><p class="report-list-item__score">' + r.score + '점</p></div>';
+    var list = document.getElementById('report-list');
+    if (!state.sessions.length) {
+      list.innerHTML = state.sessionsLoaded
+        ? '<p style="color:#8A93A3; font-size:12.5px;">완료한 면접이 없습니다.</p>'
+        : '<p style="color:#8A93A3; font-size:12.5px;">불러오는 중입니다...</p>';
+      return;
+    }
+    list.innerHTML = state.sessions.map(function (s) {
+      var selected = s.sessionId === state.selectedSessionId;
+      return '<div class="report-list-item' + (selected ? ' is-active' : '') + '" data-select-report="' + s.sessionId + '">' +
+        '<p class="report-list-item__title">' + reportModeLabel(s.mode) + '</p>' +
+        '<p class="report-list-item__date">' + formatReportDate(s.completedAt) + '</p>' +
+        '<p class="report-list-item__score">질문 ' + s.questionCount + '개</p></div>';
     }).join('');
     document.querySelectorAll('[data-select-report]').forEach(function (b) {
-      b.addEventListener('click', function () { state.selectedId = b.dataset.selectReport; state.reportStep = 'connection'; renderAll(); });
+      b.addEventListener('click', function () {
+        state.selectedSessionId = Number(b.dataset.selectReport);
+        renderAll();
+      });
     });
   }
 
   function renderReportDetail() {
-    var sel = PAST_REPORTS.find(function (r) { return r.id === state.selectedId; }) || PAST_REPORTS[0];
-    var conn = CONNECTION_BY_ID[sel.id] || CONNECTION_BY_ID.r3;
-    var html = '<p style="font-size:16px; font-weight:700; margin:0 0 4px;">' + sel.title + '</p><p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">' + sel.date + ' · 총 질문 10개</p>';
-
-    if (state.reportStep === 'connection') {
-      html += '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">공고 요구사항 · 자료 연결 분석 결과</p>' +
-        '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">면접 전 진행했던 자료 연결 분석 결과예요. 이 결과를 바탕으로 질문이 생성됐어요.</p>' +
-        '<div class="flex-row gap-12" style="flex-wrap:wrap; margin-bottom:20px;">' +
-          donut(conn.pct, 110, '<p style="font-size:17px; font-weight:700; margin:0;">' + conn.pct + '%</p><p style="font-size:11px; font-weight:700; margin:2px 0 0; color:#185FA5;">' + conn.level + '</p>') +
-          '<p style="font-size:13px; color:#5B6370; margin:0; line-height:1.7; flex:1; min-width:220px;">' + conn.desc + '</p>' +
-        '</div>';
-
-      if (conn.weakSpots.length) {
-        html += '<div class="weakspot-box"><p style="font-size:12.5px; font-weight:700; color:#8A5A22; margin:0 0 10px;">개선이 필요한 항목</p><div style="display:flex; flex-direction:column; gap:8px;">' +
-          conn.weakSpots.map(function (w) { return '<p style="font-size:12.5px; color:#5B6370; margin:0; line-height:1.6;">• ' + w + '</p>'; }).join('') + '</div></div>';
-      }
-
-      html += '<div style="margin-bottom:24px;"><p style="font-size:13px; font-weight:700; margin:0 0 10px;">요구사항별 자료 적합도</p><div style="display:flex; flex-direction:column; gap:8px;">' +
-        conn.breakdown.map(function (r) {
-          return '<div class="req-row"><div class="flex-row" style="justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px;">' +
-            '<p style="font-size:12.5px; font-weight:700; margin:0;">' + r.label + '</p><span style="font-size:11px; font-weight:700; color:' + LEVEL_COLOR[r.level] + ';">' + r.level + '</span></div>' +
-            (r.fit ? '<p style="font-size:11.5px; color:#1E7A4C; margin:0 0 3px; line-height:1.6;">✓ ' + r.fit + '</p>' : '') +
-            (r.gap ? '<p style="font-size:11.5px; color:#B5433D; margin:0; line-height:1.6;">✕ ' + r.gap + '</p>' : '') +
-          '</div>';
-        }).join('') + '</div></div>';
-
-      html += '<div class="flex-row" style="justify-content:flex-end;"><button class="btn btn--primary" id="go-final-btn">면접 최종 평가 확인하기</button></div>';
-    } else {
-      var score = sel.score;
-      html += '<button class="btn-sm" id="go-connection-btn" style="margin-bottom:20px;">← 연결 분석 결과 다시보기</button>' +
-        '<div class="flex-row gap-12" style="margin-bottom:24px;">' +
-          donut(score, 70, '<div style="font-size:17px; font-weight:700;">' + score + '</div>') +
-          '<div><p style="font-size:14px; font-weight:600; margin:0;">최종 준비도 점수</p><p style="font-size:12px; color:#8A93A3; margin:4px 0 0;">항목별 점수와 종합 평가를 반영한 결과예요</p></div>' +
-        '</div>' +
-        '<div class="flex-row gap-12" style="flex-wrap:wrap;">' +
-          '<a href="/interview-result.html" class="btn btn--primary" style="text-decoration:none;">질문별 답변 · 약점 태그 자세히 보기</a>' +
-          '<a href="/interview.html" class="btn" style="background:#fff; border:1px solid #E3E7ED; text-decoration:none; color:#14181F;">약점 보완 모드로 연습 시작</a>' +
-          '<button class="btn" style="background:#fff; border:1px solid #E3E7ED;">PDF 내보내기</button>' +
-        '</div>';
+    var detail = document.getElementById('report-detail');
+    if (!state.sessions.length) {
+      detail.innerHTML = '<p style="color:#8A93A3; font-size:13px;">완료한 면접이 없습니다. 면접을 완료하면 여기서 최종 리포트를 다시 볼 수 있어요.</p>';
+      return;
     }
+    var sel = state.sessions.find(function (s) { return s.sessionId === state.selectedSessionId; }) || state.sessions[0];
+    state.selectedSessionId = sel.sessionId;
 
-    document.getElementById('report-detail').innerHTML = html;
-    var goFinal = document.getElementById('go-final-btn');
-    if (goFinal) goFinal.addEventListener('click', function () { state.reportStep = 'final'; renderReportDetail(); });
-    var goConn = document.getElementById('go-connection-btn');
-    if (goConn) goConn.addEventListener('click', function () { state.reportStep = 'connection'; renderReportDetail(); });
+    var html = '<p style="font-size:16px; font-weight:700; margin:0 0 4px;">' + reportModeLabel(sel.mode) + '</p>' +
+      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">' + formatReportDate(sel.completedAt) +
+      ' · 질문 ' + sel.questionCount + '개' + '</p>' +
+      '<p style="font-size:13px; color:#5B6370; margin:0 0 20px; line-height:1.7;">약점 태그, 다음 연습 추천, 서류 보완 제안 같은 최종 리포트 내용은 아래 화면에서 자세히 볼 수 있어요. ' +
+      '(처음 여는 리포트는 그 자리에서 만들어지느라 몇 초 걸릴 수 있어요.)</p>' +
+      '<a href="/interview-result.html?sessionId=' + encodeURIComponent(sel.sessionId) +
+      '" class="btn btn--primary" style="text-decoration:none;">최종 리포트 자세히 보기</a>';
+
+    detail.innerHTML = html;
   }
 
   function renderGuide() {
@@ -199,5 +166,16 @@
   document.addEventListener('DOMContentLoaded', function () {
     renderTabs();
     renderAll();
+    api('/api/interview-sessions/history').then(function (sessions) {
+      state.sessions = sessions;
+      state.sessionsLoaded = true;
+      if (sessions.length) state.selectedSessionId = sessions[0].sessionId;
+      renderReportList();
+      renderReportDetail();
+    }).catch(function (error) {
+      state.sessionsLoaded = true;
+      document.getElementById('report-list').innerHTML =
+        '<p style="color:#B5433D; font-size:12.5px;">' + error.message + '</p>';
+    });
   });
 })();
