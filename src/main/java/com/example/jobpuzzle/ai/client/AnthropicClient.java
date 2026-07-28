@@ -16,6 +16,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,7 @@ import java.util.regex.Pattern;
 @Component
 public class AnthropicClient implements AiClient {
 
+    private static final Logger log = LoggerFactory.getLogger(AnthropicClient.class);
     private static final int PROVIDER_ERROR_DETAIL_LIMIT = 500;
     private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
     private static final Pattern SAFE_ENVELOPE_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,100}");
@@ -121,14 +124,7 @@ public class AnthropicClient implements AiClient {
 
     @Override
     public FinalReportResult finalReport(String prompt) {
-        try {
-            return objectMapper.readValue(
-                    message(AiExecutionStage.FINAL_REPORT, prompt),
-                    FinalReportResult.class
-            );
-        } catch (JsonProcessingException exception) {
-            throw failure(AiCallLogErrorType.RESPONSE_PARSE_FAILED, "JSON-07 response is invalid");
-        }
+        return parseJson(message(AiExecutionStage.FINAL_REPORT, prompt), FinalReportResult.class);
     }
 
     @Override
@@ -383,7 +379,16 @@ public class AnthropicClient implements AiClient {
         try {
             return objectMapper.readValue(normalized, type);
         } catch (JsonProcessingException exception) {
-            throw failure(AiCallLogErrorType.JSON_PARSE_FAIL, "Claude 응답 JSON 파싱 실패: " + exception.getClass().getSimpleName());
+            // 코드펜스가 명확하지 않거나 앞뒤에 설명 문장이 붙는 경우를 대비해, 첫 '{'~마지막 '}' 구간만 다시 시도한다.
+            String extracted = extractJsonObject(normalized);
+            if (extracted != null) {
+                try {
+                    return objectMapper.readValue(extracted, type);
+                } catch (JsonProcessingException retryException) {
+                    throw debugFailure(normalized, retryException);
+                }
+            }
+            throw debugFailure(normalized, exception);
         }
     }
 
@@ -392,7 +397,21 @@ public class AnthropicClient implements AiClient {
         return matcher.matches() ? matcher.group(1).trim() : text;
     }
 
-    private record Request(String model, @JsonProperty("max_tokens") int maxTokens, List<Message> messages) { }
+    private String extractJsonObject(String text) {
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            return null;
+        }
+        return text.substring(start, end + 1);
+    }
+
+    // TEMP-DEBUG: 원인 확인되면 이 로그 라인 제거 예정. DB error_message에는 원문을 남기지 않고 서버 로그에만 전체 원문을 남긴다.
+    private AiProcessingException debugFailure(String normalized, JsonProcessingException exception) {
+        log.warn("JSON 파싱 실패 [{}] 원문 전체:\n{}", exception.getClass().getSimpleName(), normalized);
+        return failure(AiCallLogErrorType.JSON_PARSE_FAIL, "Claude 응답 JSON 파싱 실패: " + exception.getClass().getSimpleName());
+    }
+
     private record Message(String role, String content) { }
     private record Thinking(String type) { }
     @JsonIgnoreProperties(ignoreUnknown = true)

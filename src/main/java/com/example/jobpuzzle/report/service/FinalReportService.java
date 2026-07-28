@@ -111,7 +111,7 @@ public class FinalReportService {
     // 저장된 리포트가 있으면 그대로 반환
     // 없으면 생성 가능 조건을 확인한 뒤 그 자리에서 생성해서 반환
     public FinalReportResponse getFinalReport(Long userId, Long sessionId) {
-        InterviewSession session = interviewSessionRepository.findBySessionIdAndUserId(sessionId, userId)
+        InterviewSession session = interviewSessionRepository.findBySessionIdAndUser_UserIdAndDeletedAtIsNull(sessionId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
 
         Optional<FinalReport> report = finalReportRepository.findBySession_SessionId(sessionId);
@@ -331,7 +331,7 @@ public class FinalReportService {
             aiCallLogRepository.saveAndFlush(log);
 
             return new ReportLease(
-                    sessionId, log.getAiCallLogId(), session, aggregate, scoreSummary, selection);
+                    sessionId, log.getAiCallLogId(), session, aggregate, scoreSummary, selection, promptTemplate);
         });
     }
 
@@ -376,11 +376,16 @@ public class FinalReportService {
                 .orElseThrow(() -> new CustomException(ErrorCode.AI_PROMPT_TEMPLATE_NOT_FOUND));
     }
 
-    // Mock은 내용을 보지 않으므로 지금은 평가 요약을 간단한 문자열로 조립하는 정도로 충분하다.
     private String buildPrompt(ReportLease lease) {
         QuestionAggregate aggregate = lease.aggregate();
         SessionScoreSummary score = lease.scoreSummary();
+        PromptTemplate promptTemplate = lease.promptTemplate();
         StringBuilder prompt = new StringBuilder();
+        prompt.append(promptTemplate.getTemplateText());
+        if (promptTemplate.getForbiddenRules() != null && !promptTemplate.getForbiddenRules().isBlank()) {
+            prompt.append("\n\n[금지 규칙]\n").append(promptTemplate.getForbiddenRules());
+        }
+        prompt.append("\n\n[이번 세션 정보]\n");
         prompt.append("세션 ").append(lease.sessionId())
                 .append(" 모드=").append(lease.session().getMode())
                 .append(" 총질문=").append(score.getTotalQuestionCount())
@@ -393,6 +398,7 @@ public class FinalReportService {
                 .append('\n');
         for (AnswerEvaluation evaluation : aggregate.evaluations()) {
             prompt.append("- score=").append(evaluation.getScore())
+                    .append(" weaknessTags=").append(evaluation.getWeaknessTags())
                     .append(" summary=").append(evaluation.getSummary())
                     .append('\n');
         }
@@ -606,7 +612,8 @@ public class FinalReportService {
             InterviewSession session,
             QuestionAggregate aggregate,
             SessionScoreSummary scoreSummary,
-            GenerationClientSelection selection
+            GenerationClientSelection selection,
+            PromptTemplate promptTemplate
     ) {
     }
 }

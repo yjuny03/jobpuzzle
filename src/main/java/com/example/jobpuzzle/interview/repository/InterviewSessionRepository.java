@@ -31,6 +31,4 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
             Long userId,
             InterviewSessionStatus status
     );
-
-    Optional<InterviewSession> findBySessionIdAndUserId(Long sessionId, Long userId);
 }
