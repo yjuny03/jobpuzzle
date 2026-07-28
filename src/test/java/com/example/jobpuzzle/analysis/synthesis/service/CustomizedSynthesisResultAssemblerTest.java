@@ -76,6 +76,24 @@ class CustomizedSynthesisResultAssemblerTest {
     }
 
     @Test
+    void preservesMatchesAndDisablesQuestionsWhenProviderReturnsNoUsableQuestion() {
+        CustomizedSynthesisProviderResult provider = provider("candidate-1");
+        provider.setQuestions(List.of(CustomizedSynthesisProviderResult.Question.builder()
+                .relatedRequirementId("req-1").questionType(InterviewQuestionType.COMPANY_FIT)
+                .question("placeholder?").intent("임시 문구")
+                .evaluationFocus(List.of(InterviewQuestionEvaluationFocus.requirementConnection))
+                .evidenceIds(List.of("candidate-1")).build()));
+
+        var result = assembler.assemble(provider, authority(), GuideMatchType.EXACT);
+
+        assertThat(result.getRequirementMatches()).hasSize(1);
+        assertThat(result.getQuestions()).isEmpty();
+        assertThat(result.getReadiness().isCanGenerateQuestions()).isFalse();
+        assertThat(result.getReadiness().getLimitations())
+                .contains("질문 생성 결과에서 사용할 수 있는 근거 기반 질문을 확인하지 못했습니다.");
+    }
+
+    @Test
     void rejectsDuplicateTasksForSameNonHighRequirement() {
         CustomizedSynthesisProviderResult provider = provider("candidate-1");
         var match = provider.getRequirementMatches().get(0);

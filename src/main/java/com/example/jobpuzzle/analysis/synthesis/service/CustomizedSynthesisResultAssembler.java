@@ -37,7 +37,7 @@ public class CustomizedSynthesisResultAssembler {
         CustomizedAnalysisGenerationResult.Readiness readiness =
                 readiness(provider.getReadiness(), requirements, authority, guideMatchType);
         List<CustomizedAnalysisGenerationResult.Question> questions =
-                questions(provider.getQuestions(), readiness.isCanGenerateQuestions(), requirements, evidence, matches);
+                questions(provider.getQuestions(), readiness, requirements, evidence, matches);
         List<CustomizedAnalysisGenerationResult.Task> tasks =
                 tasks(provider.getTasks(), requirements, matches);
         return CustomizedAnalysisGenerationResult.builder()
@@ -184,29 +184,28 @@ public class CustomizedSynthesisResultAssembler {
 
     private List<CustomizedAnalysisGenerationResult.Question> questions(
             List<CustomizedSynthesisProviderResult.Question> generated,
-            boolean canGenerateQuestions,
+            CustomizedAnalysisGenerationResult.Readiness readiness,
             Map<String, CustomizedSynthesisEvidenceCatalog.RequirementItem> requirements,
             Map<String, CustomizedSynthesisEvidenceCatalog.EvidenceItem> evidence,
             Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches) {
         List<CustomizedSynthesisProviderResult.Question> source = generated == null ? List.of() : generated;
-        if (!canGenerateQuestions) {
-            if (!source.isEmpty()) fail("questions must be empty when generation is disabled");
+        if (!readiness.isCanGenerateQuestions()) {
             return List.of();
         }
-        if (source.isEmpty() || source.size() > 10) fail("questions must contain 1 to 10 items");
         List<CustomizedAnalysisGenerationResult.Question> values = new ArrayList<>();
-        for (int index = 0; index < source.size(); index++) {
+        Set<String> questionTexts = new HashSet<>();
+        for (int index = 0; index < source.size() && values.size() < 10; index++) {
             CustomizedSynthesisProviderResult.Question item = source.get(index);
             if (item == null || item.getQuestionType() == null || blank(item.getQuestion())
                     || blank(item.getIntent()) || item.getEvaluationFocus() == null
-                    || item.getEvaluationFocus().isEmpty()) {
-                fail("provider question is invalid");
-            }
+                    || item.getEvaluationFocus().isEmpty() || temporaryQuestion(item.getQuestion())) continue;
             CustomizedSynthesisEvidenceCatalog.RequirementItem requirement =
-                    item.getRelatedRequirementId() == null ? null : requirements.get(item.getRelatedRequirementId());
-            if (item.getRelatedRequirementId() != null && requirement == null) {
-                fail("question relatedRequirementId is unknown");
-            }
+                    blank(item.getRelatedRequirementId()) ? null : requirements.get(item.getRelatedRequirementId());
+            if (!blank(item.getRelatedRequirementId()) && requirement == null) continue;
+            if (requirement != null && (nonInterviewRequirement(requirement.requirementText())
+                    || requirement.allowedCandidateEvidenceIds().isEmpty())) continue;
+            String normalizedQuestion = item.getQuestion().replaceAll("\\s+", " ").trim().toLowerCase();
+            if (!questionTexts.add(normalizedQuestion)) continue;
             Set<String> allowed = new HashSet<>();
             if (requirement == null) allowed.addAll(evidence.keySet());
             else {
@@ -229,11 +228,9 @@ public class CustomizedSynthesisResultAssembler {
                     selectedIds.add(requirement.postingEvidenceIds().get(0));
                 if (!hasCandidate && !requirement.allowedCandidateEvidenceIds().isEmpty())
                     selectedIds.add(requirement.allowedCandidateEvidenceIds().get(0));
-            } else if (selectedIds.isEmpty() && !allowed.isEmpty()) {
-                selectedIds.add(allowed.iterator().next());
             }
             if (new HashSet<>(item.getEvaluationFocus()).size() != item.getEvaluationFocus().size()) {
-                fail("question evaluationFocus must not contain duplicates");
+                continue;
             }
             List<SourceReference> refs = selectedIds.stream()
                     .map(evidence::get)
@@ -246,14 +243,36 @@ public class CustomizedSynthesisResultAssembler {
             CustomizedAnalysisGenerationResult.RequirementMatch match =
                     requirement == null ? null : matches.get(requirement.requirementId());
             values.add(CustomizedAnalysisGenerationResult.Question.builder()
-                    .questionId("question-" + (index + 1)).questionType(item.getQuestionType())
+                    .questionId("question-" + (values.size() + 1)).questionType(item.getQuestionType())
                     .question(item.getQuestion()).intent(item.getIntent())
                     .evaluationFocus(List.copyOf(item.getEvaluationFocus()))
                     .relatedRequirementId(requirement == null ? null : requirement.requirementId())
                     .relatedMatchId(match == null ? null : match.getMatchId())
                     .sourceRefs(refs).reviewStatus(InterviewQuestionReviewStatus.PASS).reviewNote(null).build());
         }
+        if (values.isEmpty()) {
+            readiness.setCanGenerateQuestions(false);
+            List<String> limitations = new ArrayList<>(readiness.getLimitations());
+            addLimitation(limitations, "질문 생성 결과에서 사용할 수 있는 근거 기반 질문을 확인하지 못했습니다.");
+            readiness.setLimitations(List.copyOf(limitations));
+        }
         return List.copyOf(values);
+    }
+
+    private boolean temporaryQuestion(String value) {
+        String normalized = value.replaceAll("[\\s?!.,:;_-]+", "").toLowerCase();
+        return Set.of("placeholder", "todo", "tbd", "na", "질문", "질문을입력하세요").contains(normalized);
+    }
+
+    private boolean nonInterviewRequirement(String value) {
+        if (blank(value)) return true;
+        String normalized = value.replaceAll("\\s+", "");
+        return normalized.contains("학력무관")
+                || normalized.contains("경력무관")
+                || normalized.contains("성별무관")
+                || normalized.contains("연령무관")
+                || normalized.startsWith("우대전공:")
+                || normalized.contains("관련학과전공자");
     }
 
     private List<CustomizedAnalysisGenerationResult.Task> tasks(

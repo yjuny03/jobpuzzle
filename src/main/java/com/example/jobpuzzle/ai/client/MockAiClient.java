@@ -391,17 +391,22 @@ public class MockAiClient implements AiClient {
                     evidenced ? evidenceText.get(selected) : "",
                     evidenced ? "" : "관련 경험 근거를 보완하세요."));
         }
-        CustomizedSynthesisV16ProviderResult.QuestionSlot question = null;
-        if (input.generationPolicy().questionGenerationEnabled()) {
-            question = new CustomizedSynthesisV16ProviderResult.QuestionSlot(
-                    "", InterviewQuestionType.COMPANY_FIT, "지원 직무와 연결되는 경험을 설명해주세요.",
-                    "지원자 근거와 직무 적합성 확인",
-                    com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
-                    input.evidenceCatalog().evidence().get(0).evidenceId());
-        }
+        List<CustomizedSynthesisV16ProviderResult.QuestionSlot> questions =
+                input.generationPolicy().questionGenerationEnabled()
+                        ? input.requirementCatalog().stream()
+                        .filter(requirement -> !requirement.allowedCandidateEvidenceIds().isEmpty())
+                        .limit(3)
+                        .map(requirement -> new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                                requirement.requirementId(), InterviewQuestionType.COMPANY_FIT,
+                                requirement.requirementText() + "과 연결되는 경험을 설명해주세요.",
+                                "지원자 근거와 직무 적합성 확인",
+                                com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus.requirementConnection,
+                                requirement.allowedCandidateEvidenceIds().get(0)))
+                        .toList()
+                        : null;
         return json(new CustomizedSynthesisV18ProviderResult(
                 new CustomizedSynthesisV16ProviderResult.Readiness("입력 구조화 결과 기준 준비도", List.of()),
-                decisions, narratives, question));
+                decisions, narratives, questions));
     }
 
     private ReadinessResultStatus readiness(List<RequirementInput> requirements, List<SourceReference> candidateRefs, String guideMatchType) {
