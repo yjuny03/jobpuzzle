@@ -12,6 +12,7 @@ public class FinalReportResponse {
 
     private Long sessionId;
     private String interviewMode;
+    private Long analysisCaseId;
 
     private int totalQuestionCount;
     private int submittedQuestionCount;

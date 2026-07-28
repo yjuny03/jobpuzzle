@@ -36,6 +36,66 @@
     return '약점 보완 면접';
   }
 
+  var QUESTION_TYPE_LABELS = {
+    GENERAL: '일반', COMPANY_FIT: '회사 맞춤', EXPERIENCE: '경험', PROBLEM_SOLVING: '문제 해결', SKILL: '기술'
+  };
+  var IMPROVEMENT_TARGET_LABELS = {
+    resume: '이력서', coverLetter: '자기소개서', portfolio: '포트폴리오', experienceNote: '경험정리'
+  };
+
+  function renderFinalReport(report) {
+    var panel = document.getElementById('final-report-panel');
+    var weaknessTags = report.weaknessTagSummary || [];
+    var recommendations = report.nextPracticeRecommendation || [];
+    var learningDirection = report.learningDirection || [];
+    var suggestion = report.improvementSuggestion || {};
+
+    var html = '<h2>최종 리포트</h2>' +
+      '<p class="result-empty-copy">' + esc(report.totalQuestionCount) + '개 질문, 답변 ' +
+      esc(report.submittedQuestionCount) + '개를 모두 종합해 정리한 결과예요.</p>';
+
+    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span></div>';
+    html += weaknessTags.length
+      ? '<div class="final-tag-list">' + weaknessTags.map(function (item) {
+          return '<span class="final-tag-chip">' + esc(item.tag) + ' <em>' + item.count + '회</em></span>';
+        }).join('') + '</div>'
+      : '<p class="result-empty-copy">확인된 약점 태그가 없습니다.</p>';
+
+    html += '<div class="result-section-title" style="margin-top:22px;"><span>다음에 연습하면 좋은 것</span></div>';
+    html += recommendations.length
+      ? '<div class="final-recommend-list">' + recommendations.map(function (item) {
+          return '<article class="final-recommend-card">' +
+            '<span class="eval-scope">' + esc(QUESTION_TYPE_LABELS[item.questionType] || item.questionType) + ' 질문</span>' +
+            '<p>' + esc(item.reason) + '</p></article>';
+        }).join('') + '</div>'
+      : '<p class="result-empty-copy">추천 항목이 없습니다.</p>';
+
+    var suggestionKeys = Object.keys(IMPROVEMENT_TARGET_LABELS).filter(function (key) {
+      return suggestion[key] && suggestion[key].length;
+    });
+    if (suggestionKeys.length) {
+      html += '<div class="result-section-title" style="margin-top:22px;"><span>서류 보완 제안</span></div>';
+      html += '<div class="final-suggestion-list">' + suggestionKeys.map(function (key) {
+        return '<div class="final-suggestion-group"><strong>' + esc(IMPROVEMENT_TARGET_LABELS[key]) + '</strong>' +
+          '<ul>' + suggestion[key].map(function (text) { return '<li>' + esc(text) + '</li>'; }).join('') + '</ul></div>';
+      }).join('') + '</div>';
+    }
+
+    if (learningDirection.length) {
+      html += '<div class="result-section-title" style="margin-top:22px;"><span>학습 방향</span></div>' +
+        '<ul class="final-learning-list">' + learningDirection.map(function (text) {
+          return '<li>' + esc(text) + '</li>';
+        }).join('') + '</ul>';
+    }
+
+    if (report.analysisCaseId) {
+      html += '<div style="margin-top:24px;"><a class="btn btn--secondary" href="/api/analysis/' +
+        encodeURIComponent(report.analysisCaseId) + '">공고 요구사항 연결 분석 결과 보기</a></div>';
+    }
+
+    panel.innerHTML = html;
+  }
+
   function scoreTone(score) {
     if (score >= 80) return 'score-good';
     if (score >= 70) return 'score-pass';
@@ -246,6 +306,12 @@
       renderSession(values[0], values[1]);
     }).catch(function (error) {
       document.getElementById('overall-score-label').textContent = error.message;
+    });
+
+    // 최종 리포트는 별도 호출로 분리
+    api('/api/final-report/sessions/' + sessionId).then(renderFinalReport).catch(function (error) {
+      document.getElementById('final-report-panel').innerHTML =
+        '<p class="result-empty-copy">' + esc(error.message) + '</p>';
     });
   });
 })();

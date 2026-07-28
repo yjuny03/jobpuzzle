@@ -150,6 +150,7 @@ public class FinalReportService {
 
         return FinalReportResponse.builder()
                 .sessionId(report.getSession().getSessionId())
+                .analysisCaseId(analysisCaseIdOf(report.getSession()))
                 .interviewMode(report.getInterviewMode().name())
                 .totalQuestionCount(report.getTotalQuestionCount())
                 .submittedQuestionCount(report.getSubmittedQuestionCount())
@@ -166,6 +167,13 @@ public class FinalReportService {
                 .improvementSuggestion(toResponseImprovementSuggestion(suggestions))
                 .learningDirection(report.getLearningDirection())
                 .build();
+    }
+
+    // 분석 결과 화면 링크용
+    private Long analysisCaseIdOf(InterviewSession session) {
+        return session.getSnapshot() == null || session.getSnapshot().getAnalysisCase() == null
+                ? null
+                : session.getSnapshot().getAnalysisCase().getAnalysisCaseId();
     }
 
     private FinalReportResponse.CategoryScores toResponseCategoryScores(
