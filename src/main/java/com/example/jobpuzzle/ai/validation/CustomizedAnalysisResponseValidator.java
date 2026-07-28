@@ -34,123 +34,24 @@ public class CustomizedAnalysisResponseValidator {
         validateReadiness(context.guideContext(), inputs, allCandidateRefs(candidateRefs), result.getReadiness());
         Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches = validateMatches(inputs, candidateRefs, candidateRefsById, result.getRequirementMatches());
         result.setRequirementMatches(new ArrayList<>(matches.values()));
-        result.setQuestions(ensureQuestions(
-                result.getReadiness().isCanGenerateQuestions(), matches, inputs, result.getQuestions()));
+        normalizeQuestionAvailability(result.getReadiness(), result.getQuestions());
         validateQuestions(result.getReadiness().isCanGenerateQuestions(), matches, inputs.keySet(), inputs, allCandidateRefs(candidateRefs), result.getQuestions());
         result.setTasks(addMissingTasks(matches, result.getTasks()));
         validateTasks(matches, result.getTasks());
         return result;
     }
 
-    private List<CustomizedAnalysisGenerationResult.Question> ensureQuestions(
-            boolean canGenerateQuestions,
-            Map<String, CustomizedAnalysisGenerationResult.RequirementMatch> matches,
-            Map<String, RequirementInput> inputs,
-            List<CustomizedAnalysisGenerationResult.Question> generated) {
-        if (!canGenerateQuestions) return List.of();
-
-        List<CustomizedAnalysisGenerationResult.Question> values = new ArrayList<>(generated);
-        Set<String> ids = values.stream()
-                .map(CustomizedAnalysisGenerationResult.Question::getQuestionId)
-                .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-        Set<String> coveredRequirementIds = values.stream()
-                .map(CustomizedAnalysisGenerationResult.Question::getRelatedRequirementId)
-                .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-        List<CustomizedAnalysisGenerationResult.RequirementMatch> ordered = matches.values().stream()
-                .sorted(java.util.Comparator
-                        .comparing((CustomizedAnalysisGenerationResult.RequirementMatch match) ->
-                                match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH)
-                        .thenComparing(CustomizedAnalysisGenerationResult.RequirementMatch::getRequirementId))
-                .toList();
-
-        int targetCount = Math.min(6, ordered.size());
-        for (CustomizedAnalysisGenerationResult.RequirementMatch match : ordered) {
-            if (values.size() >= targetCount) break;
-            if (!coveredRequirementIds.add(match.getRequirementId())) continue;
-            String questionId = "server-question-" + match.getRequirementId();
-            if (!ids.add(questionId)) continue;
-            List<SourceReference> refs = new ArrayList<>(
-                    copyReferences(inputs.get(match.getRequirementId()).sourceRefs()));
-            if (match.getCandidateSourceRefs() != null) {
-                refs.addAll(copyReferences(match.getCandidateSourceRefs()));
-            }
-            boolean strong = match.getMatchLevel() == MatchAnalysisResultMatchLevel.HIGH;
-            String question = fallbackQuestion(match);
-            String intent = fallbackIntent(match);
-            values.add(CustomizedAnalysisGenerationResult.Question.builder()
-                    .questionId(questionId)
-                    .questionType(strong ? InterviewQuestionType.EXPERIENCE : InterviewQuestionType.PROBLEM_SOLVING)
-                    .question(question)
-                    .intent(intent)
-                    .evaluationFocus(strong
-                            ? List.of(InterviewQuestionEvaluationFocus.ownRole,
-                            InterviewQuestionEvaluationFocus.resultExpression)
-                            : List.of(InterviewQuestionEvaluationFocus.specificity,
-                            InterviewQuestionEvaluationFocus.requirementConnection))
-                    .relatedMatchId(match.getMatchId())
-                    .relatedRequirementId(match.getRequirementId())
-                    .sourceRefs(refs)
-                    .reviewStatus(InterviewQuestionReviewStatus.PASS)
-                    .reviewNote(null)
-                    .build());
-        }
-        return values.size() <= 10 ? values : new ArrayList<>(values.subList(0, 10));
-    }
-
-    private String fallbackQuestion(CustomizedAnalysisGenerationResult.RequirementMatch match) {
-        String requirement = match.getRequirement();
-        int variant = Math.floorMod(match.getRequirementId().hashCode(), 3);
-        return switch (match.getMatchLevel()) {
-            case HIGH -> switch (variant) {
-                case 0 -> "다음 역량을 가장 잘 보여주는 사례는 무엇인가요: " + requirement
-                        + ". 당시 본인의 역할과 구체적인 성과를 설명해 주세요?";
-                case 1 -> "본인이 수행한 경험 중 다음 요구사항과 가장 가까운 사례를 설명해 주세요: "
-                        + requirement + ". 어떤 판단을 내렸고 결과는 어땠나요?";
-                default -> "다음 역량을 실제로 활용했던 상황을 하나 선택해 주세요: " + requirement
-                        + ". 본인이 직접 기여한 부분과 성과는 무엇이었나요?";
-            };
-            case MEDIUM -> switch (variant) {
-                case 0 -> "다음 요구사항과 관련해 본인이 직접 수행한 경험을 설명해 주세요: " + requirement
-                        + ". 당시 판단 기준과 수행 범위는 무엇이었나요?";
-                case 1 -> "제출 자료에서 일부 경험이 확인된 항목입니다: " + requirement
-                        + ". 실제 업무나 프로젝트에서 어떻게 적용했는지 구체적으로 설명해 주세요?";
-                default -> "다음 요구사항을 수행했던 사례가 있다면 설명해 주세요: " + requirement
-                        + ". 본인의 역할과 의사결정, 결과를 중심으로 말씀해 주세요?";
-            };
-            case LOW -> switch (variant) {
-                case 0 -> "다음 요구사항과 연결되는 경험을 확인하고 싶습니다: " + requirement
-                        + ". 직접 또는 간접적인 경험이 있다면 본인의 역할과 실제 결과를 설명해 주세요?";
-                case 1 -> "제출 자료만으로는 다음 역량을 충분히 확인하기 어려웠습니다: " + requirement
-                        + ". 유사한 경험이 있다면 어떤 상황에서 활용했는지 설명해 주세요?";
-                default -> "다음 항목과 연관된 학습이나 프로젝트 경험을 확인하고 싶습니다: "
-                        + requirement + ". 이를 실제 역량으로 연결한 구체적인 행동과 결과를 말씀해 주세요?";
-            };
-            case NONE, INSUFFICIENT -> switch (variant) {
-                case 0 -> "제출 자료에서는 다음 경험을 확인하기 어려웠습니다: " + requirement
-                        + ". 관련 경험이 있다면 상황과 행동, 결과를 설명해 주세요?";
-                case 1 -> "다음 요구사항과 관련해 자료에 포함하지 못한 경험이 있는지 확인하고 싶습니다: "
-                        + requirement + ". 있다면 본인이 직접 수행한 내용을 구체적으로 말씀해 주세요?";
-                default -> "현재 자료에서 근거가 확인되지 않은 항목입니다: " + requirement
-                        + ". 보유한 경험이 있다면 역할과 수행 과정, 결과를 설명해 주세요?";
-            };
-        };
-    }
-
-    private String fallbackIntent(CustomizedAnalysisGenerationResult.RequirementMatch match) {
-        return switch (match.getMatchLevel()) {
-            case HIGH -> "확인된 강점이 실제 본인 기여인지 역할과 결과의 구체성으로 검증합니다.";
-            case MEDIUM -> "부분적으로 확인된 경험의 판단 기준과 실제 수행 깊이를 확인합니다.";
-            case LOW -> "간접 근거가 해당 요구 역량으로 이어지는지 본인의 역할과 결과로 확인합니다.";
-            case NONE, INSUFFICIENT -> "제출 자료에 없던 경험의 실제 보유 여부를 중립적으로 확인합니다.";
-        };
-    }
-
-    private String compact(String value) {
-        if (blank(value)) return "구체적인 경험과 근거";
-        String normalized = value.replaceAll("\\s+", " ").trim();
-        return normalized.length() <= 80 ? normalized : normalized.substring(0, 80) + "…";
+    private void normalizeQuestionAvailability(
+            CustomizedAnalysisGenerationResult.Readiness readiness,
+            List<CustomizedAnalysisGenerationResult.Question> questions) {
+        if (questions != null && !questions.isEmpty()) return;
+        if (!readiness.isCanGenerateQuestions()) return;
+        readiness.setCanGenerateQuestions(false);
+        List<String> limitations = readiness.getLimitations() == null
+                ? new ArrayList<>() : new ArrayList<>(readiness.getLimitations());
+        String limitation = "질문 생성 결과에서 사용할 수 있는 근거 기반 질문을 확인하지 못했습니다.";
+        if (!limitations.contains(limitation)) limitations.add(limitation);
+        readiness.setLimitations(List.copyOf(limitations));
     }
 
     // JSON-01의 REQUIRED/PREFERRED 요구사항이 JSON-05에 정확히 한 번씩 대응되는지 확인한다.

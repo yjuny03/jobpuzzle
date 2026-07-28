@@ -22,10 +22,27 @@
 
     <div class="tabbar" style="margin-bottom:24px;">
       <span class="tabbar__btn is-active">질문 생성</span>
-      <a href="/interview-result.html" th:href="@{/interview-result.html}" class="tabbar__btn" style="text-decoration:none; display:inline-block;">답변 평가</a>
+      <a id="interview-result-tab" href="/interview-result.html" th:href="@{/interview-result.html}" class="tabbar__btn" style="text-decoration:none; display:inline-block;">답변 평가</a>
     </div>
 
     <div id="step-root"></div>
+
+    <details class="evaluation-guide" id="evaluation-guide">
+      <summary>
+        <span>면접 답변을 살펴보는 8가지 기준</span>
+        <small>질문마다 필요한 기준만 골라 평가합니다</small>
+      </summary>
+      <div class="evaluation-guide__grid">
+        <article><strong>질문 의도 이해</strong><p>질문에서 확인하려는 핵심을 정확히 짚었는지 봅니다.</p></article>
+        <article><strong>경험 구체성</strong><p>상황과 행동을 실제 사례로 구체적으로 설명했는지 봅니다.</p></article>
+        <article><strong>본인 역할</strong><p>팀의 성과와 본인이 직접 수행한 일을 구분했는지 봅니다.</p></article>
+        <article><strong>문제 해결 과정</strong><p>판단 기준과 해결 과정을 논리적으로 설명했는지 봅니다.</p></article>
+        <article><strong>성과 및 결과 표현</strong><p>행동으로 만들어낸 변화와 결과를 분명히 제시했는지 봅니다.</p></article>
+        <article><strong>공고 요구사항 연결</strong><p>경험이 지원 직무의 요구사항과 어떻게 연결되는지 봅니다.</p></article>
+        <article><strong>직무 가이드 적합</strong><p>답변이 직무에서 중요하게 보는 역량과 맞는지 봅니다.</p></article>
+        <article><strong>답변 전달력</strong><p>핵심이 잘 드러나도록 명확하고 이해하기 쉽게 말했는지 봅니다.</p></article>
+      </div>
+    </details>
 
   </div>
 </div>

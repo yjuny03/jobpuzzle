@@ -9,6 +9,7 @@ import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContext;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotContextSource;
 import com.example.jobpuzzle.analysis.dto.AnalysisInputSnapshotResponse;
 import com.example.jobpuzzle.analysis.entity.AnalysisCase;
+import com.example.jobpuzzle.analysis.entity.AnalysisCaseStatus;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseSource;
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshotSource;
@@ -76,6 +77,20 @@ public class AnalysisCaseService {
     public AnalysisCaseResponse getCase(Long userId, Long analysisCaseId) {
         AnalysisCase analysisCase = findOwnedCase(userId, analysisCaseId);
         return AnalysisCaseResponse.of(analysisCase, findSources(analysisCaseId));
+    }
+
+    public List<AnalysisCaseResponse> getCompletedCases(Long userId) {
+        return analysisCaseRepository
+                .findByUser_UserIdAndStatusOrderByCreatedAtDesc(
+                        userId,
+                        AnalysisCaseStatus.COMPLETED
+                )
+                .stream()
+                .map(analysisCase -> AnalysisCaseResponse.of(
+                        analysisCase,
+                        findSources(analysisCase.getAnalysisCaseId())
+                ))
+                .toList();
     }
 
     @Transactional
