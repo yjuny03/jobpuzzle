@@ -17,6 +17,7 @@ import com.example.jobpuzzle.evaluation.entity.WeaknessTagLog;
 import com.example.jobpuzzle.evaluation.entity.WeaknessTagResolveStatus;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagLogRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
+import com.example.jobpuzzle.evaluation.service.WeaknessTagNormalizer;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.interview.entity.*;
@@ -32,7 +33,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +56,7 @@ public class QuestionGenerationService {
     private final InterviewQuestionGenerationInputMapper inputMapper;
     private final InterviewQuestionGenerationResponseValidator responseValidator;
     private final InterviewQuestionGenerationResultWriter resultWriter;
+    private final WeaknessTagNormalizer weaknessTagNormalizer;
 
     public QuestionSetResponse generateBasicQuestionSet(Long userId, BasicQuestionRequest request) {
         User user = userRepository.findById(userId)
@@ -106,23 +110,39 @@ public class QuestionGenerationService {
     ) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        weaknessTagStatusRepository
-                .findByUser_UserIdAndTag(userId, request.getTargetWeaknessTag())
-                .filter(status -> status.getStatus() == WeaknessTagResolveStatus.UNRESOLVED)
-                .orElseThrow(() -> new CustomException(ErrorCode.WEAKNESS_NOT_AVAILABLE));
+        String canonicalTag = weaknessTagNormalizer.canonicalTag(request.getTargetWeaknessTag());
+        boolean unresolved = weaknessTagStatusRepository
+                .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
+                .stream()
+                .anyMatch(status -> weaknessTagNormalizer.sameDimension(status.getTag(), canonicalTag));
+        if (!unresolved) {
+            throw new CustomException(ErrorCode.WEAKNESS_NOT_AVAILABLE);
+        }
 
+        Set<Long> seenEvaluationIds = new HashSet<>();
         List<WeaknessTagLog> origins = weaknessTagLogRepository
-                .findTop10ByUser_UserIdAndTagOrderByTagLogIdDesc(
-                        userId,
-                        request.getTargetWeaknessTag()
-                );
+                .findByUser_UserIdOrderByTagLogIdDesc(userId)
+                .stream()
+                .filter(logEntry -> weaknessTagNormalizer.sameDimension(logEntry.getTag(), canonicalTag))
+                .filter(logEntry -> logEntry.getEvaluation() != null)
+                .filter(logEntry -> seenEvaluationIds.add(logEntry.getEvaluation().getEvaluationId()))
+                .limit(10)
+                .toList();
         if (origins.isEmpty()) {
             throw new CustomException(ErrorCode.WEAKNESS_NOT_AVAILABLE);
         }
 
-        AnswerEvaluation firstEvaluation = origins.get(0).getEvaluation();
-        InterviewSession originSession = firstEvaluation.getSessionQuestion().getSession();
-        String targetDimension = targetDimension(request.getTargetWeaknessTag());
+        // 약점 로그가 이미 원본 세션을 보존하므로, 구형 평가 데이터의 연관관계가
+        // 일부 비어 있어도 약점 질문 세트를 다시 만들 수 있다.
+        InterviewSession originSession = origins.get(0).getSession();
+        if (originSession == null
+                && origins.get(0).getEvaluation().getSessionQuestion() != null) {
+            originSession = origins.get(0).getEvaluation().getSessionQuestion().getSession();
+        }
+        if (originSession == null) {
+            throw new CustomException(ErrorCode.WEAKNESS_NOT_AVAILABLE);
+        }
+        String targetDimension = weaknessTagNormalizer.dimension(canonicalTag);
         List<Long> basisEvaluationIds = origins.stream()
                 .map(log -> log.getEvaluation().getEvaluationId())
                 .distinct()
@@ -132,13 +152,13 @@ public class QuestionGenerationService {
         String prompt = promptTemplateRenderer.renderInterviewQuestionGeneration(
                 template,
                 "weaknessInputJson",
-                inputMapper.weakness(request.getTargetWeaknessTag(), targetDimension, origins)
+                inputMapper.weakness(canonicalTag, targetDimension, origins)
         );
         AiCallLog log = startLog(
                 template,
                 AiExecutionStage.WEAKNESS_QUESTION_GENERATION,
                 AiInputReferenceType.WEAKNESS_TAG,
-                userId + ":" + request.getTargetWeaknessTag(),
+                userId + ":" + canonicalTag,
                 prompt
         );
         String rawResponse = aiClientService.generateWeaknessQuestions(prompt);
@@ -146,7 +166,7 @@ public class QuestionGenerationService {
                 aiResponseProcessor.parseInterviewQuestions(rawResponse, "JSON-09");
         responseValidator.validateWeakness(
                 generated,
-                request.getTargetWeaknessTag(),
+                canonicalTag,
                 targetDimension,
                 basisEvaluationIds
         );
@@ -159,7 +179,7 @@ public class QuestionGenerationService {
                 originSession.getGuideContextResult(),
                 QuestionSetGenerationSource.AI,
                 log.getPromptVersion(),
-                request.getTargetWeaknessTag(),
+                canonicalTag,
                 targetDimension,
                 basisEvaluationIds,
                 log
@@ -203,15 +223,6 @@ public class QuestionGenerationService {
                 .filter(value -> value.getReviewStatus() == InterviewQuestionReviewStatus.PASS)
                 .orElseThrow(() -> new CustomException(ErrorCode.COMMON_NOT_FOUND));
         return QuestionHintResponse.from(question);
-    }
-
-    private String targetDimension(String tag) {
-        for (InterviewQuestionEvaluationFocus focus : InterviewQuestionEvaluationFocus.values()) {
-            if (tag.startsWith(focus.name())) {
-                return focus.name();
-            }
-        }
-        return InterviewQuestionEvaluationFocus.specificity.name();
     }
 
     private AiCallLog startLog(

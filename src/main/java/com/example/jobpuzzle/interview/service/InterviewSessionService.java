@@ -7,6 +7,8 @@ import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
 import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
 import com.example.jobpuzzle.evaluation.entity.WeaknessTagResolveStatus;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
+import com.example.jobpuzzle.evaluation.repository.WeaknessTagLogRepository;
+import com.example.jobpuzzle.evaluation.service.WeaknessTagNormalizer;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.interview.dto.*;
@@ -36,6 +38,8 @@ public class InterviewSessionService {
     private final AnswerEvaluationService answerEvaluationService;
     private final AnswerEvaluationRepository answerEvaluationRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
+    private final WeaknessTagLogRepository weaknessTagLogRepository;
+    private final WeaknessTagNormalizer weaknessTagNormalizer;
 
     @Transactional(readOnly = true)
     public InterviewModeAvailabilityResponse getAvailableModes(Long userId) {
@@ -73,8 +77,57 @@ public class InterviewSessionService {
         return weaknessTagStatusRepository
                 .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
                 .stream()
-                .sorted(Comparator.comparing(weakness -> weakness.getLastOccurredAt(), Comparator.reverseOrder()))
-                .map(weakness -> weakness.getTag())
+                .sorted(Comparator.comparing(
+                        weakness -> weakness.getLastOccurredAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
+                .map(weakness -> weaknessTagNormalizer.canonicalTag(weakness.getTag()))
+                .distinct()
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WeaknessTagResponse> getUnresolvedWeaknessTagDetails(Long userId) {
+        var statuses = weaknessTagStatusRepository
+                .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        weakness -> weaknessTagNormalizer.canonicalTag(weakness.getTag())
+                ));
+        var allLogs = weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(userId);
+        return statuses.entrySet().stream()
+                .map(entry -> {
+                    String canonicalTag = entry.getKey();
+                    var logs = allLogs.stream()
+                            .filter(log -> weaknessTagNormalizer.sameDimension(log.getTag(), canonicalTag))
+                            .limit(10)
+                            .toList();
+                    return WeaknessTagResponse.builder()
+                            .tag(canonicalTag)
+                            .displayName(weaknessTagNormalizer.displayName(canonicalTag))
+                            .description(weaknessTagNormalizer.displayName(canonicalTag)
+                                    + "이 반복해서 확인되었습니다. 최근 평가를 바탕으로 집중 연습합니다.")
+                            .occurrenceCount(logs.size())
+                            .recentOccurrences(logs.stream()
+                                    .map(log -> WeaknessTagResponse.Occurrence.builder()
+                                            .sessionId(log.getSession() == null
+                                                    ? null : log.getSession().getSessionId())
+                                            .evaluationId(log.getEvaluation() == null
+                                                    ? null : log.getEvaluation().getEvaluationId())
+                                            .mode(log.getSession() == null || log.getSession().getMode() == null
+                                                    ? null : log.getSession().getMode().name())
+                                            .score(log.getEvaluation() == null
+                                                    ? null : log.getEvaluation().getScore())
+                                            .occurredAt(log.getCreatedAt())
+                                            .build())
+                                    .toList())
+                            .build();
+                })
+                .sorted(Comparator.comparing(
+                        item -> item.getRecentOccurrences().isEmpty()
+                                ? null : item.getRecentOccurrences().get(0).getOccurredAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
                 .toList();
     }
 
@@ -97,7 +150,19 @@ public class InterviewSessionService {
                 .findByUser_UserIdAndStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
                         userId, UNFINISHED_STATUSES)
                 .stream()
+                .filter(session -> !isReviewReady(session))
                 .map(this::toActiveSessionResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getReviewReadySessions(Long userId) {
+        return interviewSessionRepository
+                .findByUser_UserIdAndStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        userId, UNFINISHED_STATUSES)
+                .stream()
+                .filter(this::isReviewReady)
+                .map(session -> toActiveSessionResponse(session).withReviewReady(true))
                 .toList();
     }
 
@@ -181,6 +246,77 @@ public class InterviewSessionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<RemainingQuestionResponse> getRemainingQuestions(Long userId, Long sessionId) {
+        InterviewSession session = getOwnedSession(userId, sessionId);
+        if (!session.isEditable()) {
+            return List.of();
+        }
+        Set<Long> selectedIds = sessionQuestionRepository
+                .findBySession_SessionIdOrderByDisplayOrderAsc(sessionId)
+                .stream()
+                .map(question -> question.getQuestion().getQuestionId())
+                .collect(Collectors.toSet());
+        return interviewQuestionRepository
+                .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
+                        session.getQuestionSet().getQuestionSetId())
+                .stream()
+                .filter(question -> question.getReviewStatus() == InterviewQuestionReviewStatus.PASS)
+                .filter(question -> !selectedIds.contains(question.getQuestionId()))
+                .map(RemainingQuestionResponse::from)
+                .toList();
+    }
+
+    public List<SessionQuestionResponse> addQuestions(
+            Long userId,
+            Long sessionId,
+            List<Long> questionIds
+    ) {
+        InterviewSession session = getOwnedSession(userId, sessionId);
+        validateEditable(session);
+        if (!session.getQuestionSet().isActive()) {
+            throw new CustomException(ErrorCode.QUESTION_SET_NOT_READY);
+        }
+
+        List<Long> selectedIds = questionIds.stream().distinct().toList();
+        if (selectedIds.isEmpty() || selectedIds.size() != questionIds.size()) {
+            throw new CustomException(ErrorCode.INVALID_QUESTION_SELECTION);
+        }
+
+        List<InterviewSessionQuestion> existing =
+                sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId);
+        Set<Long> existingIds = existing.stream()
+                .map(question -> question.getQuestion().getQuestionId())
+                .collect(Collectors.toSet());
+        if (selectedIds.stream().anyMatch(existingIds::contains)) {
+            throw new CustomException(ErrorCode.INVALID_QUESTION_SELECTION);
+        }
+
+        List<InterviewQuestion> additions =
+                interviewQuestionRepository.findByQuestionSet_QuestionSetIdAndQuestionIdIn(
+                        session.getQuestionSet().getQuestionSetId(),
+                        selectedIds
+                );
+        if (additions.size() != selectedIds.size()
+                || additions.stream().anyMatch(question ->
+                question.getReviewStatus() != InterviewQuestionReviewStatus.PASS)) {
+            throw new CustomException(ErrorCode.INVALID_QUESTION_SELECTION);
+        }
+        additions.sort(Comparator.comparingInt(InterviewQuestion::getDisplayOrder));
+
+        int nextOrder = existing.stream()
+                .mapToInt(InterviewSessionQuestion::getDisplayOrder)
+                .max()
+                .orElse(0) + 1;
+        for (InterviewQuestion question : additions) {
+            InterviewSessionQuestion snapshot = sessionQuestionRepository.save(
+                    InterviewSessionQuestion.snapshot(session, question, nextOrder++)
+            );
+            interviewMessageRepository.save(InterviewMessage.originalQuestion(snapshot));
+        }
+        return getSessionQuestions(userId, sessionId);
+    }
+
     public SessionResponse startSession(Long userId, Long sessionId) {
         InterviewSession session = getOwnedSession(userId, sessionId);
         validateEditable(session);
@@ -216,6 +352,10 @@ public class InterviewSessionService {
                 .orElseThrow(() -> new CustomException(ErrorCode.SESSION_QUESTION_NOT_FOUND));
         InterviewSession session = sessionQuestion.getSession();
         validateEditable(session);
+        if (sessionQuestion.getStatus() == InterviewSessionQuestionStatus.COMPLETED
+                || sessionQuestion.getStatus() == InterviewSessionQuestionStatus.SKIPPED) {
+            throw new CustomException(ErrorCode.SESSION_QUESTION_NOT_FOUND);
+        }
 
         InterviewMessage parentQuestion = resolveParentQuestion(userId, sessionQuestion, request);
         if (interviewMessageRepository.existsByParentMessage_MessageIdAndSender(
@@ -477,6 +617,42 @@ public class InterviewSessionService {
                 currentQuestionOrder,
                 currentQaDepth
         );
+    }
+
+    private boolean isReviewReady(InterviewSession session) {
+        List<InterviewSessionQuestion> questions =
+                sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(
+                        session.getSessionId());
+        if (questions.isEmpty() || !hasAnyAnswer(session.getSessionId())) {
+            return false;
+        }
+        return questions.stream().noneMatch(question ->
+                question.getStatus() == InterviewSessionQuestionStatus.PENDING
+                        || question.getStatus() == InterviewSessionQuestionStatus.IN_PROGRESS);
+    }
+
+    private String displayWeaknessTag(String tag) {
+        if (tag == null) return "확인이 필요한 답변";
+        return switch (tag) {
+            case "requirementConnection_weak", "requirementConnection_insufficient", "요구사항 연결부족" ->
+                    "공고 요구사항 연결 부족";
+            case "specificity_weak", "specificity_insufficient", "구체성 부족" ->
+                    "답변의 구체성 부족";
+            case "ownRole_weak", "ownRole_insufficient" -> "본인 역할 설명 부족";
+            case "problemSolving_weak", "problemSolving_insufficient" -> "문제 해결 과정 부족";
+            case "resultExpression_weak", "resultExpression_insufficient" -> "성과·결과 표현 부족";
+            case "guideAlignment_weak", "guideAlignment_insufficient" -> "직무 가이드 연결 부족";
+            case "deliveryClarity_weak", "deliveryClarity_insufficient" -> "답변 전달력 부족";
+            case "intentMatch_weak", "intentMatch_insufficient", "질문의도미파악" -> "질문 의도 파악 부족";
+            case "기술스택 언급없음" -> "필요 기술 경험 설명 부족";
+            case "경험연결부족" -> "관련 경험 연결 부족";
+            default -> tag.replace("#", "").replace("_weak", "").replace("_insufficient", "");
+        };
+    }
+
+    private String weaknessDescription(String tag) {
+        String name = displayWeaknessTag(tag);
+        return name + "이 반복해서 확인되었습니다. 최근 평가를 바탕으로 집중 연습합니다.";
     }
 
     private SessionQuestionResponse toSessionQuestionResponse(

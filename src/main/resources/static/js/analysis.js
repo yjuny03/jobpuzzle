@@ -12,6 +12,26 @@
         ['customizedAnalysisStatus', '맞춤 결과 생성']
     ];
     var stageText = { NOT_STARTED: '분석 대기', RUNNING: '분석 중', SUCCEEDED: '분석 완료', FAILED: '분석 실패' };
+
+    function showAcceptedNotice() {
+        var notice = sessionStorage.getItem('jobpuzzle_analysis_notice');
+        if (!notice) return;
+        sessionStorage.removeItem('jobpuzzle_analysis_notice');
+        var toast = el('div', 'analysis-accepted-toast', notice + ' 이 화면에서 바로 분석을 시작할 수 있어요.');
+        document.body.appendChild(toast);
+        requestAnimationFrame(function () { toast.classList.add('is-visible'); });
+        setTimeout(function () {
+            toast.classList.remove('is-visible');
+            setTimeout(function () { toast.remove(); }, 250);
+        }, 3200);
+    }
+
+    function stageLabel(stageKey) {
+        for (var i = 0; i < stages.length; i += 1) {
+            if (stages[i][0] === stageKey) return stages[i][1];
+        }
+        return '분석 과정';
+    }
     var levelMeta = {
         HIGH: { label: '충족', className: 'high' },
         MEDIUM: { label: '일부 충족', className: 'medium' },
@@ -99,15 +119,20 @@
         clear();
         root.setAttribute('aria-busy', status.analysisCaseStatus === 'ANALYZING' ? 'true' : 'false');
         var card = el('section', 'report-card progress-card');
-        card.appendChild(el('p', 'report-eyebrow', 'ANALYSIS IN PROGRESS'));
-        card.appendChild(el('h2', null, status.analysisCaseStatus === 'FAILED' ? '분석을 완료하지 못했어요' : '지원 자료를 차근차근 읽고 있어요'));
-        card.appendChild(el('p', null, '페이지를 닫아도 서버의 분석 작업은 계속 진행됩니다.'));
-        var list = el('div', 'progress-list');
+        var isFailed = status.analysisCaseStatus === 'FAILED';
+        var isRunning = status.analysisCaseStatus === 'ANALYZING';
+        var isReady = status.analysisCaseStatus === 'INPUT_CONFIRMED';
+        card.appendChild(el('p', 'report-eyebrow', isFailed ? 'ANALYSIS NEEDS REVIEW' : isRunning ? 'ANALYSIS IN PROGRESS' : 'ANALYSIS READY'));
+        card.appendChild(el('h2', null, isFailed ? '분석 결과를 확인해 주세요' : isRunning ? '지원 자료를 차근차근 읽고 있어요' : '분석을 시작할 준비가 되었어요'));
+        card.appendChild(el('p', 'progress-card__description', isFailed
+            ? '선택한 자료와 앞선 분석 결과는 보존되어 있습니다. 같은 자료로 다시 실행할 수 있어요.'
+            : isRunning ? '페이지를 닫아도 서버의 분석 작업은 계속 진행됩니다.' : '선택한 공고와 지원 자료를 바탕으로 맞춤 분석을 시작합니다.'));
+        var list = el('ol', 'analysis-stage-chain');
         stages.forEach(function (stage) {
             var value = status[stage[0]] || 'NOT_STARTED';
-            var row = el('div', 'progress-step progress-step--' + value);
-            row.appendChild(el('span', 'progress-step__mark', value === 'SUCCEEDED' ? '✓' : value === 'FAILED' ? '!' : '·'));
-            var copy = el('div');
+            var row = el('li', 'analysis-stage-node analysis-stage-node--' + value);
+            row.appendChild(el('span', 'analysis-stage-node__mark', value === 'SUCCEEDED' ? '✓' : value === 'FAILED' ? '!' : value === 'RUNNING' ? '·' : ''));
+            var copy = el('div', 'analysis-stage-node__copy');
             copy.appendChild(el('strong', null, stage[1]));
             copy.appendChild(el('span', null, stageText[value] || '상태 확인 중'));
             row.appendChild(copy);
@@ -115,17 +140,24 @@
         });
         card.appendChild(list);
         var failure = runError || status.userMessage;
-        if (failure) {
+        if (failure && isFailed) {
             var message = typeof failure === 'string' ? failure : friendlyError(failure);
-            card.appendChild(el('div', 'report-error', message));
+            var failureBox = el('div', 'report-error');
+            failureBox.appendChild(el('strong', null, status.latestFailureStage
+                ? stageLabel(status.latestFailureStage) + ' 단계에서 멈췄어요.'
+                : '분석 결과 생성 중 멈췄어요.'));
+            failureBox.appendChild(el('p', null, message));
+            card.appendChild(failureBox);
         }
-        if (status.analysisCaseStatus === 'INPUT_CONFIRMED'
-            || (status.analysisCaseStatus === 'FAILED' && status.retryable !== false)) {
+        if (isReady || isFailed) {
             var actions = el('div', 'report-actions');
             var button = el('button', 'btn btn--primary', status.analysisCaseStatus === 'FAILED' ? '분석 다시 시도' : '분석 시작');
             button.type = 'button';
             button.disabled = state.running;
-            button.addEventListener('click', runAnalysis);
+            button.addEventListener('click', function () {
+                if (isFailed && !window.confirm('선택한 자료와 앞선 분석 결과는 유지됩니다.\n\n분석을 다시 실행하면 AI·임베딩 요청이 다시 발생할 수 있습니다. 계속할까요?')) return;
+                runAnalysis(isFailed);
+            });
             actions.appendChild(button);
             card.appendChild(actions);
         }
@@ -311,19 +343,20 @@
             item.appendChild(el('span', 'question-item__type', typeText[question.questionType] || question.questionType || '질문'));
             item.appendChild(el('h3', null, question.question));
             var details = el('details');
-            details.appendChild(el('summary', null, '질문 의도와 평가 포인트 보기'));
+            details.open = true;
+            details.appendChild(el('summary', null, '이 질문에서 준비할 핵심'));
             var detail = el('div', 'question-item__detail');
             var intent = el('p');
-            intent.appendChild(el('strong', null, '질문 의도 · '));
+            intent.appendChild(el('strong', null, '왜 묻는 질문인가요?'));
             intent.appendChild(document.createTextNode(question.intent || '지원자의 경험을 구체적으로 확인합니다.'));
             detail.appendChild(intent);
             var focus = el('p');
-            focus.appendChild(el('strong', null, '평가 포인트 · '));
+            focus.appendChild(el('strong', null, '답변할 때 집중할 기준'));
             focus.appendChild(document.createTextNode(focusText(question.evaluationFocus)));
             detail.appendChild(focus);
             if (question.relatedRequirementId) {
                 var related = el('p');
-                related.appendChild(el('strong', null, '관련 요구사항 · '));
+                related.appendChild(el('strong', null, '연결된 공고 기준'));
                 related.appendChild(document.createTextNode(question.relatedRequirementId));
                 detail.appendChild(related);
             }
@@ -399,10 +432,13 @@
         });
     }
 
-    function runAnalysis() {
+    function runAnalysis(reuseExistingIndex) {
         if (state.running) return;
         state.running = true;
-        api('/api/analysis-cases/' + caseId + '/index', { method: 'POST' })
+        var ensureIndexed = reuseExistingIndex
+            ? Promise.resolve()
+            : api('/api/analysis-cases/' + caseId + '/index', { method: 'POST' });
+        ensureIndexed
             .then(function () {
                 var runPromise = analysisApi('/run', { method: 'POST' });
                 schedulePoll();
@@ -431,5 +467,6 @@
         state.disposed = true;
         clearTimeout(state.pollTimer);
     }, { once: true });
+    showAcceptedNotice();
     loadStatus();
 })();
