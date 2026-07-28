@@ -49,7 +49,7 @@ public class CustomizedSynthesisProviderInputFactory {
                 guideProjection(guide),
                 evidenceProjector.project(authority),
                 new CustomizedSynthesisProviderInput.GenerationPolicy(
-                        questionGenerationEnabled, questionGenerationEnabled ? 1 : 0));
+                        questionGenerationEnabled, questionGenerationEnabled ? 10 : 0));
     }
 
     private Map<SourceIdentity, List<String>> candidateEvidenceIds(CustomizedSynthesisEvidenceCatalog authority) {

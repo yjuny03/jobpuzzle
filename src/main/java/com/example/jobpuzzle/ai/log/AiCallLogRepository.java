@@ -32,14 +32,15 @@ public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
             String inputReferenceId,
             AiCallLogStatus status
     );
+
     Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdAndStatusOrderByAiCallLogIdDesc(
             AiInputReferenceType inputReferenceType, String inputReferenceId, AiCallLogStatus status);
 
-    Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
-            AiInputReferenceType inputReferenceType, String inputReferenceId);
-
     Optional<AiCallLog> findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
             AiExecutionStage executionStage, AiInputReferenceType inputReferenceType, String inputReferenceId);
+
+    Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+            AiInputReferenceType inputReferenceType, String inputReferenceId);
 
     // 관리자 AI 오류 로그 조회 - status가 없으면 전체
     @Query("SELECT l FROM AiCallLog l WHERE :status IS NULL OR l.status = :status")

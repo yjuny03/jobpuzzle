@@ -6,10 +6,9 @@ import com.example.jobpuzzle.ai.validation.AiProcessingException;
 import com.example.jobpuzzle.analysis.entity.MatchAnalysisResultMatchLevel;
 import com.example.jobpuzzle.analysis.synthesis.dto.*;
 import com.example.jobpuzzle.guide.entity.GuideMatchType;
-import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
-import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +16,10 @@ import java.util.Set;
 
 @Component
 public class CustomizedSynthesisV18ResultAssembler {
-    private final CustomizedSynthesisV15ResultAssembler v15Assembler;
+    private final CustomizedSynthesisResultAssembler resultAssembler;
 
-    public CustomizedSynthesisV18ResultAssembler(CustomizedSynthesisV15ResultAssembler v15Assembler) {
-        this.v15Assembler = v15Assembler;
+    public CustomizedSynthesisV18ResultAssembler(CustomizedSynthesisResultAssembler resultAssembler) {
+        this.resultAssembler = resultAssembler;
     }
 
     public CustomizedAnalysisGenerationResult assemble(CustomizedSynthesisV18ProviderResult provider,
@@ -35,8 +34,8 @@ public class CustomizedSynthesisV18ResultAssembler {
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
         exact("decisionById", provider.getDecisionById(), expected);
         exact("narrativesById", provider.getNarrativesById(), expected);
-        Map<String, CustomizedSynthesisV15ProviderResult.MatchSlot> matches = new LinkedHashMap<>();
-        Map<String, CustomizedSynthesisV15ProviderResult.TaskSlot> tasks = new LinkedHashMap<>();
+        List<CustomizedSynthesisProviderResult.RequirementMatch> matches = new ArrayList<>();
+        List<CustomizedSynthesisProviderResult.Task> tasks = new ArrayList<>();
         for (String id : expected) {
             Decision decision = decision(provider.getDecisionById().get(id));
             CustomizedSynthesisV18ProviderResult.Narrative narrative = provider.getNarrativesById().get(id);
@@ -45,7 +44,7 @@ public class CustomizedSynthesisV18ResultAssembler {
             String reason = blank(narrative.getReason())
                     ? "선택된 근거를 기준으로 요구사항 충족도를 판단했습니다."
                     : narrative.getReason();
-            String missingPoint = high ? "" : defaultText(
+            String missingPoint = high ? null : defaultText(
                     narrative.getMissingPoint(), "추가 경험과 구체적인 근거를 확인해 주세요.");
             String candidateEvidence = Set.of(MatchAnalysisResultMatchLevel.HIGH,
                             MatchAnalysisResultMatchLevel.MEDIUM, MatchAnalysisResultMatchLevel.LOW)
@@ -55,48 +54,54 @@ public class CustomizedSynthesisV18ResultAssembler {
                     : "";
             String taskSuggestion = high ? "" : defaultText(
                     narrative.getTaskSuggestion(), "관련 경험을 역할과 결과 중심으로 정리해 주세요.");
-            matches.put(id, new CustomizedSynthesisV15ProviderResult.MatchSlot(
-                    decision.level(), reason, missingPoint, candidateEvidence,
-                    decision.evidenceId() == null ? List.of() : List.of(decision.evidenceId())));
+            matches.add(CustomizedSynthesisProviderResult.RequirementMatch.builder()
+                    .requirementId(id)
+                    .matchLevel(decision.level())
+                    .reason(reason)
+                    .missingPoint(missingPoint)
+                    .candidateEvidence(candidateEvidence)
+                    .candidateEvidenceIds(decision.evidenceId() == null
+                            ? List.of() : List.of(decision.evidenceId()))
+                    .build());
             boolean applicable = !high;
-            tasks.put(id, new CustomizedSynthesisV15ProviderResult.TaskSlot(
-                    applicable, missingPoint, taskSuggestion));
-        }
-        CustomizedSynthesisV16ProviderResult.QuestionSlot q = provider.getPrimaryQuestion();
-        if (input.generationPolicy().questionGenerationEnabled()
-                && !authority.requirements().isEmpty()) {
-            CustomizedSynthesisEvidenceCatalog.RequirementItem target = authority.requirements().get(0);
-            if (q == null) q = new CustomizedSynthesisV16ProviderResult.QuestionSlot();
-            if (!expected.contains(q.getRelatedRequirementId())) q.setRelatedRequirementId(target.requirementId());
-            if (q.getQuestionType() == null) q.setQuestionType(InterviewQuestionType.COMPANY_FIT);
-            if (blank(q.getQuestion())) q.setQuestion(
-                    target.requirementText() + "과 관련된 본인의 경험을 구체적으로 설명해 주세요.");
-            if (blank(q.getIntent())) q.setIntent("요구사항과 지원자 경험의 실제 연결 정도를 확인합니다.");
-            if (q.getEvaluationFocus() == null)
-                q.setEvaluationFocus(InterviewQuestionEvaluationFocus.requirementConnection);
-            if (blank(q.getEvidenceId())) {
-                List<String> evidenceIds = new java.util.ArrayList<>(target.postingEvidenceIds());
-                evidenceIds.addAll(target.allowedCandidateEvidenceIds());
-                q.setEvidenceId(evidenceIds.isEmpty() ? "" : evidenceIds.get(0));
+            if (applicable) {
+                tasks.add(CustomizedSynthesisProviderResult.Task.builder()
+                        .relatedRequirementId(id)
+                        .missingPoint(missingPoint)
+                        .suggestion(taskSuggestion)
+                        .build());
             }
-        } else {
-            q = null;
         }
-        CustomizedSynthesisV15ProviderResult.QuestionSlot question = q == null ? null
-                : new CustomizedSynthesisV15ProviderResult.QuestionSlot(
-                q.getRelatedRequirementId(), q.getQuestionType(), q.getQuestion(), q.getIntent(),
-                q.getEvaluationFocus() == null ? null : List.of(q.getEvaluationFocus()),
-                blank(q.getEvidenceId()) ? List.of() : List.of(q.getEvidenceId()));
-        return v15Assembler.assemble(new CustomizedSynthesisV15ProviderResult(
-                        new CustomizedSynthesisV15ProviderResult.Readiness(
-                                defaultText(provider.getReadiness().getReason(),
-                                        "등록된 자료를 기준으로 분석 결과를 정리했습니다."),
-                                provider.getReadiness().getLimitations() == null
+        List<CustomizedSynthesisProviderResult.Question> questions =
+                provider.getQuestions() == null ? List.of() : provider.getQuestions().stream()
+                        .map(q -> q == null ? null : CustomizedSynthesisProviderResult.Question.builder()
+                                .relatedRequirementId(q.getRelatedRequirementId())
+                                .questionType(q.getQuestionType())
+                                .question(q.getQuestion())
+                                .intent(q.getIntent())
+                                .evaluationFocus(q.getEvaluationFocus() == null
+                                        ? List.of() : List.of(q.getEvaluationFocus()))
+                                .evidenceIds(blank(q.getEvidenceId())
+                                        ? List.of() : List.of(q.getEvidenceId()))
+                                .build())
+                        .toList();
+        if (!input.generationPolicy().questionGenerationEnabled()) {
+            questions = List.of();
+        }
+        return resultAssembler.assemble(CustomizedSynthesisProviderResult.builder()
+                        .readiness(CustomizedSynthesisProviderResult.Readiness.builder()
+                                .reason(defaultText(provider.getReadiness().getReason(),
+                                        "등록된 자료를 기준으로 분석 결과를 정리했습니다."))
+                                .limitations(provider.getReadiness().getLimitations() == null
                                         ? List.of()
                                         : provider.getReadiness().getLimitations().stream()
-                                        .filter(value -> !blank(value)).distinct().toList()),
-                        matches, question, tasks),
-                input, authority, guideMatchType);
+                                        .filter(value -> !blank(value)).distinct().toList())
+                                .build())
+                        .requirementMatches(matches)
+                        .questions(questions)
+                        .tasks(tasks)
+                        .build(),
+                authority, guideMatchType);
     }
 
     private Decision decision(String value) {

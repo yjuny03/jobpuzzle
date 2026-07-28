@@ -129,7 +129,8 @@ class PromptTemplateDeploymentArtifactTest {
 
     private String prompt(String filename) throws IOException {
         // UTF-8 정본의 마지막 줄바꿈 차이는 SQL literal 비교에서 제거한다.
-        return Files.readString(Path.of("src/main/resources/prompts", filename)).trim();
+        return Files.readString(Path.of("src/main/resources/prompts", filename))
+                .replace("\r\n", "\n").trim();
     }
 
     private String sqlLiteral(String filename, String promptCode) throws IOException {
@@ -143,7 +144,7 @@ class PromptTemplateDeploymentArtifactTest {
             value = nextLiteral(sql, cursor);
             cursor = value.end();
         }
-        return value.value();
+        return value.value().replace("\r\n", "\n");
     }
 
     private Literal nextLiteral(String sql, int from) {

@@ -93,7 +93,9 @@ public enum ErrorCode {
 
     // interview / report
     INTERVIEW_SESSION_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "REPORT_002", "완료되지 않은 세션은 최종 리포트를 생성할 수 없습니다."),
-    FINAL_REPORT_NOT_GENERATABLE(HttpStatus.BAD_REQUEST, "REPORT_003", "평가에 성공한 답변이 없어 최종 리포트를 생성할 수 없습니다.");
+    FINAL_REPORT_NOT_GENERATABLE(HttpStatus.BAD_REQUEST, "REPORT_003", "평가에 성공한 답변이 없어 최종 리포트를 생성할 수 없습니다."),
+    FINAL_REPORT_GENERATION_IN_PROGRESS(HttpStatus.CONFLICT, "REPORT_004", "최종 리포트를 생성하는 중입니다. 잠시 후 다시 시도해주세요."),
+    FINAL_REPORT_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_005", "최종 리포트 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String code;

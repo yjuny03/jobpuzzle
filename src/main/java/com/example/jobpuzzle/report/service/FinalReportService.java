@@ -26,11 +26,14 @@ import com.example.jobpuzzle.interview.entity.InterviewSessionStatus;
 import com.example.jobpuzzle.interview.repository.InterviewMessageRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionQuestionRepository;
 import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
+import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
+import com.example.jobpuzzle.report.dto.FinalReportResponse;
 import com.example.jobpuzzle.report.entity.FinalReport;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestion;
 import com.example.jobpuzzle.report.entity.ImprovementSuggestionTargetType;
 import com.example.jobpuzzle.report.repository.FinalReportRepository;
 import com.example.jobpuzzle.report.repository.ImprovementSuggestionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -39,10 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class FinalReportService {
@@ -60,6 +60,7 @@ public class FinalReportService {
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiClientService aiClientService;
     private final TransactionTemplate transactionTemplate;
+    private final int evaluationPassThreshold;
 
     public FinalReportService(
             InterviewSessionRepository interviewSessionRepository,
@@ -72,7 +73,8 @@ public class FinalReportService {
             AiCallLogRepository aiCallLogRepository,
             PromptTemplateRepository promptTemplateRepository,
             AiClientService aiClientService,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            @Value("${evaluation.pass-threshold}") int evaluationPassThreshold
     ) {
         this.interviewSessionRepository = interviewSessionRepository;
         this.interviewSessionQuestionRepository = interviewSessionQuestionRepository;
@@ -86,6 +88,7 @@ public class FinalReportService {
         this.aiClientService = aiClientService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.evaluationPassThreshold = evaluationPassThreshold;
     }
 
     // JSON-07: DB 선점과 AI 호출을 분리한 짧은 트랜잭션 구조는 analysis/service/InitialAnalysisStageExecutor와
@@ -105,8 +108,166 @@ public class FinalReportService {
         }
     }
 
-    public void getFinalReport() {
-        // TODO: 클래스 정의서 기준으로 구현
+    // 저장된 리포트가 있으면 그대로 반환
+    // 없으면 생성 가능 조건을 확인한 뒤 그 자리에서 생성해서 반환
+    public FinalReportResponse getFinalReport(Long userId, Long sessionId) {
+        InterviewSession session = interviewSessionRepository.findBySessionIdAndUser_UserIdAndDeletedAtIsNull(sessionId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+
+        Optional<FinalReport> report = finalReportRepository.findBySession_SessionId(sessionId);
+        if (report.isEmpty()) {
+            generateIfPossible(session);
+            report = finalReportRepository.findBySession_SessionId(sessionId);
+            if (report.isEmpty()) {
+                throw new CustomException(ErrorCode.FINAL_REPORT_GENERATION_FAILED);
+            }
+        }
+        return toResponse(report.get());
+    }
+
+    private void generateIfPossible(InterviewSession session) {
+        if (session.getStatus() != InterviewSessionStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.INTERVIEW_SESSION_NOT_COMPLETED);
+        }
+
+        Optional<AiCallLog> latest = aiCallLogRepository
+                .findFirstByExecutionStageAndInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
+                        AiExecutionStage.FINAL_REPORT, AiInputReferenceType.INTERVIEW_SESSION,
+                        String.valueOf(session.getSessionId()));
+        if (latest.isPresent()) {
+            AiCallLogStatus latestStatus = latest.get().getStatus();
+            if (latestStatus == AiCallLogStatus.PENDING || latestStatus == AiCallLogStatus.RUNNING) {
+                throw new CustomException(ErrorCode.FINAL_REPORT_GENERATION_IN_PROGRESS);
+            }
+        }
+
+        generateFinalReport(session.getSessionId());
+    }
+
+    private FinalReportResponse toResponse(FinalReport report) {
+        List<ImprovementSuggestion> suggestions = improvementSuggestionRepository
+                .findByReportIdOrderByTargetTypeAscDisplayOrderAsc(report.getReportId());
+
+        return FinalReportResponse.builder()
+                .sessionId(report.getSession().getSessionId())
+                .analysisCaseId(analysisCaseIdOf(report.getSession()))
+                .interviewMode(report.getInterviewMode().name())
+                .totalQuestionCount(report.getTotalQuestionCount())
+                .submittedQuestionCount(report.getSubmittedQuestionCount())
+                .evaluatedQuestionCount(report.getEvaluatedQuestionCount())
+                .evaluationFailedQuestionCount(report.getEvaluationFailedQuestionCount())
+                .skippedQuestionCount(report.getSkippedQuestionCount())
+                .completionRate(report.getCompletionRate())
+                .overallScore(report.getOverallScore())
+                .scoreLabel(report.getScoreLabel())
+                .overallAssessment(report.getOverallAssessment())
+                .categoryScores(toResponseCategoryScores(report.getCategoryScores()))
+                .basisSummary(toResponseBasisSummary(report.getBasisSummary()))
+                .weaknessTagSummary(toResponseWeaknessTagSummaries(report.getWeaknessTagSummary()))
+                .nextPracticeRecommendation(toResponseNextPracticeRecommendations(report.getNextPracticeRecommendation()))
+                .improvementSuggestion(toResponseImprovementSuggestion(suggestions))
+                .learningDirection(report.getLearningDirection())
+                .build();
+    }
+
+    // 분석 결과 화면 링크용
+    private Long analysisCaseIdOf(InterviewSession session) {
+        return session.getSnapshot() == null || session.getSnapshot().getAnalysisCase() == null
+                ? null
+                : session.getSnapshot().getAnalysisCase().getAnalysisCaseId();
+    }
+
+    private FinalReportResponse.CategoryScores toResponseCategoryScores(
+            FinalReport.CategoryScores source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReportResponse.CategoryScores.builder()
+                .intentMatch(source.getIntentMatch())
+                .specificity(source.getSpecificity())
+                .ownRole(source.getOwnRole())
+                .problemSolving(source.getProblemSolving())
+                .resultExpression(source.getResultExpression())
+                .requirementConnection(source.getRequirementConnection())
+                .guideAlignment(source.getGuideAlignment())
+                .deliveryClarity(source.getDeliveryClarity())
+                .build();
+    }
+
+    private FinalReportResponse.BasisSummary toResponseBasisSummary(
+            FinalReport.BasisSummary source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReportResponse.BasisSummary.builder()
+                .jobCategory(source.getJobCategory())
+                .careerLevel(source.getCareerLevel() == null ? null : source.getCareerLevel().name())
+                .evaluationPassThreshold(source.getEvaluationPassThreshold())
+                .usedGuide(source.getUsedGuide() == null ? null
+                        : FinalReportResponse.UsedGuide.builder()
+                        .guideId(source.getUsedGuide().getGuideId())
+                        .version(source.getUsedGuide().getVersion())
+                        .build())
+                .requirementConnections(source.getRequirementConnections() == null ? null
+                        : source.getRequirementConnections().stream()
+                        .map(connection -> FinalReportResponse.RequirementConnection.builder()
+                                .requirement(connection.getRequirement())
+                                .matchLevel(connection.getMatchLevel() == null ? null : connection.getMatchLevel().name())
+                                .build())
+                        .toList())
+                .missingEvidence(source.getMissingEvidence())
+                .targetWeaknessTag(source.getTargetWeaknessTag())
+                .targetDimension(source.getTargetDimension())
+                .originEvaluationIds(source.getOriginEvaluationIds())
+                .build();
+    }
+
+    private List<FinalReportResponse.WeaknessTagSummary> toResponseWeaknessTagSummaries(
+            List<FinalReport.WeaknessTagSummary> source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return source.stream()
+                .map(tag -> FinalReportResponse.WeaknessTagSummary.builder()
+                        .tag(tag.getTag())
+                        .count(tag.getCount())
+                        .build())
+                .toList();
+    }
+
+    private List<FinalReportResponse.NextPracticeRecommendation> toResponseNextPracticeRecommendations(
+            List<FinalReport.NextPracticeRecommendation> source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return source.stream()
+                .map(recommendation -> FinalReportResponse.NextPracticeRecommendation.builder()
+                        .questionType(recommendation.getQuestionType() == null ? null : recommendation.getQuestionType().name())
+                        .reason(recommendation.getReason())
+                        .build())
+                .toList();
+    }
+
+    private FinalReportResponse.ImprovementSuggestion toResponseImprovementSuggestion(
+            List<ImprovementSuggestion> suggestions
+    ) {
+        return FinalReportResponse.ImprovementSuggestion.builder()
+                .resume(textsOf(suggestions, ImprovementSuggestionTargetType.RESUME))
+                .coverLetter(textsOf(suggestions, ImprovementSuggestionTargetType.COVER_LETTER))
+                .portfolio(textsOf(suggestions, ImprovementSuggestionTargetType.PORTFOLIO))
+                .experienceNote(textsOf(suggestions, ImprovementSuggestionTargetType.EXPERIENCE_NOTE))
+                .build();
+    }
+
+    private List<String> textsOf(List<ImprovementSuggestion> suggestions, ImprovementSuggestionTargetType targetType) {
+        return suggestions.stream()
+                .filter(suggestion -> suggestion.getTargetType() == targetType)
+                .map(ImprovementSuggestion::getSuggestionText)
+                .toList();
     }
 
     public void getReadinessScore() {
@@ -179,7 +340,7 @@ public class FinalReportService {
             aiCallLogRepository.saveAndFlush(log);
 
             return new ReportLease(
-                    sessionId, log.getAiCallLogId(), session, aggregate, scoreSummary, selection);
+                    sessionId, log.getAiCallLogId(), session, aggregate, scoreSummary, selection, promptTemplate);
         });
     }
 
@@ -224,11 +385,16 @@ public class FinalReportService {
                 .orElseThrow(() -> new CustomException(ErrorCode.AI_PROMPT_TEMPLATE_NOT_FOUND));
     }
 
-    // Mock은 내용을 보지 않으므로 지금은 평가 요약을 간단한 문자열로 조립하는 정도로 충분하다.
     private String buildPrompt(ReportLease lease) {
         QuestionAggregate aggregate = lease.aggregate();
         SessionScoreSummary score = lease.scoreSummary();
+        PromptTemplate promptTemplate = lease.promptTemplate();
         StringBuilder prompt = new StringBuilder();
+        prompt.append(promptTemplate.getTemplateText());
+        if (promptTemplate.getForbiddenRules() != null && !promptTemplate.getForbiddenRules().isBlank()) {
+            prompt.append("\n\n[금지 규칙]\n").append(promptTemplate.getForbiddenRules());
+        }
+        prompt.append("\n\n[이번 세션 정보]\n");
         prompt.append("세션 ").append(lease.sessionId())
                 .append(" 모드=").append(lease.session().getMode())
                 .append(" 총질문=").append(score.getTotalQuestionCount())
@@ -241,6 +407,7 @@ public class FinalReportService {
                 .append('\n');
         for (AnswerEvaluation evaluation : aggregate.evaluations()) {
             prompt.append("- score=").append(evaluation.getScore())
+                    .append(" weaknessTags=").append(evaluation.getWeaknessTags())
                     .append(" summary=").append(evaluation.getSummary())
                     .append('\n');
         }
@@ -272,6 +439,9 @@ public class FinalReportService {
                             ? result.getOverallScore()
                             : score.getOverallScore())
                     .scoreLabel(result.getScoreLabel())
+                    .overallAssessment(result.getOverallAssessment() == null || result.getOverallAssessment().isBlank()
+                            ? "이번 세션의 총평을 생성하지 못했습니다."
+                            : result.getOverallAssessment())
                     .categoryScores(toCategoryScores(score.getCategoryScores()))
                     .basisSummary(toBasisSummary(result.getBasisSummary()))
                     .weaknessTagSummary(toWeaknessTagSummaries(result.getWeaknessTagSummary()))
@@ -368,7 +538,7 @@ public class FinalReportService {
     }
 
     private FinalReport.CategoryScores toCategoryScores(
-            java.util.Map<String, Integer> source
+            Map<String, Integer> source
     ) {
         if (source == null) {
             return FinalReport.CategoryScores.builder().build();
@@ -454,7 +624,8 @@ public class FinalReportService {
             InterviewSession session,
             QuestionAggregate aggregate,
             SessionScoreSummary scoreSummary,
-            GenerationClientSelection selection
+            GenerationClientSelection selection,
+            PromptTemplate promptTemplate
     ) {
     }
 }

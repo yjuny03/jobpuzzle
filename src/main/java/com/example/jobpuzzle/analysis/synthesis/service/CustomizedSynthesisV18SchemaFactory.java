@@ -48,8 +48,8 @@ public class CustomizedSynthesisV18SchemaFactory {
                 "reason", ref("text"), "limitations", array(ref("text")))));
         properties.put("decisionById", object(decisions));
         properties.put("narrativesById", object(narratives));
-        properties.put("primaryQuestion", input.generationPolicy().questionGenerationEnabled()
-                ? question(input) : Map.of("type", "null"));
+        properties.put("questions", input.generationPolicy().questionGenerationEnabled()
+                ? array(question(input)) : Map.of("type", "null"));
         Map<String, Object> root = new LinkedHashMap<>(object(properties));
         root.put("$defs", definitions);
         JsonNode schema = mapper.valueToTree(root);
