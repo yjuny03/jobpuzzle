@@ -172,7 +172,7 @@ class CustomizedAnalysisResponseValidatorTest {
     }
 
     @Test
-    void createsFallbackQuestionWhenReadinessAllowsQuestionsButProviderOmitsThem() {
+    void preservesAnalysisAndDisablesQuestionSetWhenProviderOmitsQuestions() {
         CustomizedAnalysisGenerationResult result = CustomizedAnalysisGenerationResult.builder()
                 .readiness(CustomizedAnalysisGenerationResult.Readiness.builder()
                         .status(ReadinessResultStatus.SUFFICIENT)
@@ -189,13 +189,10 @@ class CustomizedAnalysisResponseValidatorTest {
                 new CustomizedAnalysisValidationContext(
                         posting(), candidate(), guide(GuideMatchType.EXACT), evidence()), result);
 
-        assertThat(normalized.getReadiness().isCanGenerateQuestions()).isTrue();
-        assertThat(normalized.getQuestions()).singleElement().satisfies(question -> {
-            assertThat(question.getQuestion()).contains("Spring 경험");
-            assertThat(question.getRelatedRequirementId()).isEqualTo("req-1");
-            assertThat(question.getReviewStatus())
-                    .isEqualTo(com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus.PASS);
-        });
+        assertThat(normalized.getReadiness().isCanGenerateQuestions()).isFalse();
+        assertThat(normalized.getReadiness().getLimitations())
+                .contains("질문 생성 결과에서 사용할 수 있는 근거 기반 질문을 확인하지 못했습니다.");
+        assertThat(normalized.getQuestions()).isEmpty();
     }
 
     @Test

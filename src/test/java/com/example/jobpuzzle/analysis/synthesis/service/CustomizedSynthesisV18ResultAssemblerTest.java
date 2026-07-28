@@ -16,8 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CustomizedSynthesisV18ResultAssemblerTest {
     private final CustomizedSynthesisV18ResultAssembler assembler =
-            new CustomizedSynthesisV18ResultAssembler(new CustomizedSynthesisV15ResultAssembler(
-                    new CustomizedSynthesisResultAssembler()));
+            new CustomizedSynthesisV18ResultAssembler(new CustomizedSynthesisResultAssembler());
 
     @Test
     void normalizesHighNarrativeInsteadOfRejectingNonBlankMissingPoint() {
@@ -26,9 +25,9 @@ class CustomizedSynthesisV18ResultAssemblerTest {
                 Map.of("req-1", "HIGH::cand-1"),
                 Map.of("req-1", new CustomizedSynthesisV18ProviderResult.Narrative(
                         "충족", "모델이 잘못 넣은 부족점", "후보 근거", "불필요한 과제")),
-                new CustomizedSynthesisV16ProviderResult.QuestionSlot(
-                        "", InterviewQuestionType.COMPANY_FIT, "설명해 주세요", "검증",
-                        InterviewQuestionEvaluationFocus.requirementConnection, "cand-1"));
+                List.of(new CustomizedSynthesisV16ProviderResult.QuestionSlot(
+                        "req-1", InterviewQuestionType.COMPANY_FIT, "설명해 주세요", "검증",
+                        InterviewQuestionEvaluationFocus.requirementConnection, "cand-1")));
 
         var result = assembler.assemble(provider, input(), authority(), GuideMatchType.EXACT);
 

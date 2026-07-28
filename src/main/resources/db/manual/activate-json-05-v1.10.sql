@@ -24,13 +24,17 @@ SELECT 'PT-JSON05-001', '맞춤 종합 분석 프롬프트', 'v1.10', 'JSON-05',
 - NONE/INSUFFICIENT이면 candidateEvidence는 빈 문자열이다.
 
 [질문]
-- generationPolicy.questionGenerationEnabled=true이면 primaryQuestion을 하나 반환하고 false이면 null이다.
-- relatedRequirementId는 requirementCatalog에서 면접 확인 가치가 가장 높은 요구사항 하나를 선택한다.
-- 우선순위는 낮은 충족도, 중요한 부족점, 근거의 모호함 순이다.
+- generationPolicy.questionGenerationEnabled=true이면 questions 배열을 반환하고 false이면 null이다.
+- 질문은 근거와 확인 가치가 있는 만큼 만들되 3~6개를 목표로 하고 절대 10개를 넘기지 않는다.
+- relatedRequirementId는 서로 다른 직무 핵심 요구사항을 우선하며 같은 요구사항과 질문 의도를 불필요하게 반복하지 않는다.
+- 우선순위는 지원자 근거가 있는 직무 핵심 HIGH, 역할·판단·성과가 모호한 MEDIUM, 실제 확인 가치가 있는 LOW 순이다.
+- NONE/INSUFFICIENT와 지원자 근거가 없는 요구사항은 질문이 아니라 taskSuggestion으로 보완한다.
+- 학력무관, 경력무관, 성별·연령 조건, 관련 학과·우대전공 같은 행정·조건성 항목은 질문 대상으로 선택하지 않는다.
 - 선택한 요구사항과 candidate evidence를 바탕으로 실제 상황·본인 역할·판단·행동·결과 중 부족한 내용을 답하게 묻는다.
 - “관련 경험을 설명해 주세요” 같은 일반 질문이나 답을 유도하는 질문은 피한다.
 - question은 한 번에 하나의 핵심만 묻고, intent에는 평가자가 확인할 구체적인 판단 기준을 작성한다.
 - 질문을 자연스러운 한국어 한 문장으로 작성하고, 출력 전에 오탈자·중복 표현·조사 호응을 확인한다.
+- 각 question에는 placeholder, TODO, TBD, N/A 같은 임시 문구를 절대 반환하지 않는다.
 - questionDirection과 avoidQuestions가 있으면 반드시 반영한다.
 - evidenceId와 evaluationFocus는 schema enum에서 하나씩 선택한다.
 
@@ -44,5 +48,39 @@ TRUE, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
     SELECT 1 FROM prompt_template WHERE target_json = 'JSON-05' AND version = 'v1.10'
 );
+UPDATE prompt_template
+SET template_text = REPLACE(
+        template_text,
+        '- generationPolicy.questionGenerationEnabled=true이면 primaryQuestion을 하나 반환하고 false이면 null이다.
+- relatedRequirementId는 requirementCatalog에서 면접 확인 가치가 가장 높은 요구사항 하나를 선택한다.
+- 우선순위는 낮은 충족도, 중요한 부족점, 근거의 모호함 순이다.',
+        '- generationPolicy.questionGenerationEnabled=true이면 questions 배열을 반환하고 false이면 null이다.
+- 질문은 근거와 확인 가치가 있는 만큼 만들되 3~6개를 목표로 하고 절대 10개를 넘기지 않는다.
+- relatedRequirementId는 서로 다른 직무 핵심 요구사항을 우선하며 같은 요구사항과 질문 의도를 불필요하게 반복하지 않는다.
+- 우선순위는 지원자 근거가 있는 직무 핵심 HIGH, 역할·판단·성과가 모호한 MEDIUM, 실제 확인 가치가 있는 LOW 순이다.
+- NONE/INSUFFICIENT와 지원자 근거가 없는 요구사항은 질문이 아니라 taskSuggestion으로 보완한다.
+- 학력무관, 경력무관, 성별·연령 조건, 관련 학과·우대전공 같은 행정·조건성 항목은 질문 대상으로 선택하지 않는다.'
+    )
+WHERE target_json = 'JSON-05'
+  AND version = 'v1.10'
+  AND template_text LIKE '%primaryQuestion을 하나 반환%';
+UPDATE prompt_template
+SET template_text = REPLACE(
+        template_text,
+        '- 질문을 자연스러운 한국어 한 문장으로 작성하고, 출력 전에 오탈자·중복 표현·조사 호응을 확인한다.',
+        '- 질문을 자연스러운 한국어 한 문장으로 작성하고, 출력 전에 오탈자·중복 표현·조사 호응을 확인한다.
+- 각 question에는 placeholder, TODO, TBD, N/A 같은 임시 문구를 절대 반환하지 않는다.'
+    )
+WHERE target_json = 'JSON-05'
+  AND version = 'v1.10'
+  AND template_text NOT LIKE '%placeholder, TODO, TBD, N/A%';
+UPDATE prompt_template
+SET template_text = REPLACE(
+        template_text,
+        '- question에는 placeholder, TODO, TBD, N/A 같은 임시 문구를 절대 반환하지 않는다.',
+        '- 각 question에는 placeholder, TODO, TBD, N/A 같은 임시 문구를 절대 반환하지 않는다.'
+    )
+WHERE target_json = 'JSON-05'
+  AND version = 'v1.10';
 UPDATE prompt_template SET is_active = TRUE WHERE target_json = 'JSON-05' AND version = 'v1.10';
 COMMIT;
