@@ -2,6 +2,8 @@
   'use strict';
 
   var sessionId = new URLSearchParams(window.location.search).get('sessionId');
+  var sessionQuestions = [];
+  var sessionScoreByQuestion = {};
   var CATEGORY_LABELS = {
     intentMatch: '질문 의도 이해',
     specificity: '경험 구체성',
@@ -43,6 +45,25 @@
     resume: '이력서', coverLetter: '자기소개서', portfolio: '포트폴리오', experienceNote: '경험정리'
   };
 
+  // 최종 리포트의 약점 태그를 클릭하면 그 태그가 달린 첫 질문으로 이동한다.
+  // renderSession()이 아직 안 끝났으면(sessionQuestions 비어있음) 조용히 무시한다.
+  function jumpToQuestionWithTag(tag) {
+    var index = sessionQuestions.findIndex(function (question) {
+      var item = sessionScoreByQuestion[question.sessionQuestionId];
+      return item && item.weaknessTags && item.weaknessTags.indexOf(tag) !== -1;
+    });
+    if (index === -1) return;
+
+    var listTabButton = document.querySelector('.tabbar__btn[data-tab="list"]');
+    if (listTabButton) listTabButton.click();
+
+    var listButton = document.querySelector('.q-list-item[data-question-index="' + index + '"]');
+    if (listButton) {
+      listButton.click();
+      listButton.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
   function renderFinalReport(report) {
     var panel = document.getElementById('final-report-panel');
     var weaknessTags = report.weaknessTagSummary || [];
@@ -54,10 +75,15 @@
       '<p class="result-empty-copy">' + esc(report.totalQuestionCount) + '개 질문, 답변 ' +
       esc(report.submittedQuestionCount) + '개를 모두 종합해 정리한 결과예요.</p>';
 
-    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span></div>';
+    if (report.overallAssessment) {
+      html += '<div class="final-assessment">' + esc(report.overallAssessment) + '</div>';
+    }
+
+    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span><small>태그를 누르면 관련 질문으로 이동해요</small></div>';
     html += weaknessTags.length
       ? '<div class="final-tag-list">' + weaknessTags.map(function (item) {
-          return '<span class="final-tag-chip">' + esc(item.tag) + ' <em>' + item.count + '회</em></span>';
+          return '<button type="button" class="final-tag-chip" data-jump-tag="' + esc(item.tag) + '">' +
+            esc(item.tag) + ' <em>' + item.count + '회</em></button>';
         }).join('') + '</div>'
       : '<p class="result-empty-copy">확인된 약점 태그가 없습니다.</p>';
 
@@ -94,6 +120,9 @@
     }
 
     panel.innerHTML = html;
+    panel.querySelectorAll('[data-jump-tag]').forEach(function (button) {
+      button.addEventListener('click', function () { jumpToQuestionWithTag(button.dataset.jumpTag); });
+    });
   }
 
   function scoreTone(score) {
@@ -197,6 +226,8 @@
     (score.questionScores || []).forEach(function (item) {
       scoreByQuestion[item.sessionQuestionId] = item;
     });
+    sessionQuestions = questions;
+    sessionScoreByQuestion = scoreByQuestion;
     var list = document.getElementById('q-list');
     list.innerHTML = questions.map(function (question, index) {
       var item = scoreByQuestion[question.sessionQuestionId];

@@ -29,5 +29,7 @@ public class SessionScoreSummary {
         private Integer finalScore;
         private Map<String, Integer> dimensionScores;
         private Map<String, Integer> dimensionEvaluationCounts;
+        // 이 질문의 답변에서 나온 약점 태그 전체
+        private List<String> weaknessTags;
     }
 }

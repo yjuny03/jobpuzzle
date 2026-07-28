@@ -160,6 +160,7 @@ public class FinalReportService {
                 .completionRate(report.getCompletionRate())
                 .overallScore(report.getOverallScore())
                 .scoreLabel(report.getScoreLabel())
+                .overallAssessment(report.getOverallAssessment())
                 .categoryScores(toResponseCategoryScores(report.getCategoryScores()))
                 .basisSummary(toResponseBasisSummary(report.getBasisSummary()))
                 .weaknessTagSummary(toResponseWeaknessTagSummaries(report.getWeaknessTagSummary()))
@@ -438,6 +439,9 @@ public class FinalReportService {
                             ? result.getOverallScore()
                             : score.getOverallScore())
                     .scoreLabel(result.getScoreLabel())
+                    .overallAssessment(result.getOverallAssessment() == null || result.getOverallAssessment().isBlank()
+                            ? "이번 세션의 총평을 생성하지 못했습니다."
+                            : result.getOverallAssessment())
                     .categoryScores(toCategoryScores(score.getCategoryScores()))
                     .basisSummary(toBasisSummary(result.getBasisSummary()))
                     .weaknessTagSummary(toWeaknessTagSummaries(result.getWeaknessTagSummary()))

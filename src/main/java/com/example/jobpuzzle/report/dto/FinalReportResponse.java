@@ -25,6 +25,7 @@ public class FinalReportResponse {
     // FinalReport 엔티티 컬럼이 현재 NOT NULL이라 이 필드는 항상 채워짐.
     private Integer overallScore;
     private String scoreLabel;
+    private String overallAssessment;
 
     private CategoryScores categoryScores;
     private BasisSummary basisSummary;

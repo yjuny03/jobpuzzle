@@ -734,6 +734,7 @@ public class MockAiClient implements AiClient {
         return FinalReportResult.builder()
                 .overallScore(78)
                 .scoreLabel("세션 종합 기준 충족도")
+                .overallAssessment("전반적으로 기준 점수를 충족했으며, 결과 표현과 문제 해결 과정에서 보완이 필요합니다.")
                 .categoryScores(
                         FinalReportResult.CategoryScores.builder()
                                 .intentMatch(81)
