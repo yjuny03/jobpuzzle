@@ -32,6 +32,8 @@ public class FinalReportResult {
     // WEAKNESS_REVIEW는 null
     private Integer overallScore;
     private String scoreLabel;
+    // 질문별 답변·평가를 종합한 총평 문단
+    private String overallAssessment;
 
     private CategoryScores categoryScores;
     private BasisSummary basisSummary;

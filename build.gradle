@@ -45,4 +45,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 테스트 실행에서만 mock/fake로 강제한다. 실제 AI 확인은 bootRun에서 한다.
+    environment 'AI_GENERATION_DEFAULT_PROVIDER', 'mock'
+    environment 'RAG_MODE', 'fake'
 }

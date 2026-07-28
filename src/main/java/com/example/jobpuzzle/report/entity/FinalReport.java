@@ -62,6 +62,10 @@ public class FinalReport extends BaseTimeEntity {
     @Column(name = "score_label", nullable = false)
     private String scoreLabel;
 
+    // 질문별 답변·평가를 종합한 총평 문단
+    @Column(name = "overall_assessment", columnDefinition = "TEXT", nullable = false)
+    private String overallAssessment;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "category_scores", columnDefinition = "json", nullable = false)
     private CategoryScores categoryScores;
@@ -99,6 +103,7 @@ public class FinalReport extends BaseTimeEntity {
             int completionRate,
             int overallScore,
             String scoreLabel,
+            String overallAssessment,
             CategoryScores categoryScores,
             BasisSummary basisSummary,
             List<WeaknessTagSummary> weaknessTagSummary,
@@ -116,6 +121,7 @@ public class FinalReport extends BaseTimeEntity {
         this.completionRate = completionRate;
         this.overallScore = overallScore;
         this.scoreLabel = scoreLabel;
+        this.overallAssessment = overallAssessment;
         this.categoryScores = categoryScores;
         this.basisSummary = basisSummary;
         this.weaknessTagSummary = weaknessTagSummary;

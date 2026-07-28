@@ -12,4 +12,6 @@ public interface PromptTemplateRepository extends JpaRepository<PromptTemplate, 
     boolean existsByPromptCodeAndVersion(String promptCode, String version);
 
     boolean existsByTargetJsonAndIsActiveTrue(String targetJson);
+
+    Optional<PromptTemplate> findByPromptCode(String promptCode);
 }
