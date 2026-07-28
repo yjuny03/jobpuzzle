@@ -4,7 +4,16 @@
 
     var root = document.getElementById('analysis-root');
     var caseId = root && root.dataset.analysisCaseId;
-    var state = { disposed: false, loading: false, running: false, pollTimer: null, statusSequence: 0 };
+    var state = {
+        disposed: false,
+        loading: false,
+        running: false,
+        pollTimer: null,
+        retryTimer: null,
+        statusSequence: 0,
+        automaticRetries: 0,
+        maximumAutomaticRetries: 2
+    };
     var stages = [
         ['jobPostingAnalysisStatus', '채용공고 분석'],
         ['candidateMaterialAnalysisStatus', '지원자 자료 분석'],
@@ -408,6 +417,65 @@
         if (!state.disposed) state.pollTimer = setTimeout(loadStatus, 3500);
     }
 
+    function showRetryProgress(status, delaySeconds) {
+        clear();
+        root.setAttribute('aria-busy', 'true');
+        var card = el('section', 'report-card progress-card');
+        card.appendChild(el('p', 'report-eyebrow', 'ANALYSIS RECOVERY'));
+        card.appendChild(el('h2', null, '분석 연결을 다시 확인하고 있어요'));
+        card.appendChild(el('p', 'progress-card__description',
+            '일시적인 응답 지연을 감지해 ' + delaySeconds + '초 후 자동으로 이어서 진행합니다.'));
+        var list = el('ol', 'analysis-stage-chain');
+        stages.forEach(function (stage) {
+            var value = status[stage[0]] === 'FAILED' ? 'RUNNING' : (status[stage[0]] || 'NOT_STARTED');
+            var row = el('li', 'analysis-stage-node analysis-stage-node--' + value);
+            row.appendChild(el('span', 'analysis-stage-node__mark', value === 'SUCCEEDED' ? '✓' : '·'));
+            var copy = el('div', 'analysis-stage-node__copy');
+            copy.appendChild(el('strong', null, stage[1]));
+            copy.appendChild(el('span', null, value === 'SUCCEEDED' ? '분석 완료' : '다시 연결 중'));
+            row.appendChild(copy);
+            list.appendChild(row);
+        });
+        card.appendChild(list);
+        root.appendChild(card);
+    }
+
+    function canRetryAutomatically(status) {
+        var serverHasAttempts = status.attemptCount == null || status.maxAttempts == null
+            || status.attemptCount < status.maxAttempts;
+        return status.analysisCaseStatus === 'FAILED'
+            && status.retryable === true
+            && serverHasAttempts
+            && state.automaticRetries < state.maximumAutomaticRetries;
+    }
+
+    function scheduleAutomaticRetry(status) {
+        if (state.retryTimer || state.running || state.disposed) return;
+        var delaySeconds = Number(status.retryAfterSeconds)
+            || Math.min(3 * Math.pow(2, state.automaticRetries), 12);
+        state.automaticRetries++;
+        showRetryProgress(status, delaySeconds);
+        state.retryTimer = setTimeout(function () {
+            state.retryTimer = null;
+            runAnalysis(true);
+        }, delaySeconds * 1000);
+    }
+
+    function handleStatus(status) {
+        if (status.analysisCaseStatus === 'COMPLETED') {
+            clearTimeout(state.pollTimer);
+            clearTimeout(state.retryTimer);
+            window.location.replace('/analysis-results/' + encodeURIComponent(caseId));
+            return;
+        }
+        if (canRetryAutomatically(status)) {
+            scheduleAutomaticRetry(status);
+            return;
+        }
+        renderProgress(status);
+        if (status.analysisCaseStatus === 'ANALYZING') schedulePoll();
+    }
+
     function loadStatus() {
         if (state.loading || state.disposed) return;
         var sequence = ++state.statusSequence;
@@ -415,12 +483,7 @@
         analysisApi('/status').then(function (status) {
             state.loading = false;
             if (state.disposed || sequence !== state.statusSequence) return;
-            if (status.analysisCaseStatus === 'COMPLETED') {
-                clearTimeout(state.pollTimer);
-                return analysisApi('/result').then(renderResult);
-            }
-            renderProgress(status);
-            if (status.analysisCaseStatus === 'ANALYZING') schedulePoll();
+            handleStatus(status);
         }).catch(function (error) {
             state.loading = false;
             if (sequence !== state.statusSequence) return;
@@ -453,8 +516,17 @@
                 clearTimeout(state.pollTimer);
                 // 이미 전송된 이전 status 응답이 실패 화면을 덮지 못하게 무효화한다.
                 state.statusSequence++;
-                analysisApi('/status').then(function (status) { renderProgress(status, error); }).catch(function () {
-                    renderProgress({ analysisCaseStatus: 'FAILED' }, error);
+                analysisApi('/status').then(function (status) {
+                    if (reuseExistingIndex === true && canRetryAutomatically(status)) {
+                        scheduleAutomaticRetry(status);
+                        return;
+                    }
+                    renderProgress(status, reuseExistingIndex === true ? null : error);
+                }).catch(function () {
+                    renderProgress(
+                        { analysisCaseStatus: 'FAILED' },
+                        reuseExistingIndex === true ? null : error
+                    );
                 });
             });
     }
@@ -466,6 +538,7 @@
     window.addEventListener('pagehide', function () {
         state.disposed = true;
         clearTimeout(state.pollTimer);
+        clearTimeout(state.retryTimer);
     }, { once: true });
     showAcceptedNotice();
     loadStatus();
