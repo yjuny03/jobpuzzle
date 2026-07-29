@@ -1,7 +1,9 @@
 package com.example.jobpuzzle.guide.service;
 
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
+import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.guide.dto.GuideContextResultDto;
@@ -10,6 +12,9 @@ import com.example.jobpuzzle.guide.repository.GuideContextChunkRepository;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
+import com.example.jobpuzzle.guide.config.GuideVectorProperties;
+import com.example.jobpuzzle.guide.vector.GuideVectorHit;
+import com.example.jobpuzzle.guide.vector.GuideVectorStorePort;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import com.example.jobpuzzle.user.entity.User;
@@ -45,6 +50,9 @@ class GuideContextServiceTest {
     @Mock private JobGuideChunkRepository chunkRepository;
     @Mock private GuideContextResultRepository resultRepository;
     @Mock private GuideContextChunkRepository contextChunkRepository;
+    @Mock private JobPostingAnalysisRepository jobPostingAnalysisRepository;
+    @Mock private GuideVectorStorePort guideVectorStore;
+    @Mock private GuideVectorProperties guideVectorProperties;
     @InjectMocks private GuideContextService guideContextService;
 
     private AnalysisInputSnapshot snapshot;
@@ -61,6 +69,7 @@ class GuideContextServiceTest {
                 .build();
         ReflectionTestUtils.setField(snapshotCategory, "jobCategoryId", 100L);
         snapshot = mock(AnalysisInputSnapshot.class);
+        when(snapshot.getSnapshotId()).thenReturn(SNAPSHOT_ID);
         when(snapshot.getUser()).thenReturn(user);
         when(snapshot.getJobCategory()).thenReturn(snapshotCategory);
         when(snapshotRepository.findWithLockBySnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(snapshot));
@@ -123,6 +132,47 @@ class GuideContextServiceTest {
 
         assertThat(result.getMatchType()).isEqualTo(GuideMatchType.FALLBACK_SAME_SUBCATEGORY);
         verify(guideRepository, never()).findByScopeTypeAndScopeMainCategoryAndStatus(any(), anyString(), any());
+    }
+
+    @Test
+    void indexedGuideStoresOnlyRankedVectorHitsWithSimilarityScore() {
+        JobGuideDocument exactGuide = guide(19L, "인덱싱 가이드");
+        when(exactGuide.isIndexed()).thenReturn(true);
+        when(exactGuide.getEmbeddingProvider()).thenReturn("openai");
+        JobGuideChunk first = mock(JobGuideChunk.class);
+        JobGuideChunk second = mock(JobGuideChunk.class);
+        when(first.getChunkId()).thenReturn(101L);
+        when(first.getTitle()).thenReturn("첫째");
+        when(first.getContent()).thenReturn("첫째 내용");
+        when(second.getChunkId()).thenReturn(102L);
+        when(second.getTitle()).thenReturn("둘째");
+        when(second.getContent()).thenReturn("둘째 내용");
+        when(guideRepository.findByScopeTypeAndJobCategory_MainCategoryAndJobCategory_SubCategoryAndJobCategory_CareerLevelAndStatus(
+                GuideScopeType.CATEGORY, "개발", "백엔드",
+                JobCategoryCareerLevel.EXPERIENCED, JobGuideDocumentStatus.ACTIVE))
+                .thenReturn(List.of(exactGuide));
+        when(chunkRepository.findByGuide_GuideIdOrderByChunkIndexAsc(19L))
+                .thenReturn(List.of(first, second));
+        JobPostingAnalysis posting = mock(JobPostingAnalysis.class);
+        when(posting.getMainTasks()).thenReturn(List.of(
+                JobPostingAnalysis.Item.builder().text("API 개발").build()));
+        when(posting.getRequirements()).thenReturn(List.of());
+        when(posting.getPreferred()).thenReturn(List.of());
+        when(posting.getCoreCompetencies()).thenReturn(List.of());
+        when(jobPostingAnalysisRepository.findBySnapshot_SnapshotId(SNAPSHOT_ID))
+                .thenReturn(Optional.of(posting));
+        when(guideVectorProperties.getTopK()).thenReturn(1);
+        when(guideVectorStore.search(eq(19L), contains("API 개발"), eq(1)))
+                .thenReturn(List.of(new GuideVectorHit(102L, 0.91)));
+
+        GuideContextResultDto result =
+                guideContextService.getOrCreateCustomizedSynthesisGuideContext(USER_ID, SNAPSHOT_ID);
+
+        assertThat(result.getChunks()).singleElement()
+                .satisfies(chunk -> {
+                    assertThat(chunk.getChunkId()).isEqualTo(102L);
+                    assertThat(chunk.getScore()).isEqualTo(0.91);
+                });
     }
 
     @Test

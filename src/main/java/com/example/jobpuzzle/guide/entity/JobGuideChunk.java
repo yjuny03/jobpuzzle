@@ -46,6 +46,11 @@ public class JobGuideChunk extends BaseTimeEntity {
     @Column(name = "embedding_ref", length = 200)
     private String embeddingRef;
 
+    /** 외부 벡터 저장소가 반환한 참조 키를 인덱싱 완료 트랜잭션에서만 반영한다. */
+    public void markEmbedded(String embeddingRef) {
+        this.embeddingRef = embeddingRef;
+    }
+
     @Builder
     private JobGuideChunk(
             JobGuideDocument guide,
