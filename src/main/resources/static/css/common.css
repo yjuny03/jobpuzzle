@@ -460,7 +460,142 @@ button {
 }
 
 /* =========================================================
-   10. 반응형 및 접근성
+   10. 공통 입체형 토스트 알림
+   ========================================================= */
+.jp-toast-region {
+    position: fixed;
+    z-index: 12000;
+    top: 108px;
+    left: 50%;
+    display: flex;
+    width: min(680px, calc(100vw - 32px));
+    flex-direction: column;
+    gap: 12px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.jp-toast {
+    --toast-accent: #285A7A;
+    --toast-border: #4B83A8;
+    --toast-bg: #D9E8F1;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 28px;
+    gap: 11px;
+    align-items: start;
+    width: 100%;
+    padding: 14px 13px 14px 14px;
+    border: 2px solid var(--toast-border);
+    border-radius: 12px;
+    color: #17283A;
+    background: var(--toast-bg);
+    box-shadow: 4px 5px 0 color-mix(in srgb, var(--toast-accent) 30%, transparent);
+    opacity: 0;
+    transform: translateX(24px) scale(.98);
+    transition: opacity 180ms ease, transform 220ms ease;
+    pointer-events: auto;
+}
+
+.jp-toast.is-visible {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+.jp-toast.is-leaving {
+    opacity: 0;
+    transform: translateX(18px) scale(.98);
+}
+
+.jp-toast--success {
+    --toast-accent: #2F6857;
+    --toast-border: #43806E;
+    --toast-bg: #DCECE5;
+}
+
+.jp-toast--error {
+    --toast-accent: #8E332D;
+    --toast-border: #B5433D;
+    --toast-bg: #F0E2DE;
+}
+
+.jp-toast--warning {
+    --toast-accent: #76512C;
+    --toast-border: #A8753E;
+    --toast-bg: #F3EBDD;
+}
+
+.jp-toast--info {
+    --toast-accent: #285A7A;
+    --toast-border: #4B83A8;
+    --toast-bg: #D9E8F1;
+}
+
+.jp-toast__icon {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 2px solid var(--toast-accent);
+    border-radius: 8px;
+    color: #FFFFFF;
+    background: var(--toast-accent);
+    box-shadow: 2px 3px 0 color-mix(in srgb, var(--toast-accent) 28%, transparent);
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.jp-toast--success .jp-toast__icon::before { content: "✓"; }
+.jp-toast--error .jp-toast__icon::before { content: "!"; }
+.jp-toast--warning .jp-toast__icon::before { content: "!"; }
+.jp-toast--info .jp-toast__icon::before { content: "i"; }
+
+.jp-toast__content {
+    min-width: 0;
+    padding-top: 1px;
+}
+
+.jp-toast__title {
+    display: block;
+    color: var(--toast-accent);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.jp-toast__message {
+    margin: 4px 0 0;
+    color: #263F53;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.jp-toast__close {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    color: var(--toast-accent);
+    background: transparent;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.jp-toast__close:hover,
+.jp-toast__close:focus-visible {
+    background: rgba(255, 255, 255, .55);
+    outline: 2px solid color-mix(in srgb, var(--toast-accent) 48%, transparent);
+    outline-offset: 1px;
+}
+
+/* =========================================================
+   11. 반응형 및 접근성
    ========================================================= */
 @media (max-width: 760px) {
     .site-header[data-dynamic-header] {
@@ -471,6 +606,13 @@ button {
     .site-header__logo {
         width: 34px;
         height: 34px;
+    }
+
+    .jp-toast-region {
+        top: 126px;
+        right: auto;
+        left: 50%;
+        width: calc(100vw - 24px);
     }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -486,6 +628,11 @@ button {
 
     .site-header[data-dynamic-header] {
         opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .jp-toast {
         transform: none;
         transition: none;
     }

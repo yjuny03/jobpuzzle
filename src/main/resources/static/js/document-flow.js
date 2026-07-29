@@ -10,6 +10,14 @@
   };
   var DIRECT_INPUT_ALLOWED = ['JOB_POSTING', 'COMPANY_INFO', 'EXPERIENCE_NOTE'];
 
+  function notify(type, message, duration) {
+    if (typeof global.showToast === 'function') {
+      return global.showToast(type, message, duration);
+    }
+    global.alert(message);
+    return null;
+  }
+
   // ---- fetch helper: ApiResponse<T> 래퍼를 벗겨서 data만 반환, 실패하면 message로 reject ----
   function api(path, opts) {
     opts = opts || {};
@@ -253,7 +261,7 @@
       if (jumpInput) jumpInput.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
         var target = parseInt(jumpInput.value, 10);
-        if (!target || target < 1 || target > pageCount) { alert('1~' + pageCount + ' 사이의 페이지 번호를 입력해주세요.'); return; }
+        if (!target || target < 1 || target > pageCount) { notify('warning', '1~' + pageCount + ' 사이의 페이지 번호를 입력해주세요.'); return; }
         captureCurrentEditingPage();
         state.pageIndex = target - 1;
         render();
@@ -263,11 +271,12 @@
         var targetDocId = state.documentId;
         api('/documents/' + targetDocId + '/extractions', { method: 'POST' })
           .then(function () {
+            notify('info', '자료 추출을 다시 시작했습니다.');
             pollExtraction(targetDocId, function () {
               if (state.documentId === targetDocId) reload();
             });
           })
-          .catch(function (e) { alert(e.message); });
+          .catch(function (e) { notify('error', e.message); });
       });
 
       bindPanelAction('enter-edit', function () {
@@ -283,7 +292,7 @@
       bindPanelAction('edit-save', function () {
         captureCurrentEditingPage();
         var content = joinPages(state.editingPages, state.editingHasMarkers).trim();
-        if (!content) { alert('내용을 입력해주세요.'); return; }
+        if (!content) { notify('warning', '내용을 입력해주세요.'); return; }
         if (hasAnyVersion && options.openScaleModal) {
           options.openScaleModal(function (changeType) { submitEdit(extraction.extractionId, content, changeType); });
         } else if (hasAnyVersion) {
@@ -296,9 +305,12 @@
       bindPanelAction('confirm', function () {
         api('/document-extractions/' + extraction.extractionId + '/confirm', { method: 'POST' })
           .then(function (confirmed) {
-            return reload().then(function () { onConfirmed(confirmed); });
+            return reload().then(function () {
+              onConfirmed(confirmed);
+              notify('success', '추출 결과를 확정했습니다.');
+            });
           })
-          .catch(function (e) { alert(e.message); });
+          .catch(function (e) { notify('error', e.message); });
       });
 
       function bindPanelAction(name, fn) {
@@ -318,8 +330,10 @@
       return api('/document-extractions/' + baseExtractionId + '/versions', { method: 'POST', json: payload })
         .then(function () {
           state.editMode = false; state.editingPages = null; state.pageIndex = 0;
-          return reload();
-        }).catch(function (e) { alert(e.message); });
+          return reload().then(function () {
+            notify('success', '추출 내용을 저장했습니다.');
+          });
+        }).catch(function (e) { notify('error', e.message); });
     }
 
     return { load: load, reload: reload, clear: clear };

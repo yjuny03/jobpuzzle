@@ -477,6 +477,7 @@
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
 <!--  스크립트 실행 순서: 로더 → 동적 헤더 → WebGL 퍼즐 → GSAP → 랜딩 상호작용 -->
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/loader.js" th:src="@{/js/loader.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
 <script src="/js/vendor/gsap.min.js" th:src="@{/js/vendor/gsap.min.js}"></script>

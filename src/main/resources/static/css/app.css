@@ -1,4 +1,4 @@
-/* app.css — shared component styles for logged-in app pages (dashboard, mydata, jobanalysis, interview, reports, settings) */
+/* app.css — shared component styles for logged-in app pages (dashboard, mydata, interview, reports, settings) */
 
 .app-shell {
   background: var(--color-bg-tint);
