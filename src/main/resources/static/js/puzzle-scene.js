@@ -10,6 +10,7 @@
     var gl = canvas.getContext('webgl', { alpha:true, antialias:true, premultipliedAlpha:false });
     if (!gl) { canvas.hidden = true; return; }
     var analysisMode=canvas.hasAttribute('data-analysis-puzzle');
+    var resultMode=canvas.hasAttribute('data-result-puzzle');
 
     //  02. 퍼즐 클릭 단계별 UI 데이터: 하단 단계 문구와 우측 홀로그램 화면을 함께 변경
     var stages = [
@@ -146,7 +147,7 @@
 
     //  09. 장면 상태: 현재 단계, 시간, 전체 회전, 드래그 여부, 포인터 위치, 모션 감소 설정
     var stage=-1,started=Infinity,last=performance.now(),rx=-.17,ry=.23,tx=rx,ty=ry,drag=false,moved=false,px=0,py=0;
-    var analysisStage=-1,analysisTimer=0,analysisScatterTimer=0,analysisObserver=null;
+    var analysisStage=-1,analysisTimer=0,analysisScatterTimer=0,analysisObserver=null,resultTimer=0;
     var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     //  홀로그램 전환 상태: 연속 클릭 중에는 마지막 요청 단계를 보관해 순서가 꼬이지 않게 처리
     var currentHologramIndex=0,hologramTransitioning=false,pendingHologramIndex=null,hologramTimer=0;
@@ -242,20 +243,21 @@
     //  클릭 가능한 빈 영역인지 판별
     function interactiveTarget(target){return !target.closest('a,button,input,select,textarea,.hero__copy,.hero__card-wrap,.user-menu,.site-header');}
     //  pointerdown: 드래그 시작 위치 저장 및 포인터 캡처
-    if(!analysisMode) interaction.addEventListener('pointerdown',function(e){if(!interactiveTarget(e.target))return;drag=true;moved=false;px=e.clientX;py=e.clientY;if(interaction.setPointerCapture)interaction.setPointerCapture(e.pointerId);});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointerdown',function(e){if(!interactiveTarget(e.target))return;drag=true;moved=false;px=e.clientX;py=e.clientY;if(interaction.setPointerCapture)interaction.setPointerCapture(e.pointerId);});
     //  pointermove: 이동량으로 전체 퍼즐의 X/Y 회전 목표값 변경
-    if(!analysisMode) interaction.addEventListener('pointermove',function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;ty+=dx*.008;tx=Math.max(-.72,Math.min(.5,tx+dy*.008));px=e.clientX;py=e.clientY;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointermove',function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;ty+=dx*.008;tx=Math.max(-.72,Math.min(.5,tx+dy*.008));px=e.clientX;py=e.clientY;});
     //  pointerup/pointercancel: 드래그 상태 종료
-    if(!analysisMode) interaction.addEventListener('pointerup',function(){drag=false;});
-    if(!analysisMode) interaction.addEventListener('pointercancel',function(){drag=false;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointerup',function(){drag=false;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointercancel',function(){drag=false;});
     //  단순 클릭이면 다음 조립 단계로 이동하고, 6단계 이후에는 초기 상태로 순환
-    if(!analysisMode) interaction.addEventListener('click',function(e){if(moved||!interactiveTarget(e.target))return;setStage(stage>=5?-1:stage+1);});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('click',function(e){if(moved||!interactiveTarget(e.target))return;setStage(stage>=5?-1:stage+1);});
 
     //  12. 매 프레임 실행되는 WebGL 렌더 루프
     function render(now){
         if(!canvas.isConnected){
             window.clearTimeout(analysisTimer);
             window.clearTimeout(analysisScatterTimer);
+            window.clearInterval(resultTimer);
             if(analysisObserver)analysisObserver.disconnect();
             return;
         }
@@ -302,6 +304,13 @@
         setAnalysisStage(canvas.dataset.analysisStage);
         analysisObserver=new MutationObserver(function(){setAnalysisStage(canvas.dataset.analysisStage);});
         analysisObserver.observe(canvas,{attributes:true,attributeFilter:['data-analysis-stage']});
+        requestAnimationFrame(render);
+    }else if(resultMode){
+        setStage(-1);
+        resultTimer=window.setInterval(function(){
+            if(document.hidden)return;
+            setStage(stage>=5?-1:stage+1);
+        },1050);
         requestAnimationFrame(render);
     }else{
         setStage(-1); requestAnimationFrame(render);
