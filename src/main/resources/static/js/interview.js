@@ -7,6 +7,14 @@
 
   var DF = window.DocumentFlow;
 
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    window.alert(message);
+    return null;
+  }
+
   var MODES = [
     { id: 'basic', icon: 'basic', label: '기본 질문 모드', desc: '직무 공통 질문으로 빠르게 연습해요' },
     { id: 'weakness', icon: 'tag', label: '약점 보완 모드', desc: '반복되는 약점 태그를 골라 집중 연습해요' },
@@ -120,7 +128,12 @@
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">질문 모드를 선택하세요</p>' +
       '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">선택한 모드에 맞춰 질문을 생성해드려요</p>' +
       '<div class="mode-grid">' + MODES.map(function (m) {
-        return '<div class="mode-card" data-mode="' + m.id + '"><div class="mode-card__icon">' + icon(m.icon) + '</div><p class="mode-card__title">' + m.label + '</p><p class="mode-card__desc">' + m.desc + '</p></div>';
+        var puzzle = m.id === 'custom'
+          ? '<canvas class="mode-puzzle-canvas" data-puzzle-piece="2" aria-hidden="true"></canvas>'
+          : '';
+        return '<div class="mode-card" data-mode="' + m.id + '">' + puzzle +
+          '<div class="mode-card__icon">' + icon(m.icon) + '</div><p class="mode-card__title">' +
+          m.label + '</p><p class="mode-card__desc">' + m.desc + '</p></div>';
       }).join('') + '</div></div>';
   }
 
@@ -187,7 +200,7 @@
           state.selectedJobCategoryId = match.jobCategoryId;
         }
       }
-    }).catch(function (e) { alert(e.message); });
+    }).catch(function (e) { notify('error', e.message); });
   }
 
   function docListHtml(type) {
@@ -199,16 +212,16 @@
         if (!selectable) {
           var status = DF.statusLabel(null, d.latestVersionStatus);
           return '<div class="material-doc-row" style="opacity:.55; cursor:default;"><div class="material-checkbox"></div>' +
-            '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-            '<p style="font-size:11px; margin:2px 0 0; color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
+            '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
+            '<p class="material-doc-meta" style="color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
         }
         var checked = !!state.selectedDocIds[d.documentId];
         return '<div class="material-doc-row' + (checked ? ' is-checked' : '') + '" data-toggle-doc="' + d.documentId + '"><div class="material-checkbox"></div>' +
-          '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-          '<p style="font-size:11px; color:#8A93A3; margin:2px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + ' · 확정됨</p></div></div>';
+          '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
+          '<p class="material-doc-meta">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + ' · 확정됨</p></div></div>';
       }).join('');
     } else {
-      html += '<p style="font-size:11.5px; color:#8A93A3; margin:0 0 10px;">등록된 자료가 없어요</p>';
+      html += '<p class="material-empty">등록된 자료가 없어요</p>';
     }
     html += '<button class="material-register-btn" data-open-register="' + type + '">+ 자료 등록하기</button>';
     return html;
@@ -241,20 +254,20 @@
     return '<div class="card card--pad-lg material-select-card">' +
       backBtn('backToMode', '모드 다시 선택') +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">면접에 사용할 자료를 선택하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
+      '<p class="material-select-intro">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
       '<div class="material-columns">' +
-        '<div><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">회사 공고 / 회사 정보</p>' +
+        '<div><p class="material-column-title">회사 공고 / 회사 정보</p>' +
           COMPANY_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
         '<div>' +
-          '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:12px; padding:14px; margin-bottom:14px;">' +
-            '<p style="font-size:11px; color:#8A93A3; margin:0 0 8px;">희망 직무</p>' +
-            '<div class="flex-row gap-8" style="flex-wrap:wrap;">' +
+          '<div class="material-job-card">' +
+            '<p class="material-job-label">희망 직무</p>' +
+            '<div class="flex-row gap-8 material-job-selects">' +
               '<select id="material-main-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + mainOpts + '</select>' +
               '<select id="material-sub-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (state.selectedMainCategory ? '' : ' disabled') + '>' + subOpts + '</select>' +
               '<select id="material-level-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (levelMatches.length ? '' : ' disabled') + '>' + levelOpts + '</select>' +
             '</div><p class="material-job-note">선택한 직무·경력을 면접 기준으로 사용합니다. 공고의 요구 경력과 다르면 분석 결과에서 차이를 안내해드려요.</p></div>' +
-          '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
+          '<p class="material-column-title">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
           CANDIDATE_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
       '</div>' +
@@ -263,9 +276,9 @@
   }
 
   function goMaterialReview() {
-    if (!state.selectedJobCategoryId) { alert('희망 직무를 선택해주세요.'); return; }
+    if (!state.selectedJobCategoryId) { notify('warning', '희망 직무를 선택해주세요.'); return; }
     var selectedIds = Object.keys(state.selectedDocIds);
-    if (!selectedIds.length) { alert('자료를 1개 이상 선택해주세요.'); return; }
+    if (!selectedIds.length) { notify('warning', '자료를 1개 이상 선택해주세요.'); return; }
 
     Promise.all(selectedIds.map(function (id) {
       if (state.selectedExtractionIds[id]) return Promise.resolve();
@@ -275,7 +288,7 @@
       });
     })).then(function () {
       openMaterialReviewModal();
-    }).catch(function (e) { alert(e.message); });
+    }).catch(function (e) { notify('error', e.message); });
   }
 
   // ---- step: material review (선택 내용 읽기 전용 확인 + 확정) ----
@@ -292,17 +305,17 @@
     var jcLabel = jc ? (jc.mainCategory + ' > ' + jc.subCategory + ' · ' + (CAREER_LEVEL_LABEL[jc.careerLevel] || jc.careerLevel)) : '';
 
     return '<div class="material-review-content">' +
-      '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">선택한 자료와 기준을 확인하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 18px;">확정하면 아래 자료와 직무 기준으로 분석을 시작합니다. 확정 후에는 구성을 바꿀 수 없어요.</p>' +
-      '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:10px; padding:14px; margin-bottom:18px;">' +
-        '<p style="font-size:11px; color:#8A93A3; margin:0 0 4px;">희망 직무</p>' +
-        '<p style="font-size:13.5px; font-weight:700; margin:0;">' + esc(jcLabel) + '</p>' +
+      '<p class="material-review-lead">선택한 자료와 기준을 확인하세요</p>' +
+      '<p class="material-review-description">확정하면 아래 자료와 직무 기준으로 분석을 시작합니다. 확정 후에는 구성을 바꿀 수 없어요.</p>' +
+      '<div class="material-review-job">' +
+        '<p class="material-review-job-label">희망 직무</p>' +
+        '<p class="material-review-job-value">' + esc(jcLabel) + '</p>' +
       '</div>' +
       Object.keys(byType).map(function (type) {
-        return '<div style="margin-bottom:16px;"><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' +
+        return '<div class="material-review-group"><p class="material-review-group-title">' + DF.CATEGORY_LABEL[type] + '</p>' +
           byType[type].map(function (d) {
-            return '<div class="review-card" style="padding:12px 16px; margin-bottom:8px;"><p style="font-size:13px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-              '<p style="font-size:11.5px; color:#8A93A3; margin:4px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + '</p></div>';
+            return '<div class="review-card material-review-item"><p class="material-review-item-name">' + esc(d.displayName) + '</p>' +
+              '<p class="material-review-item-version">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + '</p></div>';
           }).join('') +
         '</div>';
       }).join('') +
@@ -384,7 +397,7 @@
         window.location.href = '/api/analysis/' + encodeURIComponent(state.analysisCaseId);
       })
       .catch(function (e) {
-        alert(e.message);
+        notify('error', e.message);
         if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '이 구성으로 분석 시작'; }
       });
   }
@@ -442,16 +455,16 @@
 
     document.getElementById('material-register-submit').addEventListener('click', function () {
       var name = document.getElementById('material-register-name').value.trim();
-      if (!name) { alert('자료명을 입력해주세요.'); return; }
+      if (!name) { notify('warning', '자료명을 입력해주세요.'); return; }
 
       var opts = { category: state.registerTargetType, name: name, method: state.materialRegisterMethod };
       if (state.materialRegisterMethod === 'file') {
         var files = document.getElementById('material-register-file').files;
-        if (!files.length) { alert('파일을 선택해주세요.'); return; }
+        if (!files.length) { notify('warning', '파일을 선택해주세요.'); return; }
         opts.files = files;
       } else {
         var content = document.getElementById('material-register-content').value.trim();
-        if (!content) { alert('내용을 입력해주세요.'); return; }
+        if (!content) { notify('warning', '내용을 입력해주세요.'); return; }
         opts.content = content;
       }
 
@@ -472,7 +485,7 @@
         if (opts.method === 'file') {
           DF.pollExtraction(doc.documentId, function () { panel.reload(); });
         }
-      }).catch(function (e) { alert(e.message); });
+      }).catch(function (e) { notify('error', e.message); });
     });
   }
 
@@ -645,7 +658,7 @@
             state.weaknessTags = tags || [];
             state.step = 'weaknessPick';
             render();
-          }).catch(function (e) { alert(e.message); });
+          }).catch(function (e) { notify('error', e.message); });
         }
         else if (state.mode === 'custom') { enterMaterialSelect(); }
       });

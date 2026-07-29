@@ -6,9 +6,10 @@
 <title>지원 자료 — JobPuzzle</title>
 <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
 <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/app-theme.css" th:href="@{/css/app-theme.css}">
 <link rel="stylesheet" href="/css/mydata.css" th:href="@{/css/mydata.css}">
 </head>
-<body>
+<body class="jp-app-theme jp-mydata-page">
 
 <div th:replace="~{fragments/header :: appHeader('mydata')}"></div>
 
@@ -70,13 +71,12 @@
 
     <p class="field-label--section">3. 등록 방법</p>
     <div class="tabbar tabbar--sm" style="margin-bottom:14px;">
-      <button class="tabbar__btn is-active" data-method="file">파일 업로드</button>
+      <button type="button" class="tabbar__btn is-active" id="register-file-add" data-method="file">이미지 · 파일 추가하기</button>
       <button class="tabbar__btn" data-method="text">직접 입력</button>
     </div>
 
     <div data-method-panel="file">
       <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="file-input" id="register-file" multiple hidden>
-      <button type="button" class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="register-file-add">이미지 파일 추가하기</button>
       <p class="file-name-preview">PDF는 1개, 이미지는 여러 장(최대 20장)을 한 번에 선택할 수 있습니다. 파일당 최대 10MB, 전체 20MB까지 업로드할 수 있습니다.</p>
       <div id="register-file-list" class="file-chip-list"></div>
       <label class="flex-row gap-8" style="font-size:12.5px; color:var(--color-text-muted); cursor:pointer;">
