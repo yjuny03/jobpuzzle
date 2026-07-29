@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.global.config;
 
+import com.example.jobpuzzle.global.security.CustomAccessDeniedHandler;
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetailsService;
 import com.example.jobpuzzle.global.security.OAuth2LoginSuccessHandler;
@@ -33,6 +34,9 @@ public class SecurityConfig {
 
     // 자동로그인 토큰을 DB(RefreshToken 테이블)에 저장/조회하는 구현체
     private final PersistentTokenRepository persistentTokenRepository;
+
+    // 로그인은 했지만 권한이 없는 요청(예: 일반 회원의 관리자 화면/API 접근) 처리
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
 
     // 자동로그인 토큰 서명에 쓰는 애플리케이션 키 (외부에 노출되면 안 됨)
     private static final String REMEMBER_ME_KEY = "jobpuzzle-remember-me-key";
@@ -72,6 +76,17 @@ public class SecurityConfig {
             "/api/job-category"
     };
 
+    // 관리자만 접근 가능한 화면 경로
+    private static final String[] ADMIN_VIEW_URLS = {
+            "/admin/**"
+    };
+
+    // 관리자만 접근 가능한 API 경로
+    private static final String[] ADMIN_API_URLS = {
+            "/api/admin/**",
+            "/api/guide-admin/**"
+    };
+
     // 비밀번호 암호화에 쓰는 인코더
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -109,11 +124,18 @@ public class SecurityConfig {
                         .requestMatchers(STATIC_URLS).permitAll()
                         .requestMatchers(PUBLIC_VIEW_URLS).permitAll()
                         .requestMatchers(PUBLIC_API_URLS).permitAll()
+                        // 관리자 전용 경로는 인증 여부보다 먼저 role을 검사해야 해서 anyRequest()보다 위에 둠
+                        .requestMatchers(ADMIN_VIEW_URLS).hasRole("ADMIN")
+                        .requestMatchers(ADMIN_API_URLS).hasRole("ADMIN")
                         // 가이드 등록·버전 활성화는 비용과 분석 기준에 영향을 주므로 관리자만 허용
                         .requestMatchers("/api/guide-admin/**").hasRole("ADMIN")
 
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()
+                )
+                // 로그인은 했지만 권한이 없는 요청(관리자 전용 경로에 일반 회원 접근 등) 처리
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .accessDeniedHandler(customAccessDeniedHandler)
                 )
                 // 세션이 없을 때 자동로그인 쿠키로 재인증을 시도하는 필터 등록
                 .rememberMe(rememberMe -> rememberMe

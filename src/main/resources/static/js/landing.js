@@ -52,6 +52,7 @@
         els.userAvatar = document.getElementById('user-avatar');
         els.userChip = document.getElementById('user-chip');
         els.userMenu = document.getElementById('user-menu');
+        els.adminLink = document.getElementById('admin-link');
         els.heroCtaLabel = document.getElementById('hero-cta-label');
         els.heroCta = document.getElementById('hero-cta');
         els.heroCtaHint = document.getElementById('hero-cta-hint');
@@ -71,7 +72,7 @@
     }
 
     //  04. 현재 미리보기 모드를 화면에 반영: 헤더 로그인 상태, HERO CTA, 리포트 잠금 상태를 함께 변경
-    function applyMode(mode, userName) {
+    function applyMode(mode, userName, role) {
         var config = STATE_CONFIG[mode] || STATE_CONFIG.guest;
         var name = userName || DUMMY_USER_NAME;
 
@@ -88,6 +89,7 @@
             if (els.authUser) els.authUser.hidden = false;
             if (els.userName) els.userName.textContent = name + '님';
             if (els.userAvatar) els.userAvatar.textContent = name.charAt(0);
+            if (els.adminLink) els.adminLink.hidden = role !== 'ADMIN';
         } else {
             if (els.authGuest) els.authGuest.hidden = false;
             if (els.authUser) els.authUser.hidden = true;
@@ -142,7 +144,7 @@
             .then(function (result) {
                 if (result.ok && result.body.success) {
                     var user = result.body.data;
-                    applyMode('noData', user.name || user.loginId);
+                    applyMode('noData', user.name || user.loginId, user.role);
                     return;
                 }
                 applyMode('guest');

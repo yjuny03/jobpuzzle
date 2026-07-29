@@ -1,6 +1,9 @@
 package com.example.jobpuzzle.user.repository;
 
 import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.entity.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +33,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 비밀번호 재설정 시 아이디와 이메일이 같은 계정 소유인지 확인
     boolean existsByLoginIdAndEmail(String loginId, String email);
+
+    // 관리자 회원 목록/검색 - status가 없으면 전체 상태, keyword가 없으면 검색 없이 상태만 필터링
+    // searchField로 keyword를 매칭할 필드(아이디/이메일/이름)를 선택
+    @Query("SELECT u FROM User u "
+            + "WHERE (:status IS NULL OR u.status = :status) "
+            + "AND (:keyword IS NULL "
+            + "     OR (:searchField = 'LOGIN_ID' AND u.loginId LIKE %:keyword%) "
+            + "     OR (:searchField = 'EMAIL' AND u.email LIKE %:keyword%) "
+            + "     OR (:searchField = 'NAME' AND u.name LIKE %:keyword%))")
+    Page<User> search(
+            @Param("keyword") String keyword,
+            @Param("searchField") String searchField,
+            @Param("status") UserStatus status,
+            Pageable pageable
+    );
 }

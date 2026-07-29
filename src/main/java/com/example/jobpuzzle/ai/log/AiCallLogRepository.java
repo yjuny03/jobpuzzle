@@ -1,6 +1,10 @@
 package com.example.jobpuzzle.ai.log;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -37,4 +41,8 @@ public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
 
     Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
             AiInputReferenceType inputReferenceType, String inputReferenceId);
+
+    // 관리자 AI 오류 로그 조회 - status가 없으면 전체
+    @Query("SELECT l FROM AiCallLog l WHERE :status IS NULL OR l.status = :status")
+    Page<AiCallLog> search(@Param("status") AiCallLogStatus status, Pageable pageable);
 }

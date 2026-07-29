@@ -44,6 +44,14 @@
               class="user-menu__item"
               >설정</a
             >
+            <a
+              href="/admin/users"
+              th:href="@{/admin/users}"
+              id="admin-link"
+              class="user-menu__item"
+              hidden
+              >관리자</a
+            >
             <div class="user-menu__divider"></div>
             <a
               href="/index.html"
@@ -115,6 +123,14 @@
               th:href="@{/settings.html}"
               class="user-menu__item"
               >설정</a
+            >
+            <a
+              href="/admin/users"
+              th:href="@{/admin/users}"
+              id="app-admin-link"
+              class="user-menu__item"
+              hidden
+              >관리자</a
             >
             <div class="user-menu__divider"></div>
             <a

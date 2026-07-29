@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 오류 로그 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <h1 class="page-title">AI 오류 로그</h1>
+    <p class="page-subtitle">AI 호출 실패·빈 응답·JSON 오류 등을 추적할 수 있어요</p>
+
+    <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
+      <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn is-active" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
+      <a class="tabbar__btn" href="/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
+    </div>
+
+    <div class="flex-row" style="gap:8px; margin-bottom:20px;">
+      <select class="select-input" id="ai-log-status-filter" style="max-width:140px;">
+        <option value="">전체 상태</option>
+        <option value="PENDING">대기</option>
+        <option value="RUNNING">실행중</option>
+        <option value="SUCCEEDED">성공</option>
+        <option value="FAILED">실패</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:0.9fr 1.2fr 1fr 1fr 1.6fr 0.9fr 1.1fr;">
+        <span>상태</span><span>실행 단계</span><span>provider/model</span><span>입력 참조</span><span>에러</span><span>재시도</span><span>실행일시</span>
+      </div>
+      <div id="ai-log-rows"></div>
+    </div>
+    <div class="flex-row" style="justify-content:center; gap:8px; margin-top:16px;" id="ai-log-pagination"></div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-ai-logs.js" th:src="@{/js/admin-ai-logs.js}"></script>
+
+</body>
+</html>

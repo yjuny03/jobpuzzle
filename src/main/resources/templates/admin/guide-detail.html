@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가이드 상세 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container app-container--narrow">
+
+    <a href="/admin/guides" th:href="@{/admin/guides}" style="font-size:13px; color:#5B6370; text-decoration:none; display:inline-block; margin-bottom:14px;">← 가이드 목록으로</a>
+
+    <div id="guide-detail-header" class="flex-row" style="justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+      <h1 class="page-title" id="guide-detail-title" style="margin:0;">불러오는 중...</h1>
+      <div class="flex-row gap-10" id="guide-detail-actions"></div>
+    </div>
+
+    <div class="card card--pad-lg" style="display:flex; flex-direction:column; gap:16px; margin-bottom:20px;" id="guide-detail-body"></div>
+
+    <div class="card card--pad-lg" id="guide-version-form" style="margin-bottom:20px;" hidden>
+      <p class="field-label--section">새 버전 만들기</p>
+
+      <div style="margin-bottom:14px;">
+        <label class="field-label">제목</label>
+        <input class="text-input" id="gv-title" style="width:100%;">
+      </div>
+
+      <div class="flex-row" style="gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end;">
+        <div>
+          <label class="field-label">적용 범위</label>
+          <select class="select-input" id="gv-scope-type" style="width:160px;">
+            <option value="CATEGORY">특정 직무분류</option>
+            <option value="PARENT_CATEGORY">상위 대분류 전체</option>
+            <option value="GLOBAL_COMMON">전체 공통</option>
+          </select>
+        </div>
+        <div id="gv-scope-category-field">
+          <label class="field-label">직무분류</label>
+          <select class="select-input" id="gv-job-category" style="width:220px;"></select>
+        </div>
+        <div id="gv-scope-main-field" hidden>
+          <label class="field-label">대분류명</label>
+          <input class="text-input" id="gv-scope-main" style="width:180px;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label class="field-label">적용 범위 설명</label>
+        <textarea class="textarea-input" id="gv-applicable-scope" style="width:100%; height:60px;"></textarea>
+      </div>
+
+      <div class="flex-row" style="gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">평가 중점 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="gv-evaluation-focus" style="width:100%; height:80px;"></textarea>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">근거 판단 기준 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="gv-evidence-rules" style="width:100%; height:80px;"></textarea>
+        </div>
+      </div>
+      <div class="flex-row" style="gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">질문 방향 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="gv-question-direction" style="width:100%; height:80px;"></textarea>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="field-label">피해야 할 질문 (한 줄에 하나씩)</label>
+          <textarea class="textarea-input" id="gv-avoid-questions" style="width:100%; height:80px;"></textarea>
+        </div>
+      </div>
+
+      <div class="flex-row" style="gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+        <div>
+          <label class="field-label">자료 유형</label>
+          <select class="select-input" id="gv-source-type" style="width:140px;">
+            <option value="DIRECT_INPUT">직접 입력</option>
+            <option value="PDF">PDF 업로드</option>
+          </select>
+        </div>
+        <div id="gv-file-field" hidden>
+          <label class="field-label">PDF 파일</label>
+          <input type="file" id="gv-file" accept=".pdf" class="text-input">
+        </div>
+      </div>
+
+      <div id="gv-source-text-field" style="margin-bottom:16px;">
+        <label class="field-label">원문 텍스트 (검색용 청크로 나뉩니다)</label>
+        <textarea class="textarea-input" id="gv-source-text" style="width:100%; height:140px;" placeholder="가이드의 원문 내용을 붙여넣어주세요"></textarea>
+      </div>
+
+      <div class="flex-row gap-10">
+        <button class="btn btn--primary" id="gv-save-btn">새 버전 저장</button>
+        <button class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="gv-cancel-btn">취소</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-guide-detail.js" th:src="@{/js/admin-guide-detail.js}"></script>
+
+</body>
+</html>

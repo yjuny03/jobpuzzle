@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>직무 분류 관리 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <h1 class="page-title">직무 분류 관리</h1>
+    <p class="page-subtitle">공고·가이드·리포트에서 공통으로 쓰는 직무 분류 기준이에요</p>
+
+    <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
+      <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn is-active" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
+      <a class="tabbar__btn" href="/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
+    </div>
+
+    <div class="flex-row" style="justify-content:flex-end; margin-bottom:12px;">
+      <button class="btn btn--primary" id="job-category-add-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        새 직무 분류 추가
+      </button>
+    </div>
+
+    <div class="card card--pad-lg" id="job-category-form" style="margin-bottom:20px;" hidden>
+      <p class="field-label--section" id="job-category-form-title">새 직무 분류 추가</p>
+      <div style="display:grid; grid-template-columns:1.2fr 1.2fr 0.8fr 1fr; gap:8px; align-items:end;">
+        <div>
+          <label class="field-label">대분류</label>
+          <input class="text-input" id="job-category-main" list="job-category-main-list" placeholder="기존 항목 선택 또는 새로 입력" style="width:100%; box-sizing:border-box;">
+          <datalist id="job-category-main-list"></datalist>
+        </div>
+        <div>
+          <label class="field-label">중분류</label>
+          <input class="text-input" id="job-category-sub" list="job-category-sub-list" placeholder="기존 항목 선택 또는 새로 입력" style="width:100%; box-sizing:border-box;">
+          <datalist id="job-category-sub-list"></datalist>
+        </div>
+        <div>
+          <label class="field-label">경력수준</label>
+          <select class="select-input" id="job-category-career" style="width:100%; box-sizing:border-box;">
+            <option value="NEW">신입</option>
+            <option value="EXPERIENCED">경력</option>
+            <option value="ANY">무관</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn--primary" id="job-category-save-btn">저장</button>
+          <button class="btn btn--ghost" style="border:1px solid #E3E7ED;" id="job-category-cancel-btn">취소</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:1.2fr 1.2fr 0.8fr 1fr;">
+        <span>대분류</span><span>중분류</span><span>경력수준</span><span>관리</span>
+      </div>
+      <div id="job-category-rows"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-job-categories.js" th:src="@{/js/admin-job-categories.js}"></script>
+
+</body>
+</html>

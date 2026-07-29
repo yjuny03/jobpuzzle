@@ -11,6 +11,7 @@ public enum ErrorCode {
     COMMON_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON_001", "요청한 리소스를 찾을 수 없습니다."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "COMMON_002", "요청 값이 올바르지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 내부 오류가 발생했습니다."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "COMMON_004", "접근 권한이 없습니다."),
 
     //AI
     AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_001", "AI 응답이 유효하지 않습니다."),
@@ -65,6 +66,8 @@ public enum ErrorCode {
 
     //job category
     JOB_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND,"job_category_001","존재하지 않는 직업 분류 입니다."),
+    JOB_CATEGORY_DUPLICATE(HttpStatus.CONFLICT, "JOB_CATEGORY_002", "이미 등록된 대분류·중분류·경력수준 조합입니다."),
+    JOB_CATEGORY_IN_USE(HttpStatus.CONFLICT, "JOB_CATEGORY_003", "다른 데이터에서 사용 중인 직무 분류는 삭제할 수 없습니다."),
 
     // guide
     GUIDE_ACTIVE_DUPLICATED(HttpStatus.CONFLICT, "GUIDE_001", "동일 검색 범위에 사용 가능한 가이드가 여러 건 존재합니다."),
@@ -87,6 +90,7 @@ public enum ErrorCode {
     GUIDE_INDEXING_FAILED(HttpStatus.BAD_GATEWAY, "GUIDE_018", "가이드 벡터 인덱싱에 실패했습니다."),
     GUIDE_INDEX_NOT_READY(HttpStatus.CONFLICT, "GUIDE_019", "벡터 인덱싱이 완료된 가이드만 활성화할 수 있습니다."),
     GUIDE_VECTOR_RESULT_INVALID(HttpStatus.CONFLICT, "GUIDE_020", "가이드 벡터 검색 결과가 현재 버전의 청크와 일치하지 않습니다."),
+    GUIDE_CODE_VERSION_DUPLICATE(HttpStatus.CONFLICT, "GUIDE_021", "이미 등록된 가이드 코드·버전 조합입니다."),
 
 
     // interview - 면접 세션·질문 선택·답변 진행

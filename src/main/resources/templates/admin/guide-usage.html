@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가이드 사용 이력 — JobPuzzle 관리자</title>
+<link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
+<link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/header :: appHeader('admin')}"></div>
+
+<div class="app-shell">
+  <div class="app-container">
+
+    <h1 class="page-title">가이드 사용 이력</h1>
+    <p class="page-subtitle">면접 세션·분석에서 어떤 가이드가 어떻게 매칭됐는지 조회할 수 있어요</p>
+
+    <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
+      <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn is-active" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
+      <a class="tabbar__btn" href="/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:0.9fr 1.4fr 0.9fr 0.7fr 0.9fr 0.9fr 1.1fr;">
+        <span>회원</span><span>직무분류</span><span>매칭유형</span><span>폴백</span><span>불충분</span><span>가이드</span><span>사용일시</span>
+      </div>
+      <div id="guide-usage-rows"></div>
+    </div>
+    <div class="flex-row" style="justify-content:center; gap:8px; margin-top:16px;" id="guide-usage-pagination"></div>
+
+  </div>
+</div>
+
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/admin-guide-usage.js" th:src="@{/js/admin-guide-usage.js}"></script>
+
+</body>
+</html>
