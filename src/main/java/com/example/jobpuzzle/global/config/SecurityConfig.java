@@ -109,6 +109,8 @@ public class SecurityConfig {
                         .requestMatchers(STATIC_URLS).permitAll()
                         .requestMatchers(PUBLIC_VIEW_URLS).permitAll()
                         .requestMatchers(PUBLIC_API_URLS).permitAll()
+                        // 가이드 등록·버전 활성화는 비용과 분석 기준에 영향을 주므로 관리자만 허용
+                        .requestMatchers("/api/guide-admin/**").hasRole("ADMIN")
 
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()
