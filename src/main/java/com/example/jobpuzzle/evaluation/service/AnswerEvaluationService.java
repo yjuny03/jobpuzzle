@@ -18,6 +18,7 @@ import com.example.jobpuzzle.interview.entity.*;
 import com.example.jobpuzzle.interview.repository.FollowUpQuestionRepository;
 import com.example.jobpuzzle.interview.repository.InterviewMessageRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class AnswerEvaluationService {
 
     private static final int PASS_THRESHOLD = 70;
@@ -59,7 +61,7 @@ public class AnswerEvaluationService {
                 ? AiExecutionStage.WEAKNESS_REEVALUATION
                 : AiExecutionStage.ANSWER_EVALUATION;
         GenerationClientSelection selection = aiClientService.resolve(stage);
-        AiCallLog log = AiCallLog.pending(
+        AiCallLog callLog = AiCallLog.pending(
                 selection.provider(),
                 selection.model(),
                 stage,
@@ -70,9 +72,9 @@ public class AnswerEvaluationService {
                 session.getGuideDocument(),
                 null
         );
-        log.start();
+        callLog.start();
         // IDENTITY PK는 save 즉시 INSERT될 수 있으므로 필수 startedAt을 먼저 채운다.
-        aiCallLogRepository.save(log);
+        aiCallLogRepository.save(callLog);
 
         EvaluationPayload payload;
         try {
@@ -80,13 +82,30 @@ public class AnswerEvaluationService {
                     ? mockPayload(answerMessage, sessionQuestion, mode)
                     : anthropicPayload(selection, template, answerMessage, sessionQuestion, mode);
         } catch (RuntimeException exception) {
-            AiCallLogErrorType errorType = exception instanceof com.example.jobpuzzle.ai.validation.AiProcessingException processing
-                    ? processing.getErrorType()
-                    : AiCallLogErrorType.PROVIDER_ERROR;
-            log.fail(errorType, exception.getClass().getSimpleName());
+            String failureTraceId = EvaluationFailureDiagnostics.newTraceId();
+            AiCallLogErrorType errorType = EvaluationFailureDiagnostics.errorType(exception);
+            callLog.fail(errorType, exception.getClass().getSimpleName());
+            log.warn(
+                    "ai_evaluation_failed traceId={} aiCallLogId={} sessionId={} sessionQuestionId={} "
+                            + "answerMessageId={} mode={} stage={} provider={} model={} answerLength={} "
+                            + "errorType={} rootCause={}",
+                    failureTraceId,
+                    callLog.getAiCallLogId(),
+                    session.getSessionId(),
+                    sessionQuestion.getSessionQuestionId(),
+                    answerMessage.getMessageId(),
+                    mode,
+                    stage,
+                    selection.provider(),
+                    selection.model(),
+                    answerMessage.getMessageText().length(),
+                    errorType,
+                    EvaluationFailureDiagnostics.rootCauseSummary(exception),
+                    exception
+            );
             // 답변 저장과 FAILED 로그는 유지한다. 실패 평가를 0점으로 만들지 않고
             // 집계에서 제외하면 사용자는 재접속·종료 흐름을 계속 사용할 수 있다.
-            return new EvaluationOutcome(null, null, true);
+            return new EvaluationOutcome(null, null, true, failureTraceId);
         }
 
         AnswerEvaluation evaluation = AnswerEvaluation.create(
@@ -102,7 +121,7 @@ public class AnswerEvaluationService {
                 payload.weaknessTags(),
                 payload.summary(),
                 payload.improvementDirection(),
-                log
+                callLog
         );
         answerEvaluationRepository.save(evaluation);
         registerWeaknessTags(evaluation);
@@ -110,8 +129,8 @@ public class AnswerEvaluationService {
         InterviewMessage followUpMessage = createFollowUpIfNeeded(
                 evaluation, answerMessage, payload.followUpQuestion(), payload.followUpType(), payload.followUpReason()
         );
-        log.succeed();
-        return new EvaluationOutcome(evaluation, followUpMessage, false);
+        callLog.succeed();
+        return new EvaluationOutcome(evaluation, followUpMessage, false, null);
     }
 
     @Transactional(readOnly = true)
@@ -421,7 +440,15 @@ public class AnswerEvaluationService {
     public record EvaluationOutcome(
             AnswerEvaluation evaluation,
             InterviewMessage followUpMessage,
-            boolean evaluationFailed
+            boolean evaluationFailed,
+            String failureTraceId
     ) {
+        public EvaluationOutcome(
+                AnswerEvaluation evaluation,
+                InterviewMessage followUpMessage,
+                boolean evaluationFailed
+        ) {
+            this(evaluation, followUpMessage, evaluationFailed, null);
+        }
     }
 }

@@ -59,6 +59,8 @@
   opacity: 0.55;
 }
 .weak-pick-row { position: relative; }
+.weak-pick-row:hover,
+.weak-pick-row:focus-within { z-index: 120; }
 .weak-pick-name {
   display: block;
   color: #164f7d;
@@ -80,7 +82,7 @@
 }
 .weak-pick-history {
   position: absolute;
-  z-index: 20;
+  z-index: 200;
   left: 18px;
   right: 18px;
   top: calc(100% - 4px);
@@ -98,6 +100,8 @@
 .weak-pick-history span { display:block; margin-top:5px; font-size:11px; line-height:1.5; }
 .weak-pick-history ul { margin:0; padding-left:18px; }
 .weak-pick-history li { margin-top:5px; font-size:11px; line-height:1.5; }
+.jp-interview-page #step-root,
+.jp-interview-page #step-root > .card { overflow: visible; }
 
 .material-columns {
   display: grid;
@@ -815,6 +819,19 @@
 .prepared-analysis-card:hover .prepared-analysis-detail,
 .prepared-analysis-copy:focus .prepared-analysis-detail { display:block; }
 .prepared-analysis-actions { display: flex; gap: 8px; }
+.prepared-analysis-card--basic { border-left-color: var(--jp-blue, #4B83A8); }
+.prepared-analysis-card--basic .prepared-analysis-check {
+  color: var(--jp-blue-deep, #285A7A);
+  background: var(--jp-blue-soft, #C9DEED);
+}
+.prepared-analysis-card--basic span { color: var(--jp-blue-deep, #285A7A); }
+.prepared-analysis-card--weakness { border-left-color: var(--jp-warning, #C98A31); }
+.prepared-analysis-card--weakness .prepared-analysis-check {
+  color: #8A5515;
+  background: #F4DFC1;
+}
+.prepared-analysis-card--weakness span { color: #8A5515; }
+.live-session-secondary-actions { display: flex; gap: 8px; }
 
 @media (max-width: 900px) {
   .evaluation-guide__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

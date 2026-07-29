@@ -11,6 +11,7 @@ import com.example.jobpuzzle.ai.validation.AiResponseProcessor;
 import com.example.jobpuzzle.ai.validation.InterviewQuestionGenerationResponseValidator;
 import com.example.jobpuzzle.analysis.dto.BasicQuestionRequest;
 import com.example.jobpuzzle.analysis.dto.QuestionSetResponse;
+import com.example.jobpuzzle.analysis.dto.PreparedQuestionSetResponse;
 import com.example.jobpuzzle.analysis.dto.WeaknessQuestionRequest;
 import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
 import com.example.jobpuzzle.evaluation.entity.WeaknessTagLog;
@@ -25,6 +26,7 @@ import com.example.jobpuzzle.interview.dto.QuestionHintResponse;
 import com.example.jobpuzzle.interview.dto.QuestionListResponse;
 import com.example.jobpuzzle.interview.repository.InterviewQuestionRepository;
 import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
+import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.user.entity.User;
@@ -46,6 +48,7 @@ public class QuestionGenerationService {
     private final JobCategoryRepository jobCategoryRepository;
     private final QuestionSetRepository questionSetRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
+    private final InterviewSessionRepository interviewSessionRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
     private final WeaknessTagLogRepository weaknessTagLogRepository;
     private final PromptTemplateRepository promptTemplateRepository;
@@ -202,6 +205,30 @@ public class QuestionGenerationService {
         List<InterviewQuestion> questions =
                 interviewQuestionRepository.findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(questionSetId);
         return QuestionSetResponse.from(set, questions);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PreparedQuestionSetResponse> getUnusedGeneratedQuestionSets(Long userId) {
+        return List.of(InterviewSessionMode.BASIC, InterviewSessionMode.WEAKNESS_REVIEW).stream()
+                .flatMap(mode -> questionSetRepository
+                        .findByUser_UserIdAndInterviewModeAndStatus(
+                                userId, mode, QuestionSetStatus.ACTIVE
+                        )
+                        .stream())
+                .filter(set -> !interviewSessionRepository
+                        .existsByQuestionSet_QuestionSetId(set.getQuestionSetId()))
+                .map(set -> PreparedQuestionSetResponse.from(
+                        set,
+                        interviewQuestionRepository
+                                .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
+                                        set.getQuestionSetId()
+                                )
+                                .size()
+                ))
+                .sorted(java.util.Comparator.comparing(
+                        PreparedQuestionSetResponse::getQuestionSetId
+                ).reversed())
+                .toList();
     }
 
     @Transactional(readOnly = true)

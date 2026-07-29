@@ -393,6 +393,7 @@ public class InterviewSessionService {
                         ? "AI 평가에 실패했습니다. 답변은 저장되었고 점수 계산에서는 제외됩니다."
                         : outcome.evaluation().getSummary())
                 .evaluationFailed(outcome.evaluationFailed())
+                .failureTraceId(outcome.failureTraceId())
                 .followUpQuestionMessageId(
                         outcome.followUpMessage() == null ? null : outcome.followUpMessage().getMessageId()
                 )
