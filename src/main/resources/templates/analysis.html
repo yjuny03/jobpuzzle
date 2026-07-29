@@ -6,9 +6,10 @@
     <title>맞춤 분석 — JobPuzzle</title>
     <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
     <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+    <link rel="stylesheet" href="/css/app-theme.css" th:href="@{/css/app-theme.css}">
     <link rel="stylesheet" href="/css/analysis.css" th:href="@{/css/analysis.css}">
 </head>
-<body>
+<body class="jp-app-theme jp-analysis-page">
 <div th:replace="~{fragments/header :: appHeader('interview')}"></div>
 <main class="analysis-page">
     <div class="analysis-page__glow analysis-page__glow--one" aria-hidden="true"></div>
@@ -34,6 +35,7 @@
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/puzzle-scene.js" th:src="@{/js/puzzle-scene.js}"></script>
 <script src="/js/analysis.js" th:src="@{/js/analysis.js}"></script>
 </body>
 </html>

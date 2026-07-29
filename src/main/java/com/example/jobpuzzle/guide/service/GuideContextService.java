@@ -1,7 +1,9 @@
 package com.example.jobpuzzle.guide.service;
 
 import com.example.jobpuzzle.analysis.entity.AnalysisInputSnapshot;
+import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
 import com.example.jobpuzzle.analysis.repository.AnalysisInputSnapshotRepository;
+import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.guide.dto.GuideContextResultDto;
@@ -12,11 +14,17 @@ import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
+import com.example.jobpuzzle.guide.config.GuideVectorProperties;
+import com.example.jobpuzzle.guide.vector.GuideVectorHit;
+import com.example.jobpuzzle.guide.vector.GuideVectorStorePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 // JSON-04 가이드 검색 결과를 스냅샷 단위로 고정·재사용하는 운영 서비스다.
 @Service
@@ -28,6 +36,9 @@ public class GuideContextService {
     private final JobGuideChunkRepository jobGuideChunkRepository;
     private final GuideContextResultRepository guideContextResultRepository;
     private final GuideContextChunkRepository guideContextChunkRepository;
+    private final JobPostingAnalysisRepository jobPostingAnalysisRepository;
+    private final GuideVectorStorePort guideVectorStore;
+    private final GuideVectorProperties guideVectorProperties;
 
     // 사용자 소유 스냅샷에 대해 JSON-04 결과를 조회하거나 한 번만 생성한다.
     @Transactional
@@ -59,7 +70,8 @@ public class GuideContextService {
         GuideContextResult result = guideContextResultRepository.saveAndFlush(
                 GuideContextResult.create(snapshot.getUser(), inputReferenceId, jobCategory,
                         selection.guide(), selection.matchType()));
-        List<GuideContextChunk> contextChunks = saveChunks(result, selection.guide());
+        List<GuideContextChunk> contextChunks =
+                saveChunks(result, selection.guide(), snapshot, jobCategory);
         return GuideContextResultDto.from(result, contextChunks);
     }
 
@@ -121,18 +133,87 @@ public class GuideContextService {
         return candidates.isEmpty() ? null : candidates.get(0);
     }
 
-    // 선택 가이드의 모든 청크를 chunkIndex 순서대로 0부터 고정 저장한다.
-    private List<GuideContextChunk> saveChunks(GuideContextResult result, JobGuideDocument guide) {
+    /**
+     * 새로 인덱싱된 가이드는 채용공고 분석과 직무를 검색어로 사용해 관련 청크만 고정한다.
+     * 과거 ACTIVE 가이드와 fake 재시작 환경은 기존 전체 청크 정책으로 안전하게 호환한다.
+     */
+    private List<GuideContextChunk> saveChunks(
+            GuideContextResult result,
+            JobGuideDocument guide,
+            AnalysisInputSnapshot snapshot,
+            JobCategory category
+    ) {
         if (guide == null) {
             return List.of();
         }
         List<JobGuideChunk> chunks = jobGuideChunkRepository.findByGuide_GuideIdOrderByChunkIndexAsc(guide.getGuideId());
-        List<GuideContextChunk> contextChunks = java.util.stream.IntStream.range(0, chunks.size())
-                .mapToObj(index -> GuideContextChunk.create(result, chunks.get(index), index))
+        List<ScoredGuideChunk> selected = selectChunks(guide, snapshot, category, chunks);
+        List<GuideContextChunk> contextChunks = java.util.stream.IntStream.range(0, selected.size())
+                .mapToObj(index -> GuideContextChunk.create(
+                        result, selected.get(index).chunk(), selected.get(index).score(), index))
                 .toList();
         return guideContextChunkRepository.saveAll(contextChunks);
     }
 
+    private List<ScoredGuideChunk> selectChunks(
+            JobGuideDocument guide,
+            AnalysisInputSnapshot snapshot,
+            JobCategory category,
+            List<JobGuideChunk> chunks
+    ) {
+        if (chunks.isEmpty()) {
+            return List.of();
+        }
+        // 기존 ACTIVE 데이터는 embedding metadata가 없으므로 이전과 동일하게 전 청크를 사용한다.
+        if (!guide.isIndexed() || guide.getEmbeddingProvider() == null) {
+            return chunks.stream().map(chunk -> new ScoredGuideChunk(chunk, null)).toList();
+        }
+
+        List<GuideVectorHit> hits = guideVectorStore.search(
+                guide.getGuideId(),
+                buildSearchQuery(snapshot.getSnapshotId(), category),
+                Math.max(1, Math.min(guideVectorProperties.getTopK(), chunks.size())));
+        if (hits.isEmpty() && "fake".equalsIgnoreCase(guideVectorStore.provider())) {
+            return chunks.stream().map(chunk -> new ScoredGuideChunk(chunk, null)).toList();
+        }
+
+        Map<Long, JobGuideChunk> byId = chunks.stream().collect(Collectors.toMap(
+                JobGuideChunk::getChunkId, Function.identity()));
+        List<ScoredGuideChunk> selected = hits.stream()
+                .map(hit -> new ScoredGuideChunk(byId.remove(hit.chunkId()), hit.score()))
+                .toList();
+        if (selected.isEmpty() || selected.stream().anyMatch(value -> value.chunk() == null)) {
+            throw new CustomException(ErrorCode.GUIDE_VECTOR_RESULT_INVALID);
+        }
+        return selected;
+    }
+
+    /** JSON-01에서 이미 검증·저장된 채용 요구사항만 검색어로 사용한다. */
+    private String buildSearchQuery(Long snapshotId, JobCategory category) {
+        JobPostingAnalysis posting = jobPostingAnalysisRepository.findBySnapshot_SnapshotId(snapshotId)
+                .orElseThrow(() -> new CustomException(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT));
+        StringBuilder query = new StringBuilder()
+                .append(category.getMainCategory()).append(' ')
+                .append(category.getSubCategory()).append(' ')
+                .append(category.getCareerLevel()).append('\n');
+        appendTexts(query, posting.getMainTasks(), JobPostingAnalysis.Item::getText);
+        appendTexts(query, posting.getRequirements(), JobPostingAnalysis.Requirement::getText);
+        appendTexts(query, posting.getPreferred(), JobPostingAnalysis.Requirement::getText);
+        appendTexts(query, posting.getCoreCompetencies(), JobPostingAnalysis.Item::getText);
+        return query.toString();
+    }
+
+    private <T> void appendTexts(
+            StringBuilder query, List<T> values, Function<T, String> textExtractor
+    ) {
+        if (values == null) return;
+        values.stream().map(textExtractor).filter(value -> value != null && !value.isBlank())
+                .forEach(value -> query.append(value).append('\n'));
+    }
+
     private record GuideSelection(JobGuideDocument guide, GuideMatchType matchType) {
+    }
+
+    private record ScoredGuideChunk(JobGuideChunk chunk, Double score) {
     }
 }

@@ -43,9 +43,16 @@ public class GuideContextChunk extends BaseTimeEntity {
     private String chunkContentHashSnapshot;
 
     public static GuideContextChunk create(GuideContextResult result, JobGuideChunk chunk, int displayOrder) {
+        return create(result, chunk, null, displayOrder);
+    }
+
+    public static GuideContextChunk create(
+            GuideContextResult result, JobGuideChunk chunk, Double similarityScore, int displayOrder
+    ) {
         GuideContextChunk contextChunk = new GuideContextChunk();
         contextChunk.guideContextResult = result;
         contextChunk.jobGuideChunk = chunk;
+        contextChunk.similarityScore = similarityScore;
         contextChunk.displayOrder = displayOrder;
         contextChunk.chunkTitleSnapshot = chunk.getTitle();
         contextChunk.chunkContentSnapshot = chunk.getContent();
