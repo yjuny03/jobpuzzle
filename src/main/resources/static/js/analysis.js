@@ -178,10 +178,12 @@
         var isFailed = status.analysisCaseStatus === 'FAILED';
         var isRunning = status.analysisCaseStatus === 'ANALYZING';
         var isReady = status.analysisCaseStatus === 'INPUT_CONFIRMED';
-        card.appendChild(el('p', 'report-eyebrow', isFailed ? 'ANALYSIS NEEDS REVIEW' : isRunning ? 'ANALYSIS IN PROGRESS' : 'ANALYSIS READY'));
-        card.appendChild(el('h2', null, isFailed ? '분석 결과를 확인해 주세요' : isRunning ? '지원 자료를 차근차근 읽고 있어요' : '분석을 시작할 준비가 되었어요'));
+        var isPreparing = status.clientPreparing === true;
+        card.appendChild(el('p', 'report-eyebrow', isFailed ? 'ANALYSIS NEEDS REVIEW' : isPreparing ? 'ANALYSIS PREPARING' : isRunning ? 'ANALYSIS IN PROGRESS' : 'ANALYSIS READY'));
+        card.appendChild(el('h2', null, isFailed ? '분석 결과를 확인해 주세요' : isPreparing ? '분석에 필요한 자료를 준비하고 있어요' : isRunning ? '지원 자료를 차근차근 읽고 있어요' : '분석을 시작할 준비가 되었어요'));
         card.appendChild(el('p', 'progress-card__description', isFailed
             ? '선택한 자료와 앞선 분석 결과는 보존되어 있습니다. 같은 자료로 다시 실행할 수 있어요.'
+            : isPreparing ? '지원 자료의 색인을 확인한 뒤 AI 분석을 시작합니다. 잠시만 기다려 주세요.'
             : isRunning ? '페이지를 닫아도 서버의 분석 작업은 계속 진행됩니다.' : '선택한 공고와 지원 자료를 바탕으로 맞춤 분석을 시작합니다.'));
         if (isReady) appendAnalysisLoader(card, status, 'ready');
         if (isRunning) appendAnalysisLoader(card, status, 'running');
@@ -570,6 +572,14 @@
     function runAnalysis(reuseExistingIndex) {
         if (state.running) return;
         state.running = true;
+        renderProgress({
+            analysisCaseStatus: 'ANALYZING',
+            clientPreparing: true,
+            jobPostingAnalysisStatus: 'NOT_STARTED',
+            candidateMaterialAnalysisStatus: 'NOT_STARTED',
+            guideContextStatus: 'NOT_STARTED',
+            customizedAnalysisStatus: 'NOT_STARTED'
+        });
         var ensureIndexed = reuseExistingIndex
             ? Promise.resolve()
             : api('/api/analysis-cases/' + caseId + '/index', { method: 'POST' });
