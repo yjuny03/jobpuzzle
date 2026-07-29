@@ -57,20 +57,20 @@
     var currentUser = null;
 
     // 저장 시 이름/이메일도 같이 보내야 해서(내 정보 수정 API는 항상 전체를 덮어씀) 로그인된 내 정보를 먼저 가져옴
-    fetch('/api/user/me', { credentials: 'same-origin' })
+    fetch(window.JobPuzzleRoutes.path('/user/me'), { credentials: 'same-origin' })
       .then(function (res) { return res.json(); })
       .then(function (body) {
         if (!body.success) {
-          window.location.href = '/login';
+          window.location.href = window.JobPuzzleRoutes.path('/login');
           return;
         }
         currentUser = body.data;
       })
       .catch(function () {
-        window.location.href = '/login';
+        window.location.href = window.JobPuzzleRoutes.path('/login');
       });
 
-    fetch('/api/job-category')
+    fetch(window.JobPuzzleRoutes.path('/job-category'))
       .then(function (res) { return res.json(); })
       .then(function (body) {
         jobCategories = body.data || [];
@@ -152,7 +152,7 @@
         defaultJobCategoryId: Number(selectedJobCategoryId)
       };
 
-      fetch('/api/user/me', {
+      fetch(window.JobPuzzleRoutes.path('/user/me'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -163,7 +163,7 @@
         })
         .then(function (result) {
           if (result.ok && result.body.success) {
-            window.location.href = '/index.html';
+            window.location.href = window.JobPuzzleRoutes.path('/');
           } else {
             showError(errorEl, result.body.message || '저장에 실패했습니다.');
           }

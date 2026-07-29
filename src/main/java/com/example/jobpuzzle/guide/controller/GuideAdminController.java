@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/guide-admin")
+@RequestMapping("/guide-admin")
 public class GuideAdminController {
 
     private final GuideService guideService;

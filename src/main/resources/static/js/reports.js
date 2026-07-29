@@ -108,7 +108,7 @@
       ' · 질문 ' + sel.questionCount + '개' + '</p>' +
       '<p style="font-size:13px; color:#5B6370; margin:0 0 20px; line-height:1.7;">약점 태그, 다음 연습 추천, 서류 보완 제안 같은 최종 리포트 내용은 아래 화면에서 자세히 볼 수 있어요. ' +
       '(처음 여는 리포트는 그 자리에서 만들어지느라 몇 초 걸릴 수 있어요.)</p>' +
-      '<a href="/interview-result.html?sessionId=' + encodeURIComponent(sel.sessionId) +
+      '<a href="' + window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(sel.sessionId)) +
       '" class="btn btn--primary" style="text-decoration:none;">최종 리포트 자세히 보기</a>';
 
     detail.innerHTML = html;
@@ -166,7 +166,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     renderTabs();
     renderAll();
-    api('/api/interview-sessions/history').then(function (sessions) {
+    api(window.JobPuzzleRoutes.path('/interview-sessions/history')).then(function (sessions) {
       state.sessions = sessions;
       state.sessionsLoaded = true;
       if (sessions.length) state.selectedSessionId = sessions[0].sessionId;

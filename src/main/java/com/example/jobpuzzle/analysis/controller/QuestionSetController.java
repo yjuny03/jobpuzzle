@@ -18,7 +18,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/question-sets")
+@RequestMapping("/question-sets")
 public class QuestionSetController {
 
     private final QuestionGenerationService questionGenerationService;

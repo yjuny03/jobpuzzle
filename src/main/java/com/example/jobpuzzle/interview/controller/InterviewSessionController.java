@@ -22,7 +22,7 @@ public class InterviewSessionController {
     private final InterviewSessionService interviewSessionService;
     private final SessionScoreAggregationService sessionScoreAggregationService;
 
-    @GetMapping("/api/interview-modes/availability")
+    @GetMapping("/interview-modes/availability")
     public ResponseEntity<ApiResponse<InterviewModeAvailabilityResponse>> getAvailableModes(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -31,7 +31,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-sessions")
+    @PostMapping("/interview-sessions")
     public ResponseEntity<ApiResponse<SessionResponse>> createSession(
             @AuthenticationPrincipal(expression = "user") User user,
             @Valid @RequestBody SessionCreateRequest request
@@ -43,7 +43,7 @@ public class InterviewSessionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    @GetMapping("/api/interview-sessions/{sessionId}")
+    @GetMapping("/interview-sessions/{sessionId}")
     public ResponseEntity<ApiResponse<SessionResponse>> getSession(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -53,7 +53,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-sessions/{sessionId}/start")
+    @PostMapping("/interview-sessions/{sessionId}/start")
     public ResponseEntity<ApiResponse<SessionResponse>> startSession(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -63,7 +63,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/{sessionId}/questions")
+    @GetMapping("/interview-sessions/{sessionId}/questions")
     public ResponseEntity<ApiResponse<List<SessionQuestionResponse>>> getQuestions(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -73,7 +73,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/{sessionId}/questions/next")
+    @GetMapping("/interview-sessions/{sessionId}/questions/next")
     public ResponseEntity<ApiResponse<SessionQuestionResponse>> getNextQuestion(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -83,7 +83,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-session-questions/{sessionQuestionId}/answers")
+    @PostMapping("/interview-session-questions/{sessionQuestionId}/answers")
     public ResponseEntity<ApiResponse<AnswerSubmitResponse>> submitAnswer(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionQuestionId,
@@ -98,7 +98,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-sessions/{sessionId}/complete")
+    @PostMapping("/interview-sessions/{sessionId}/complete")
     public ResponseEntity<ApiResponse<SessionResponse>> completeSession(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -108,7 +108,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-sessions/{sessionId}/cancel")
+    @PostMapping("/interview-sessions/{sessionId}/cancel")
     public ResponseEntity<ApiResponse<SessionResponse>> cancelSession(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -118,7 +118,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/{sessionId}/questions/remaining")
+    @GetMapping("/interview-sessions/{sessionId}/questions/remaining")
     public ResponseEntity<ApiResponse<List<RemainingQuestionResponse>>> getRemainingQuestions(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId
@@ -128,7 +128,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @PostMapping("/api/interview-sessions/{sessionId}/questions")
+    @PostMapping("/interview-sessions/{sessionId}/questions")
     public ResponseEntity<ApiResponse<List<SessionQuestionResponse>>> addQuestions(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId,
@@ -143,7 +143,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-weakness-tags")
+    @GetMapping("/interview-weakness-tags")
     public ResponseEntity<ApiResponse<List<String>>> getUnresolvedWeaknessTags(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -152,7 +152,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-weakness-tags/details")
+    @GetMapping("/interview-weakness-tags/details")
     public ResponseEntity<ApiResponse<List<WeaknessTagResponse>>> getUnresolvedWeaknessTagDetails(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -161,7 +161,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/active")
+    @GetMapping("/interview-sessions/active")
     public ResponseEntity<ApiResponse<SessionResponse>> getActiveSession(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -170,7 +170,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/active-list")
+    @GetMapping("/interview-sessions/active-list")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> getActiveSessions(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -179,7 +179,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/review-list")
+    @GetMapping("/interview-sessions/review-list")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> getReviewReadySessions(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -188,7 +188,7 @@ public class InterviewSessionController {
         ));
     }
 
-    @GetMapping("/api/interview-sessions/history")
+    @GetMapping("/interview-sessions/history")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> getCompletedSessions(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -198,7 +198,7 @@ public class InterviewSessionController {
     }
 
     // 면접 종료 직후 화면과 JSON-07 리포트 입력에서 함께 사용하는 확정 집계값
-    @GetMapping("/api/interview-sessions/{sessionId}/score")
+    @GetMapping("/interview-sessions/{sessionId}/score")
     public ResponseEntity<ApiResponse<SessionScoreSummary>> getScore(
             @AuthenticationPrincipal(expression = "user") User user,
             @PathVariable Long sessionId

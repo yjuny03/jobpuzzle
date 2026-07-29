@@ -1,4 +1,4 @@
-// admin-job-categories.js — 관리자 직무 분류 관리 (/api/admin/job-categories)
+// admin-job-categories.js — 관리자 직무 분류 관리 (/jobpuzzle/admin-api/job-categories)
 (function () {
   'use strict';
 
@@ -12,7 +12,7 @@
       headers['Content-Type'] = 'application/json; charset=UTF-8';
       fetchOpts.body = JSON.stringify(opts.json);
     }
-    return fetch('/api' + path, fetchOpts).then(function (res) {
+    return fetch(window.JobPuzzleRoutes.path(path.replace(/^\/admin/, '/admin-api')), fetchOpts).then(function (res) {
       return res.json().then(function (body) {
         if (!res.ok || !body.success) {
           throw new Error((body && body.message) || '요청에 실패했습니다.');

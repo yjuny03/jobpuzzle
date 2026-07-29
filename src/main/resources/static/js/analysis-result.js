@@ -101,7 +101,7 @@
   function renderTop(result, counts, questions) {
     var topbar = node('div', 'result-topbar');
     var back = node('a', 'result-breadcrumb', '면접 준비로 돌아가기');
-    back.href = '/interview.html';
+    back.href = window.JobPuzzleRoutes.path('/interview');
     topbar.appendChild(back);
     topbar.appendChild(node('span', 'result-date', '분석 #' + result.analysisCaseId + ' · 저장된 결과'));
     root.appendChild(topbar);
@@ -369,7 +369,7 @@
     card.appendChild(list);
     var actions = node('div', 'result-question-actions');
     var interviewLink = node('a', 'result-question-actions__button', '질문을 선택하고 면접 시작');
-    interviewLink.href = '/interview.html?analysisCaseId=' + encodeURIComponent(caseId);
+    interviewLink.href = window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId));
     actions.appendChild(interviewLink);
     card.appendChild(actions);
     return card;
@@ -417,24 +417,24 @@
   }
 
   if (!root || !caseId || !/^\d+$/.test(caseId) || Number(caseId) <= 0) {
-    if (root) renderUnavailable('유효하지 않은 분석 결과 주소입니다.', '/interview.html', '면접 준비로 이동');
+    if (root) renderUnavailable('유효하지 않은 분석 결과 주소입니다.', window.JobPuzzleRoutes.path('/interview'), '면접 준비로 이동');
     return;
   }
 
-  api('/api/analysis/cases/' + caseId + '/status')
+  api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + '/status'))
     .then(function (status) {
       if (status.analysisCaseStatus !== 'COMPLETED') {
         renderUnavailable('분석이 진행 중이거나 결과가 아직 준비되지 않았습니다.',
-          '/api/analysis/' + encodeURIComponent(caseId), '분석 상태 확인');
+          window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(caseId)), '분석 상태 확인');
         return null;
       }
-      return api('/api/analysis/cases/' + caseId + '/result');
+      return api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + '/result'));
     })
     .then(function (result) { if (result) render(result); })
     .catch(function (error) {
       var message = error.status === 403
         ? '이 분석 결과를 볼 권한이 없습니다.'
         : '잠시 후 다시 시도해 주세요.';
-      renderUnavailable(message, '/interview.html', '면접 준비로 이동');
+      renderUnavailable(message, window.JobPuzzleRoutes.path('/interview'), '면접 준비로 이동');
     });
 })();

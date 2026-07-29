@@ -38,30 +38,32 @@
       </form>
 
       <p class="auth-footer-link">
-        <a href="/find-id" th:href="@{/find-id}" id="find-id-link" style="display:none;">아이디를 잊으셨나요?</a>
-        <a href="/passwd-reset" th:href="@{/passwd-reset}" id="passwd-reset-link" style="display:none;">비밀번호를 잊으셨나요?</a>
+        <a href="/jobpuzzle/find-id" th:href="@{/find-id}" id="find-id-link" style="display:none;">아이디를 잊으셨나요?</a>
+        <a href="/jobpuzzle/passwd-reset" th:href="@{/passwd-reset}" id="passwd-reset-link" style="display:none;">비밀번호를 잊으셨나요?</a>
       </p>
       <p class="auth-footer-link">
-        <a href="/unlock" th:href="@{/unlock}">계정이 잠기셨나요?</a>
+        <a href="/jobpuzzle/unlock" th:href="@{/unlock}">계정이 잠기셨나요?</a>
       </p>
 
       <div class="auth-divider">또는</div>
 
-      <a class="auth-kakao-btn" href="/oauth2/authorization/kakao">
+      <!-- TODO(team): 카카오·구글 콘솔 callback URI에 /jobpuzzle context path를 반영한다. -->
+      <a class="auth-kakao-btn" href="/jobpuzzle/oauth2/authorization/kakao" th:href="@{/oauth2/authorization/kakao}">
         카카오로 시작하기
       </a>
 
-      <a class="auth-google-btn" href="/oauth2/authorization/google">
+      <a class="auth-google-btn" href="/jobpuzzle/oauth2/authorization/google" th:href="@{/oauth2/authorization/google}">
         구글로 시작하기
       </a>
 
       <p class="auth-footer-link">
-        아직 회원이 아니신가요? <a href="/join" th:href="@{/join}">회원가입</a>
+        아직 회원이 아니신가요? <a href="/jobpuzzle/join" th:href="@{/join}">회원가입</a>
       </p>
     </div>
   </main>
 
-  <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
   <script src="/js/login.js" th:src="@{/js/login.js}"></script>
 </body>
 

@@ -54,8 +54,8 @@
 
   function renderTodos() {
     var todos = [];
-    todos.push({ icon: 'play', title: '진행 중인 면접 마무리하기', desc: '약점 보완 모의면접 · #성과 수치화 부족', cta: '이어서 진행하기', href: '/interview.html' });
-    todos.push({ icon: 'tag', title: '약점 태그 해결하기', desc: '#성과 수치화 부족 · #운영·장애대응 경험 부족 연습이 필요해요', cta: '약점 보완 연습하기', href: '/interview.html' });
+    todos.push({ icon: 'play', title: '진행 중인 면접 마무리하기', desc: '약점 보완 모의면접 · #성과 수치화 부족', cta: '이어서 진행하기', href: window.JobPuzzleRoutes.path('/interview') });
+    todos.push({ icon: 'tag', title: '약점 태그 해결하기', desc: '#성과 수치화 부족 · #운영·장애대응 경험 부족 연습이 필요해요', cta: '약점 보완 연습하기', href: window.JobPuzzleRoutes.path('/interview') });
 
     var incomplete = ASSIGNMENTS.filter(function (a) { return !a.done; }).length;
     if (incomplete > 0) {

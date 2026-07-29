@@ -1,9 +1,9 @@
-// admin-guides.js — 관리자 가이드 등록/목록 (/api/admin/guides)
+// admin-guides.js — 관리자 가이드 등록/목록 (/jobpuzzle/admin-api/guides)
 (function () {
   'use strict';
 
   function api(path) {
-    return fetch('/api' + path, { credentials: 'same-origin' }).then(function (res) {
+    return fetch(window.JobPuzzleRoutes.path(path.replace(/^\/admin/, '/admin-api')), { credentials: 'same-origin' }).then(function (res) {
       return res.json().then(function (body) {
         if (!res.ok || !body.success) {
           throw new Error((body && body.message) || '요청에 실패했습니다.');
@@ -67,7 +67,7 @@
 
     document.querySelectorAll('[data-guide]').forEach(function (row) {
       row.addEventListener('click', function () {
-        window.location.href = '/admin/guides/' + row.dataset.guide;
+        window.location.href = window.JobPuzzleRoutes.path('/admin/guides/' + row.dataset.guide);
       });
     });
   }
@@ -142,7 +142,7 @@
       formData.append('file', fileInput.files[0]);
     }
 
-    fetch('/api/admin/guides', { method: 'POST', credentials: 'same-origin', body: formData })
+    fetch(window.JobPuzzleRoutes.path('/admin-api/guides'), { method: 'POST', credentials: 'same-origin', body: formData })
       .then(function (res) {
         return res.json().then(function (body) {
           if (!res.ok || !body.success) throw new Error((body && body.message) || '등록에 실패했습니다.');

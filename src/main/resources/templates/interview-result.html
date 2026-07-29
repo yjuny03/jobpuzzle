@@ -15,10 +15,10 @@
 <div class="app-shell">
   <main class="app-container">
     <div class="result-top-actions">
-      <a href="/interview.html" th:href="@{/interview.html}" class="result-nav-link">
+      <a href="/jobpuzzle/interview" th:href="@{/interview}" class="result-nav-link">
         <span aria-hidden="true">←</span> 새 면접 시작
       </a>
-      <a href="/reports.html" th:href="@{/reports.html}" class="result-nav-link result-nav-link--report">
+      <a href="/jobpuzzle/reports" th:href="@{/reports}" class="result-nav-link result-nav-link--report">
         리포트 목록 <span aria-hidden="true">→</span>
       </a>
     </div>
@@ -57,6 +57,7 @@
 
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
 <script src="/js/interview-result.js" th:src="@{/js/interview-result.js}"></script>

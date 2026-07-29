@@ -43,8 +43,8 @@ public class DocumentController {
     private final DocumentExtractionService documentExtractionService;
 
     // 파일 자료 등록 (이미지는 여러 장을 한 번에 등록 가능)
-    // POST /api/documents (multipart: files, documentType, displayName, keepOriginal)
-    @PostMapping(value = "/api/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    // POST /jobpuzzle/documents (multipart: files, documentType, displayName, keepOriginal)
+    @PostMapping(value = "/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
             @RequestPart("files") List<MultipartFile> files,
             @RequestParam("documentType") UserDocumentType documentType,
@@ -58,8 +58,8 @@ public class DocumentController {
     }
 
     // 직접 입력 자료 등록 및 최초 DRAFT 버전 생성
-    // POST /api/documents/text
-    @PostMapping("/api/documents/text")
+    // POST /jobpuzzle/documents/text
+    @PostMapping("/documents/text")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> registerTextDocument(
             @Valid @RequestBody DirectDocumentRegisterRequest request,
             @AuthenticationPrincipal(expression = "user") User user
@@ -70,8 +70,8 @@ public class DocumentController {
     }
 
     // PDF 텍스트 추출 또는 OCR 실행 (비동기) - 완료 결과는 버전 이력 조회로 확인
-    // POST /api/documents/{documentId}/extractions
-    @PostMapping("/api/documents/{documentId}/extractions")
+    // POST /jobpuzzle/documents/{documentId}/extractions
+    @PostMapping("/documents/{documentId}/extractions")
     public ResponseEntity<ApiResponse<ExtractionJobResponse>> extractDocumentText(
             @PathVariable Long documentId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -82,8 +82,8 @@ public class DocumentController {
     }
 
     // 내 자료 목록 조회
-    // GET /api/documents?documentType=&page=&size=
-    @GetMapping("/api/documents")
+    // GET /jobpuzzle/documents?documentType=&page=&size=
+    @GetMapping("/documents")
     public ResponseEntity<ApiResponse<PageResponse<DocumentListResponse>>> getDocumentList(
             @RequestParam(required = false) UserDocumentType documentType,
             Pageable pageable,
@@ -95,8 +95,8 @@ public class DocumentController {
     }
 
     // 자료 메타와 최신 버전 요약 조회
-    // GET /api/documents/{documentId}
-    @GetMapping("/api/documents/{documentId}")
+    // GET /jobpuzzle/documents/{documentId}
+    @GetMapping("/documents/{documentId}")
     public ResponseEntity<ApiResponse<DocumentDetailResponse>> getDocumentDetail(
             @PathVariable Long documentId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -107,8 +107,8 @@ public class DocumentController {
     }
 
     // 자료 버전 이력 조회
-    // GET /api/documents/{documentId}/extractions
-    @GetMapping("/api/documents/{documentId}/extractions")
+    // GET /jobpuzzle/documents/{documentId}/extractions
+    @GetMapping("/documents/{documentId}/extractions")
     public ResponseEntity<ApiResponse<List<ExtractionVersionResponse>>> getDocumentVersions(
             @PathVariable Long documentId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -119,8 +119,8 @@ public class DocumentController {
     }
 
     // 원본 파일 보관 여부 변경
-    // PATCH /api/documents/{documentId}/retention { keepOriginal }
-    @PatchMapping("/api/documents/{documentId}/retention")
+    // PATCH /jobpuzzle/documents/{documentId}/retention { keepOriginal }
+    @PatchMapping("/documents/{documentId}/retention")
     public ResponseEntity<ApiResponse<Void>> updateOriginalFileRetention(
             @PathVariable Long documentId,
             @RequestBody OriginalFileRetentionRequest request,
@@ -131,8 +131,8 @@ public class DocumentController {
     }
 
     // 자료 논리 삭제 및 신규 분석 대상 제외
-    // DELETE /api/documents/{documentId}
-    @DeleteMapping("/api/documents/{documentId}")
+    // DELETE /jobpuzzle/documents/{documentId}
+    @DeleteMapping("/documents/{documentId}")
     public ResponseEntity<Void> deleteDocument(
             @PathVariable Long documentId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -142,8 +142,8 @@ public class DocumentController {
     }
 
     // 특정 추출·수정 버전 조회
-    // GET /api/document-extractions/{extractionId}
-    @GetMapping("/api/document-extractions/{extractionId}")
+    // GET /jobpuzzle/document-extractions/{extractionId}
+    @GetMapping("/document-extractions/{extractionId}")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> getExtractionVersion(
             @PathVariable Long extractionId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -154,8 +154,8 @@ public class DocumentController {
     }
 
     // 수정 내용을 새 DRAFT 버전으로 저장 (기존 버전 본문 UPDATE 금지)
-    // POST /api/document-extractions/{baseExtractionId}/versions { content }
-    @PostMapping("/api/document-extractions/{baseExtractionId}/versions")
+    // POST /jobpuzzle/document-extractions/{baseExtractionId}/versions { content }
+    @PostMapping("/document-extractions/{baseExtractionId}/versions")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> saveEditedVersion(
             @PathVariable Long baseExtractionId,
             @Valid @RequestBody ExtractionEditRequest request,
@@ -168,8 +168,8 @@ public class DocumentController {
     }
 
     // 최신 DRAFT 추출본 개별 확정
-    // POST /api/document-extractions/{extractionId}/confirm
-    @PostMapping("/api/document-extractions/{extractionId}/confirm")
+    // POST /jobpuzzle/document-extractions/{extractionId}/confirm
+    @PostMapping("/document-extractions/{extractionId}/confirm")
     public ResponseEntity<ApiResponse<ExtractionVersionResponse>> confirmExtraction(
             @PathVariable Long extractionId,
             @AuthenticationPrincipal(expression = "user") User user

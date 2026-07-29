@@ -19,9 +19,11 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                          Authentication authentication) throws IOException, ServletException {
         User user = ((CustomOAuth2User) authentication.getPrincipal()).getUser();
-        String redirectUrl = user.getDefaultJobCategory() == null
-                ? "/job-category-setup.html"
-                : "/index.html";
+        // TODO(team): 카카오·구글 개발자 콘솔의 redirect URI에
+        // /jobpuzzle/login/oauth2/code/{registrationId} 경로를 등록해야 한다.
+        String redirectUrl = request.getContextPath() + (user.getDefaultJobCategory() == null
+                ? "/job-category-setup"
+                : "/");
         response.sendRedirect(redirectUrl);
     }
 }

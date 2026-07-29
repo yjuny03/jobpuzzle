@@ -24,12 +24,36 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                         AccessDeniedException accessDeniedException) throws IOException, ServletException {
-        if (request.getRequestURI().startsWith("/api/")) {
+        if (isFunctionRequest(request.getServletPath())) {
             response.setStatus(ErrorCode.ACCESS_DENIED.getStatus().value());
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail(ErrorCode.ACCESS_DENIED)));
             return;
         }
-        response.sendRedirect("/");
+        response.sendRedirect(request.getContextPath() + "/");
+    }
+
+    /** `/api` 접두사 없이도 화면 요청과 기능 요청을 구분한다. */
+    private boolean isFunctionRequest(String path) {
+        return path.startsWith("/user/")
+                || path.startsWith("/documents")
+                || path.startsWith("/document-extractions")
+                || path.startsWith("/analysis-cases")
+                || path.startsWith("/analysis/cases")
+                || path.startsWith("/question-sets")
+                || path.startsWith("/questions")
+                || path.startsWith("/interview-sessions")
+                || path.startsWith("/interview-session-questions")
+                || path.startsWith("/interview-modes")
+                || path.startsWith("/interview-weakness-tags")
+                || path.startsWith("/interview-history")
+                || path.startsWith("/answer-evaluations")
+                || path.startsWith("/action-plan")
+                || path.startsWith("/job-category")
+                || path.startsWith("/job-analysis-report")
+                || path.startsWith("/recommendation")
+                || path.startsWith("/final-report")
+                || path.startsWith("/admin-api")
+                || path.startsWith("/guide-admin");
     }
 }

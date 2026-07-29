@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// /admin/**, /api/admin/**가 SecurityConfig의 hasRole("ADMIN") 매처와 CustomAccessDeniedHandler로
+// /admin/**, /admin-api/**가 SecurityConfig의 hasRole("ADMIN") 매처와 CustomAccessDeniedHandler로
 // 실제로 보호되는지 검증한다. (로그인 필요 -> 로그인 페이지 리다이렉트, 권한 없음 -> 403/메인 리다이렉트, 관리자 -> 통과)
 @WebMvcTest(controllers = {AdminViewController.class, AdminController.class})
 @Import({SecurityConfig.class, CustomAccessDeniedHandler.class})
@@ -73,14 +73,14 @@ class AdminAccessSecurityTest {
 
     @Test
     void adminApiRedirectsAnonymousUserToLogin() throws Exception {
-        mockMvc.perform(get("/api/admin/users"))
+        mockMvc.perform(get("/admin-api/users"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost/login"));
     }
 
     @Test
     void adminApiReturnsJsonForbiddenForRegularUser() throws Exception {
-        mockMvc.perform(get("/api/admin/users").with(user(UserRole.USER)))
+        mockMvc.perform(get("/admin-api/users").with(user(UserRole.USER)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("COMMON_004"));
@@ -96,7 +96,7 @@ class AdminAccessSecurityTest {
                         .build()
         );
 
-        mockMvc.perform(get("/api/admin/users").with(user(UserRole.ADMIN)))
+        mockMvc.perform(get("/admin-api/users").with(user(UserRole.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

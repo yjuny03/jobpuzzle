@@ -54,7 +54,6 @@ public class SecurityConfig {
     // 로그인 없이 볼 수 있는 화면(뷰) 경로
     private static final String[] PUBLIC_VIEW_URLS = {
             "/",
-            "/index.html",
             "/login",
             "/join",
             "/find-id",
@@ -65,15 +64,15 @@ public class SecurityConfig {
 
     // 인증 없이 호출 가능한 공개 API 경로
     private static final String[] PUBLIC_API_URLS = {
-            "/api/user/join",
-            "/api/user/join/**",
-            "/api/user/login",
-            "/api/user/check-id",
-            "/api/user/check-email",
-            "/api/user/find-id/**",
-            "/api/user/passwd-reset/**",
-            "/api/user/unlock/**",
-            "/api/job-category"
+            "/user/join",
+            "/user/join/**",
+            "/user/login",
+            "/user/check-id",
+            "/user/check-email",
+            "/user/find-id/**",
+            "/user/passwd-reset/**",
+            "/user/unlock/**",
+            "/job-category"
     };
 
     // 관리자만 접근 가능한 화면 경로
@@ -83,8 +82,8 @@ public class SecurityConfig {
 
     // 관리자만 접근 가능한 API 경로
     private static final String[] ADMIN_API_URLS = {
-            "/api/admin/**",
-            "/api/guide-admin/**"
+            "/admin-api/**",
+            "/guide-admin/**"
     };
 
     // 비밀번호 암호화에 쓰는 인코더
@@ -127,9 +126,6 @@ public class SecurityConfig {
                         // 관리자 전용 경로는 인증 여부보다 먼저 role을 검사해야 해서 anyRequest()보다 위에 둠
                         .requestMatchers(ADMIN_VIEW_URLS).hasRole("ADMIN")
                         .requestMatchers(ADMIN_API_URLS).hasRole("ADMIN")
-                        // 가이드 등록·버전 활성화는 비용과 분석 기준에 영향을 주므로 관리자만 허용
-                        .requestMatchers("/api/guide-admin/**").hasRole("ADMIN")
-
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()
                 )

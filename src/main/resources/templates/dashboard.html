@@ -35,10 +35,10 @@
               <p class="job-chip__label">희망 직무</p>
               <p class="job-chip__value">IT·개발 &gt; 백엔드 개발 · 경력 1년 미만</p>
             </div>
-            <a href="/settings.html" th:href="@{/settings.html}" class="job-chip__edit">수정</a>
+            <a href="/jobpuzzle/settings" th:href="@{/settings}" class="job-chip__edit">수정</a>
           </div>
         </div>
-        <a href="/mydata.html" th:href="@{/templates/my-data.html}" class="btn btn--primary">
+        <a href="/jobpuzzle/my-data" th:href="@{/my-data}" class="btn btn--primary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
@@ -89,21 +89,21 @@
           <div class="card">
             <p style="font-size:13.5px; font-weight:700; margin:0 0 14px;">완료된 면접</p>
             <div class="session-list">
-              <a href="/interview-result.html" th:href="@{/interview-result.html}" class="session-row">
+              <a href="/jobpuzzle/interview-results" th:href="@{/interview-results}" class="session-row">
                 <div>
                   <p class="session-row__title">LUME 백엔드 개발자 모의면접 #3</p>
                   <p class="session-row__meta">2026.07.11 · 약점 보완 · #역할 구분 불명확</p>
                 </div>
                 <span class="session-row__score">82점</span>
               </a>
-              <a href="/reports.html" th:href="@{/reports.html}" class="session-row">
+              <a href="/jobpuzzle/reports" th:href="@{/reports}" class="session-row">
                 <div>
                   <p class="session-row__title">LUME 백엔드 개발자 모의면접 #2</p>
                   <p class="session-row__meta">2026.06.28 · 맞춤 면접 질문</p>
                 </div>
                 <span class="session-row__score">74점</span>
               </a>
-              <a href="/reports.html" th:href="@{/reports.html}" class="session-row">
+              <a href="/jobpuzzle/reports" th:href="@{/reports}" class="session-row">
                 <div>
                   <p class="session-row__title">LUME 백엔드 개발자 모의면접 #1</p>
                   <p class="session-row__meta">2026.06.20 · 기본 질문 모드</p>
@@ -114,7 +114,7 @@
           </div>
           <div class="card">
             <p style="font-size:13.5px; font-weight:700; margin:0 0 14px;">진행 중인 세션</p>
-            <a href="/interview.html" th:href="@{/interview.html}" class="session-row session-row--progress">
+            <a href="/jobpuzzle/interview" th:href="@{/interview}" class="session-row session-row--progress">
               <div>
                 <p class="session-row__title">약점 보완 모의면접 · #성과 수치화 부족</p>
                 <p class="session-row__meta">질문 2개 중 1개 답변 완료</p>
@@ -144,7 +144,7 @@
                 <p class="tag-card__desc">직무 가이드에서 중시하는 장애 대응·운영 관점을 더 반영해보세요</p>
                 <p class="tag-card__meta">최근 시도 69점 · 기준 70점</p>
               </div>
-              <a href="/interview.html" th:href="@{/interview.html}" class="btn btn--primary" style="justify-content:center; margin-top:4px;">약점 보완
+              <a href="/jobpuzzle/interview" th:href="@{/interview}" class="btn btn--primary" style="justify-content:center; margin-top:4px;">약점 보완
                 모드로 연습하기</a>
             </div>
           </div>
@@ -222,7 +222,7 @@
       <p style="font-size:13px; color:#5B6370; line-height:1.6; margin:0 0 22px;">과제를 완료해서 보완된 내용을 바탕으로 새로운 면접을 진행해보세요.
       </p>
       <div style="display:flex; flex-direction:column; gap:8px;">
-        <a href="/interview.html" th:href="@{/interview.html}" class="btn btn--primary"
+        <a href="/jobpuzzle/interview" th:href="@{/interview}" class="btn btn--primary"
           style="justify-content:center; border-radius:9px; padding:12px;">면접으로 이동하기</a>
         <button class="btn"
           style="justify-content:center; background:#fff; border:1px solid #E3E7ED; border-radius:9px; padding:11px; color:#5B6370;"
@@ -233,7 +233,8 @@
 
   <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
-  <script src="/js/common.js" th:src="@{/js/common.js}"></script>
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
+<script src="/js/common.js" th:src="@{/js/common.js}"></script>
   <script src="/js/header.js" th:src="@{/js/header.js}"></script>
   <script src="/js/puzzle-scene.js" th:src="@{/js/puzzle-scene.js}"></script>
   <script src="/js/dashboard-puzzle.js" th:src="@{/js/dashboard-puzzle.js}"></script>

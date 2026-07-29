@@ -2,16 +2,35 @@ package com.example.jobpuzzle.global.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 
-// templates/ 밑에 있는 화면들을 그대로 렌더링하는 임시 라우팅.
-// 각 화면 담당자가 별도 컨트롤러를 만들면 그쪽으로 옮기면 됨 - 지금은 라우팅 자체가 없어서 임시로 모아둠.
-// {page}는 아래 화이트리스트로만 제한해서, 존재하지 않는 임의의 경로가 템플릿 이름으로 들어가지 않게 함.
+// 사용자 화면 URL은 확장자를 노출하지 않고 템플릿 이름만 반환한다.
 @Controller
 public class PageViewController {
 
-    @GetMapping("/{page:index|dashboard|my-data|job-analysis|interview|interview-result|reports|settings|job-category-setup}.html")
-    public String page(@PathVariable String page) {
-        return page;
-    }
+    @GetMapping({"", "/"})
+    public String index() { return "index"; }
+
+    @GetMapping("/dashboard")
+    public String dashboard() { return "dashboard"; }
+
+    @GetMapping("/my-data")
+    public String myData() { return "my-data"; }
+
+    @GetMapping("/job-analysis")
+    public String jobAnalysis() { return "job-analysis"; }
+
+    @GetMapping("/interview")
+    public String interview() { return "interview"; }
+
+    @GetMapping("/interview-results")
+    public String interviewResult() { return "interview-result"; }
+
+    @GetMapping("/reports")
+    public String reports() { return "reports"; }
+
+    @GetMapping("/settings")
+    public String settings() { return "settings"; }
+
+    @GetMapping("/job-category-setup")
+    public String jobCategorySetup() { return "job-category-setup"; }
 }

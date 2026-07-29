@@ -1,3 +1,7 @@
+server:
+  servlet:
+    context-path: /jobpuzzle
+
 spring:
   profiles:
     include: local
@@ -17,6 +21,8 @@ spring:
         format_sql: true
   security:
     oauth2:
+      # TODO(team): context path 적용에 맞춰 카카오·구글 콘솔 callback URI를
+      # /jobpuzzle/login/oauth2/code/{registrationId} 형식으로 갱신한다.
       client:
         registration:
           #카카오 API KEY

@@ -4,7 +4,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-// 추출 실행(202 Accepted) 응답 - 완료 결과는 GET /api/documents/{documentId}/extractions로 폴링해 확인한다
+// 추출 실행(202 Accepted) 응답 - 완료 결과는 GET /jobpuzzle/documents/{documentId}/extractions로 폴링해 확인한다
 @Getter
 public class ExtractionJobResponse {
 

@@ -23,7 +23,7 @@
 
     <div class="tabbar" style="margin-bottom:24px;">
       <span class="tabbar__btn is-active">질문 생성</span>
-      <a id="interview-result-tab" href="/interview-result.html" th:href="@{/interview-result.html}" class="tabbar__btn" style="text-decoration:none; display:inline-block;">답변 평가</a>
+      <a id="interview-result-tab" href="/jobpuzzle/interview-results" th:href="@{/interview-results}" class="tabbar__btn" style="text-decoration:none; display:inline-block;">답변 평가</a>
     </div>
 
     <div id="step-root"></div>
@@ -83,6 +83,7 @@
 
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
 <script src="/js/document-flow.js" th:src="@{/js/document-flow.js}"></script>

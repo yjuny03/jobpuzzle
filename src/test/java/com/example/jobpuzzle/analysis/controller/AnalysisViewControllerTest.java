@@ -16,7 +16,7 @@ class AnalysisViewControllerTest {
 
     @Test
     void rendersAnalysisResultPageWithCaseId() throws Exception {
-        mockMvc.perform(get("/api/analysis/{analysisCaseId}", 12L))
+        mockMvc.perform(get("/analysis/{analysisCaseId}", 12L))
                 .andExpect(status().isOk())
                 .andExpect(view().name("analysis"))
                 .andExpect(model().attribute("analysisCaseId", 12L));

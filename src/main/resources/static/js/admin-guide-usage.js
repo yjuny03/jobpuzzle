@@ -1,9 +1,9 @@
-// admin-guide-usage.js — 관리자 가이드 사용 이력 조회 (/api/admin/guide-usage)
+// admin-guide-usage.js — 관리자 가이드 사용 이력 조회 (/jobpuzzle/admin-api/guide-usage)
 (function () {
   'use strict';
 
   function api(path) {
-    return fetch('/api' + path, { credentials: 'same-origin' }).then(function (res) {
+    return fetch(window.JobPuzzleRoutes.path(path.replace(/^\/admin/, '/admin-api')), { credentials: 'same-origin' }).then(function (res) {
       return res.json().then(function (body) {
         if (!res.ok || !body.success) {
           throw new Error((body && body.message) || '요청에 실패했습니다.');

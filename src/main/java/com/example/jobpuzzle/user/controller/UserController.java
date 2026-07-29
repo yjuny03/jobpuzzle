@@ -34,13 +34,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/user")
+@RequestMapping("/user")
 public class UserController {
 
     private final UserService userService;
 
     // 회원가입
-    // POST /api/user/join { loginId, password, email, name }
+    // POST /jobpuzzle/user/join { loginId, password, email, name }
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<Void>> join(@Valid @RequestBody JoinRequest request) {
         userService.join(request);
@@ -48,7 +48,7 @@ public class UserController {
     }
 
     // 회원가입 - 이메일 인증 코드 발송
-    // POST /api/user/join/send-code { email }
+    // POST /jobpuzzle/user/join/send-code { email }
     @PostMapping("/join/send-code")
     public ResponseEntity<ApiResponse<Void>> sendJoinEmailCode(@Valid @RequestBody JoinEmailSendRequest request) {
         userService.sendJoinEmailCode(request.getEmail());
@@ -56,7 +56,7 @@ public class UserController {
     }
 
     // 회원가입 - 이메일 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 실제 가입 시점에 재검증됨)
-    // POST /api/user/join/verify { email, code }
+    // POST /jobpuzzle/user/join/verify { email, code }
     @PostMapping("/join/verify")
     public ResponseEntity<ApiResponse<Void>> verifyJoinEmailCode(@Valid @RequestBody JoinEmailVerifyRequest request) {
         userService.verifyJoinEmailCode(request.getEmail(), request.getCode());
@@ -64,21 +64,21 @@ public class UserController {
     }
 
     // 아이디 중복 확인 (회원가입 화면에서 아이디 입력할 때 실시간으로 호출)
-    // GET /api/user/check-id?loginId=xxx -> true(중복) / false(사용 가능)
+    // GET /jobpuzzle/user/check-id?loginId=xxx -> true(중복) / false(사용 가능)
     @GetMapping("/check-id")
     public ResponseEntity<ApiResponse<Boolean>> checkIdDuplicate(@RequestParam String loginId) {
         return ResponseEntity.ok(ApiResponse.success(userService.checkIdDuplicate(loginId)));
     }
 
     // 이메일 중복 확인
-    // GET /api/user/check-email?email=xxx -> true(중복) / false(사용 가능)
+    // GET /jobpuzzle/user/check-email?email=xxx -> true(중복) / false(사용 가능)
     @GetMapping("/check-email")
     public ResponseEntity<ApiResponse<Boolean>> checkEmailDuplicate(@RequestParam String email) {
         return ResponseEntity.ok(ApiResponse.success(userService.checkEmailDuplicate(email)));
     }
 
     // 아이디/비밀번호 로그인
-    // POST /api/user/login { loginId, password, autoLogin }
+    // POST /jobpuzzle/user/login { loginId, password, autoLogin }
     // 성공하면 세션에 로그인 상태가 저장되고, 이후 요청부터는 로그인된 상태로 인식됨
     // autoLogin이 true면 자동로그인 쿠키도 함께 발급됨
     @PostMapping("/login")
@@ -90,7 +90,7 @@ public class UserController {
     }
 
     // 로그아웃
-    // POST /api/user/logout - 세션 + 자동로그인 쿠키/토큰을 모두 정리해서 로그인 상태를 해제함
+    // POST /jobpuzzle/user/logout - 세션 + 자동로그인 쿠키/토큰을 모두 정리해서 로그인 상태를 해제함
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         userService.logout(httpRequest, httpResponse);
@@ -98,7 +98,7 @@ public class UserController {
     }
 
     // 내 정보 조회 - 로그인된 사용자만 호출 가능 (프론트에서 로그인 상태 판단할 때도 사용)
-    // GET /api/user/me
+    // GET /jobpuzzle/user/me
     // expression="user"로 받는 이유: 아이디/비번 로그인은 CustomUserDetails, 카카오/구글 로그인은 CustomOAuth2User가
     // principal로 들어오는데, 두 타입 다 getUser()를 갖고 있어서 SpEL로 공통 추출함
     @GetMapping("/me")
@@ -108,7 +108,7 @@ public class UserController {
     }
 
     // 내 정보 수정 - 이름/이메일/기본 관심 직무
-    // PUT /api/user/me { name, email, defaultJobCategoryId }
+    // PUT /jobpuzzle/user/me { name, email, defaultJobCategoryId }
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<Void>> updateMyInfo(@Valid @RequestBody MyInfoUpdateRequest request,
                                                             @AuthenticationPrincipal(expression = "user") User user) {
@@ -117,7 +117,7 @@ public class UserController {
     }
 
     // 회원 탈퇴
-    // DELETE /api/user/me - 상태를 WITHDRAWN으로 바꾸고 로그인 상태도 함께 해제
+    // DELETE /jobpuzzle/user/me - 상태를 WITHDRAWN으로 바꾸고 로그인 상태도 함께 해제
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> withdraw(@AuthenticationPrincipal(expression = "user") User user,
                                                         HttpServletRequest httpRequest,
@@ -127,7 +127,7 @@ public class UserController {
     }
 
     // 로그인 아이디 찾기 - 인증 코드 발송
-    // POST /api/user/find-id/send-code { email }
+    // POST /jobpuzzle/user/find-id/send-code { email }
     @PostMapping("/find-id/send-code")
     public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@Valid @RequestBody EmailSendRequest request) {
         userService.sendVerificationCode(request.getEmail());
@@ -135,7 +135,7 @@ public class UserController {
     }
 
     // 로그인 아이디 찾기 - 인증 코드 검증 후 로그인 아이디 반환
-    // POST /api/user/find-id/verify { email, code }
+    // POST /jobpuzzle/user/find-id/verify { email, code }
     @PostMapping("/find-id/verify")
     public ResponseEntity<ApiResponse<String>> verifyVerificationCode(@Valid @RequestBody EmailVerifyRequest request) {
         String loginId = userService.verifyCodeAndFindLoginId(request.getEmail(), request.getCode());
@@ -143,7 +143,7 @@ public class UserController {
     }
 
     // 로그인 비밀번호 재설정 - 인증 코드 발송
-    // POST /api/user/passwd-reset/send-code { loginId, email }
+    // POST /jobpuzzle/user/passwd-reset/send-code { loginId, email }
     @PostMapping("/passwd-reset/send-code")
     public ResponseEntity<ApiResponse<Void>> sendPasswordResetCode(@Valid @RequestBody PasswordResetSendRequest request) {
         userService.sendPasswordResetCode(request.getLoginId(), request.getEmail());
@@ -151,7 +151,7 @@ public class UserController {
     }
 
     // 로그인 비밀번호 재설정 - 인증 코드 검증 (검증만 하고 코드는 소비하지 않음, 유효시간 내에 재설정 완료해야 함)
-    // POST /api/user/passwd-reset/verify { loginId, email, code }
+    // POST /jobpuzzle/user/passwd-reset/verify { loginId, email, code }
     @PostMapping("/passwd-reset/verify")
     public ResponseEntity<ApiResponse<Void>> verifyPasswordResetCode(@Valid @RequestBody PasswordResetVerifyRequest request) {
         userService.verifyPasswordResetCode(request.getLoginId(), request.getEmail(), request.getCode());
@@ -159,7 +159,7 @@ public class UserController {
     }
 
     // 로그인 비밀번호 재설정 - 인증 코드 재확인 후 새 비밀번호로 변경
-    // POST /api/user/passwd-reset/reset { loginId, email, code, newPassword }
+    // POST /jobpuzzle/user/passwd-reset/reset { loginId, email, code, newPassword }
     @PostMapping("/passwd-reset/reset")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
         userService.resetPassword(request.getLoginId(), request.getEmail(), request.getCode(), request.getNewPassword());
@@ -167,7 +167,7 @@ public class UserController {
     }
 
     // 계정 잠금 해제 - 인증 코드 발송
-    // POST /api/user/unlock/send-code { loginId, email }
+    // POST /jobpuzzle/user/unlock/send-code { loginId, email }
     @PostMapping("/unlock/send-code")
     public ResponseEntity<ApiResponse<Void>> sendUnlockCode(@Valid @RequestBody AccountUnlockSendRequest request) {
         userService.sendUnlockCode(request.getLoginId(), request.getEmail());
@@ -175,7 +175,7 @@ public class UserController {
     }
 
     // 계정 잠금 해제 - 인증 코드 검증 (검증 성공 시 그 자리에서 잠금 해제까지 처리됨)
-    // POST /api/user/unlock/verify { loginId, email, code }
+    // POST /jobpuzzle/user/unlock/verify { loginId, email, code }
     @PostMapping("/unlock/verify")
     public ResponseEntity<ApiResponse<Void>> verifyAndUnlock(@Valid @RequestBody AccountUnlockVerifyRequest request) {
         userService.verifyAndUnlock(request.getLoginId(), request.getEmail(), request.getCode());

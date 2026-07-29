@@ -18,11 +18,11 @@
     <p class="page-subtitle">직무별 분석 가이드 문서를 등록하고 관리할 수 있어요</p>
 
     <div class="tabbar" style="margin-bottom:20px; flex-wrap:wrap;">
-      <a class="tabbar__btn" href="/admin/users" th:href="@{/admin/users}">회원 관리</a>
-      <a class="tabbar__btn" href="/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
-      <a class="tabbar__btn" href="/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
-      <a class="tabbar__btn" href="/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
-      <a class="tabbar__btn is-active" href="/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
+      <a class="tabbar__btn" href="/jobpuzzle/admin/users" th:href="@{/admin/users}">회원 관리</a>
+      <a class="tabbar__btn" href="/jobpuzzle/admin/job-categories" th:href="@{/admin/job-categories}">직무 분류 관리</a>
+      <a class="tabbar__btn" href="/jobpuzzle/admin/guide-usage" th:href="@{/admin/guide-usage}">가이드 사용 이력</a>
+      <a class="tabbar__btn" href="/jobpuzzle/admin/ai-logs" th:href="@{/admin/ai-logs}">AI 오류 로그</a>
+      <a class="tabbar__btn is-active" href="/jobpuzzle/admin/guides" th:href="@{/admin/guides}">가이드 관리</a>
     </div>
 
     <div class="flex-row" style="justify-content:flex-end; margin-bottom:12px;">
@@ -126,6 +126,7 @@
   </div>
 </div>
 
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
 <script src="/js/admin-guides.js" th:src="@{/js/admin-guides.js}"></script>
