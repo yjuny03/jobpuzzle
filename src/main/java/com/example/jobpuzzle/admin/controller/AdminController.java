@@ -40,13 +40,13 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/admin")
+@RequestMapping("/admin-api")
 public class AdminController {
 
     private final AdminService adminService;
 
     // 회원 목록/검색
-    // GET /api/admin/users?keyword=&searchField=LOGIN_ID&status=&page=&size=
+    // GET /jobpuzzle/admin-api/users?keyword=&searchField=LOGIN_ID&status=&page=&size=
     @GetMapping("/users")
     public ResponseEntity<ApiResponse<PageResponse<AdminUserListResponse>>> getUserList(
             @RequestParam(required = false) String keyword,
@@ -89,7 +89,7 @@ public class AdminController {
     }
 
     // 가이드 사용 이력 조회
-    // GET /api/admin/guide-usage?page=&size=
+    // GET /jobpuzzle/admin-api/guide-usage?page=&size=
     @GetMapping("/guide-usage")
     public ResponseEntity<ApiResponse<PageResponse<AdminGuideUsageResponse>>> getGuideUsageHistory(
             @PageableDefault(sort = "guideContextResultId", direction = Sort.Direction.DESC) Pageable pageable
@@ -98,7 +98,7 @@ public class AdminController {
     }
 
     // AI 분석 오류 로그 조회
-    // GET /api/admin/ai-call-logs?status=&page=&size=
+    // GET /jobpuzzle/admin-api/ai-call-logs?status=&page=&size=
     @GetMapping("/ai-call-logs")
     public ResponseEntity<ApiResponse<PageResponse<AdminAiCallLogResponse>>> getAiErrorLogs(
             @RequestParam(required = false) AiCallLogStatus status,
@@ -120,7 +120,7 @@ public class AdminController {
     }
 
     // 가이드 등록 - file은 sourceType=PDF일 때만 전달
-    // POST /api/admin/guides (multipart: request(json), file(선택))
+    // POST /jobpuzzle/admin-api/guides (multipart: request(json), file(선택))
     @PostMapping(value = "/guides", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<AdminGuideResponse>> createGuide(
             @Valid @RequestPart("request") AdminGuideCreateRequest request,
@@ -132,7 +132,7 @@ public class AdminController {
     }
 
     // 가이드 새 버전 생성 - guideCode는 기존 가이드에서 상속, 버전만 자동 증가
-    // POST /api/admin/guides/{guideId}/versions (multipart: request(json), file(선택))
+    // POST /jobpuzzle/admin-api/guides/{guideId}/versions (multipart: request(json), file(선택))
     @PostMapping(value = "/guides/{guideId}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<AdminGuideResponse>> createGuideVersion(
             @PathVariable Long guideId,

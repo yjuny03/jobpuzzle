@@ -54,19 +54,20 @@
 
         <div class="auth-result" id="passwd-reset-result" hidden>
           비밀번호가 변경되었습니다.
-          <a href="/login" th:href="@{/login}">로그인하러 가기</a>
+          <a href="/jobpuzzle/login" th:href="@{/login}">로그인하러 가기</a>
         </div>
       </div>
 
       <p class="auth-footer-link">
-        <a href="/find-id" th:href="@{/find-id}">아이디를 잊으셨나요?</a>
+        <a href="/jobpuzzle/find-id" th:href="@{/find-id}">아이디를 잊으셨나요?</a>
         &nbsp;·&nbsp;
-        <a href="/login" th:href="@{/login}">로그인으로 돌아가기</a>
+        <a href="/jobpuzzle/login" th:href="@{/login}">로그인으로 돌아가기</a>
       </p>
     </div>
   </main>
 
-  <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
   <script src="/js/passwd-reset.js" th:src="@{/js/passwd-reset.js}"></script>
 </body>
 

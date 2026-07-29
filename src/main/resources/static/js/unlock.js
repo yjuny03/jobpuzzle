@@ -77,7 +77,7 @@
       sendBtn.disabled = true;
       var sendBtnOriginalText = sendBtn.textContent;
       sendBtn.textContent = '전송 중...';
-      fetch('/api/user/unlock/send-code', {
+      fetch(window.JobPuzzleRoutes.path('/user/unlock/send-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -121,7 +121,7 @@
       }
 
       verifyBtn.disabled = true;
-      fetch('/api/user/unlock/verify', {
+      fetch(window.JobPuzzleRoutes.path('/user/unlock/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

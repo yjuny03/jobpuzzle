@@ -11,7 +11,7 @@
             isLoggedIn: false,
             ctaLabel: '로그인하기',
             ctaHint: '로그인이 필요해요 · 클릭하면 로그인 페이지로 이동해요',
-            ctaHref: '/login',
+            ctaHref: '/jobpuzzle/login',
             reportLocked: true,
             lockTitle: '로그인하고 리포트 확인하기',
             lockDesc: '로그인하면 직무별 요구역량 리포트를 볼 수 있어요',
@@ -21,7 +21,7 @@
             isLoggedIn: true,
             ctaLabel: '분석할 자료 등록하러 가기',
             ctaHint: '채용공고와 이력서를 등록하면 분석이 시작돼요',
-            ctaHref: '/my-data.html',
+            ctaHref: '/jobpuzzle/my-data',
             reportLocked: true,
             lockTitle: '자료를 등록하면 리포트가 열려요',
             lockDesc: '채용공고와 이력서를 등록하면 나만의 리포트를 확인할 수 있어요',
@@ -31,7 +31,7 @@
             isLoggedIn: true,
             ctaLabel: '면접 준비 이어가기',
             ctaHint: '최근 등록한 백엔드 신입 공고 기준으로 이어갈 수 있어요',
-            ctaHref: '/interview.html',
+            ctaHref: '/jobpuzzle/interview',
             reportLocked: false
         }
     };
@@ -128,7 +128,7 @@
 
         if (els.lockBtn) {
             els.lockBtn.addEventListener('click', function () {
-                window.location.href = els.lockBtn.dataset.href || '/login';
+                window.location.href = els.lockBtn.dataset.href || window.JobPuzzleRoutes.path('/login');
             });
         }
 
@@ -139,7 +139,7 @@
     // The preview toolbar stays dummy-data driven, but the real landing page
     // always derives its header and CTA state from the server-side session.
     function applyRealAuthState() {
-        fetch('/api/user/me', { credentials: 'same-origin' })
+        fetch(window.JobPuzzleRoutes.path('/user/me'), { credentials: 'same-origin' })
             .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
             .then(function (result) {
                 if (result.ok && result.body.success) {

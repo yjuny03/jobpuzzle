@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/job-analysis-report")
+@RequestMapping("/job-analysis-report")
 public class JobAnalysisReportController {
     // TODO: 클래스 정의서 기준으로 API 메서드 작성
 }

@@ -96,7 +96,7 @@
     }
 
     function analysisApi(suffix, options) {
-        return api('/api/analysis/cases/' + caseId + suffix, options);
+        return api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + suffix), options);
     }
 
     function friendlyError(error) {
@@ -225,7 +225,7 @@
         } else if (isRunning) {
             var runningActions = el('div', 'report-actions report-actions--running');
             var leaveLink = el('a', 'btn btn--ghost', '다른 서비스 이용하기');
-            leaveLink.href = '/interview.html';
+            leaveLink.href = window.JobPuzzleRoutes.path('/interview');
             runningActions.appendChild(leaveLink);
             runningActions.appendChild(el('p', 'analysis-stop-note',
                 '현재 서버는 실행 중인 AI 작업의 취소를 지원하지 않아, 화면을 이동해도 분석은 계속됩니다.'));
@@ -437,7 +437,7 @@
         card.appendChild(list);
         var actions = el('div', 'report-actions');
         var interviewLink = el('a', 'btn btn--primary', '질문을 선택하고 면접 시작');
-        interviewLink.href = '/interview.html?analysisCaseId=' + encodeURIComponent(caseId);
+        interviewLink.href = window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId));
         interviewLink.style.textDecoration = 'none';
         actions.appendChild(interviewLink);
         card.appendChild(actions);
@@ -527,7 +527,7 @@
         if (status.analysisCaseStatus === 'COMPLETED') {
             clearTimeout(state.pollTimer);
             clearTimeout(state.retryTimer);
-            window.location.replace('/analysis-results/' + encodeURIComponent(caseId));
+            window.location.replace(window.JobPuzzleRoutes.path('/analysis-results/' + encodeURIComponent(caseId)));
             return;
         }
         if (status.analysisCaseStatus === 'ANALYZING') {
@@ -582,7 +582,7 @@
         });
         var ensureIndexed = reuseExistingIndex
             ? Promise.resolve()
-            : api('/api/analysis-cases/' + caseId + '/index', { method: 'POST' });
+            : api(window.JobPuzzleRoutes.path('/analysis-cases/' + caseId + '/index'), { method: 'POST' });
         ensureIndexed
             .then(function () {
                 var runPromise = analysisApi('/run', { method: 'POST' });

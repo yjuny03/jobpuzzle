@@ -92,7 +92,7 @@
       });
     }
 
-    fetch('/api/job-category')
+    fetch(window.JobPuzzleRoutes.path('/job-category'))
       .then(function (res) { return res.json(); })
       .then(function (body) {
         jobCategories = body.data || [];
@@ -226,7 +226,7 @@
       sendEmailCodeBtn.disabled = true;
       var sendBtnOriginalText = sendEmailCodeBtn.textContent;
       sendEmailCodeBtn.textContent = '전송 중...';
-      fetch('/api/user/join/send-code', {
+      fetch(window.JobPuzzleRoutes.path('/user/join/send-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -263,7 +263,7 @@
       }
 
       verifyEmailCodeBtn.disabled = true;
-      fetch('/api/user/join/verify', {
+      fetch(window.JobPuzzleRoutes.path('/user/join/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -396,7 +396,7 @@
         setHint(loginIdHint, '아이디는 4~50자로 입력해주세요.', false);
         return;
       }
-      fetch('/api/user/check-id?loginId=' + encodeURIComponent(loginId))
+      fetch(window.JobPuzzleRoutes.path('/user/check-id?loginId=' + encodeURIComponent(loginId)))
         .then(function (res) { return res.json(); })
         .then(function (body) {
           var duplicate = body.data;
@@ -439,7 +439,7 @@
         code: Number(emailCodeInput.value.trim())
       };
 
-      fetch('/api/user/join', {
+      fetch(window.JobPuzzleRoutes.path('/user/join'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -451,7 +451,7 @@
         .then(function (result) {
           if (result.ok && result.body.success) {
             // 가입 성공 - 로그인 페이지로 이동
-            window.location.href = '/login';
+            window.location.href = window.JobPuzzleRoutes.path('/login');
           } else {
             showError(errorEl, result.body.message || '회원가입에 실패했습니다.');
           }

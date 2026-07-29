@@ -86,7 +86,7 @@
 
     function loadCurrentUser() {
         if (!document.getElementById('app-user-chip')) return;
-        fetch('/api/user/me', { credentials: 'same-origin' })
+        fetch(window.JobPuzzleRoutes.path('/user/me'), { credentials: 'same-origin' })
             .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
             .then(function (result) {
                 if (result.ok && result.body.success) {
@@ -94,17 +94,17 @@
                     renderUserDisplay(result.body.data);
                     return;
                 }
-                window.location.href = '/login';
+                window.location.href = window.JobPuzzleRoutes.path('/login');
             })
-            .catch(function () { window.location.href = '/login'; });
+            .catch(function () { window.location.href = window.JobPuzzleRoutes.path('/login'); });
     }
 
     function bindLogout() {
         document.querySelectorAll('#logout-link, #app-logout-link').forEach(function (logoutLink) {
             logoutLink.addEventListener('click', function (event) {
                 event.preventDefault();
-                fetch('/api/user/logout', { method: 'POST', credentials: 'same-origin' })
-                    .finally(function () { window.location.href = '/index.html'; });
+                fetch(window.JobPuzzleRoutes.path('/user/logout'), { method: 'POST', credentials: 'same-origin' })
+                    .finally(function () { window.location.href = window.JobPuzzleRoutes.path('/'); });
             });
         });
     }

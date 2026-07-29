@@ -65,7 +65,7 @@
                 <p class="hero__desc motion-reveal" data-reveal>채용공고와 이력서를 분석해 나만의 면접 질문을 만들고,<br>부족한 점을 찾아 이력서까지 완성해드려요</p>
 
                 <!--  메인 CTA: landing.js의 로그인/자료 유무 상태에 따라 문구와 링크가 바뀜 -->
-                <a href="/interview.html" th:href="@{/interview.html}" class="btn btn--primary btn--lg motion-reveal" id="hero-cta" data-reveal>
+                <a href="/jobpuzzle/interview" th:href="@{/interview}" class="btn btn--primary btn--lg motion-reveal" id="hero-cta" data-reveal>
                     <span id="hero-cta-label">로그인하기</span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 12h14M13 6l6 6-6 6" />
@@ -293,7 +293,7 @@
                     <span id="story-active-index">01 / 04</span>
                     <strong id="story-active-title">자료를 확인합니다</strong>
                 </div>
-                <a class="story-link" href="/my-data.html" th:href="@{/my-data.html}">내 자료에서 시작하기 <span aria-hidden="true">→</span></a>
+                <a class="story-link" href="/jobpuzzle/my-data" th:href="@{/my-data}">내 자료에서 시작하기 <span aria-hidden="true">→</span></a>
             </div>
 
             <!--  서비스 흐름 우측 레일: 스크롤 위치에 따라 현재 story-stage가 강조됨 -->
@@ -477,6 +477,7 @@
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
 <!--  스크립트 실행 순서: 로더 → 동적 헤더 → WebGL 퍼즐 → GSAP → 랜딩 상호작용 -->
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/loader.js" th:src="@{/js/loader.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>

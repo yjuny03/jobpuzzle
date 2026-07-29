@@ -47,21 +47,22 @@
 
         <div class="auth-result" id="unlock-result" hidden>
           계정 잠금이 해제되었습니다.
-          <a href="/login" th:href="@{/login}">로그인하러 가기</a>
+          <a href="/jobpuzzle/login" th:href="@{/login}">로그인하러 가기</a>
         </div>
       </div>
 
       <p class="auth-footer-link">
-        <a href="/find-id" th:href="@{/find-id}">아이디를 잊으셨나요?</a>
+        <a href="/jobpuzzle/find-id" th:href="@{/find-id}">아이디를 잊으셨나요?</a>
         &nbsp;·&nbsp;
-        <a href="/passwd-reset" th:href="@{/passwd-reset}">비밀번호를 잊으셨나요?</a>
+        <a href="/jobpuzzle/passwd-reset" th:href="@{/passwd-reset}">비밀번호를 잊으셨나요?</a>
         &nbsp;·&nbsp;
-        <a href="/login" th:href="@{/login}">로그인으로 돌아가기</a>
+        <a href="/jobpuzzle/login" th:href="@{/login}">로그인으로 돌아가기</a>
       </p>
     </div>
   </main>
 
-  <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
   <script src="/js/unlock.js" th:src="@{/js/unlock.js}"></script>
 </body>
 

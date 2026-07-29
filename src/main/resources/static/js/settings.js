@@ -123,14 +123,14 @@
       idRow.style.display = user.socialProvider ? 'none' : '';
     }
 
-    // header.js가 헤더 표시를 위해 이미 /api/user/me를 불러오므로, 중복 호출 없이 그 결과를 그대로 재사용함
+    // header.js가 헤더 표시를 위해 이미 /jobpuzzle/user/me를 불러오므로, 중복 호출 없이 그 결과를 그대로 재사용함
     document.addEventListener('app-user-loaded', function (event) {
       currentUser = event.detail;
       fillProfile(currentUser);
       applyCurrentJobCategory();
     });
 
-    fetch('/api/job-category')
+    fetch(window.JobPuzzleRoutes.path('/job-category'))
       .then(function (res) { return res.json(); })
       .then(function (body) {
         jobCategories = body.data || [];
@@ -171,7 +171,7 @@
     });
 
     function saveMyInfo(payload, errorEl, onSuccess) {
-      fetch('/api/user/me', {
+      fetch(window.JobPuzzleRoutes.path('/user/me'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -262,7 +262,7 @@
     withdrawConfirmBtn.addEventListener('click', function () {
       hideError(withdrawError);
 
-      fetch('/api/user/me', {
+      fetch(window.JobPuzzleRoutes.path('/user/me'), {
         method: 'DELETE',
         credentials: 'same-origin'
       })
@@ -283,7 +283,7 @@
     });
 
     withdrawDoneConfirm.addEventListener('click', function () {
-      window.location.href = '/index.html';
+      window.location.href = window.JobPuzzleRoutes.path('/');
     });
   });
 })();

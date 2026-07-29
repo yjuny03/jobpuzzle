@@ -7,7 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 내 정보 조회 응답 (/api/user/me)
+// 내 정보 조회 응답 (/jobpuzzle/user/me)
 @Getter
 @AllArgsConstructor
 public class UserInfoResponse {

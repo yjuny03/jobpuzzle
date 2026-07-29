@@ -4,7 +4,7 @@
 
   function api(path, opts) {
     opts = opts || {};
-    return fetch('/api' + path, { method: opts.method || 'GET', credentials: 'same-origin' }).then(function (res) {
+    return fetch(window.JobPuzzleRoutes.path(path.replace(/^\/admin/, '/admin-api')), { method: opts.method || 'GET', credentials: 'same-origin' }).then(function (res) {
       return res.json().then(function (body) {
         if (!res.ok || !body.success) {
           var err = new Error((body && body.message) || '요청에 실패했습니다.');
@@ -211,7 +211,7 @@
       formData.append('file', fileInput.files[0]);
     }
 
-    fetch('/api/admin/guides/' + guideId + '/versions', { method: 'POST', credentials: 'same-origin', body: formData })
+    fetch(window.JobPuzzleRoutes.path('/admin-api/guides/' + guideId + '/versions'), { method: 'POST', credentials: 'same-origin', body: formData })
       .then(function (res) {
         return res.json().then(function (body) {
           if (!res.ok || !body.success) throw new Error((body && body.message) || '새 버전 등록에 실패했습니다.');
@@ -219,7 +219,7 @@
         });
       })
       .then(function (newGuide) {
-        window.location.href = '/admin/guides/' + newGuide.guideId;
+        window.location.href = window.JobPuzzleRoutes.path('/admin/guides/' + newGuide.guideId);
       })
       .catch(function (e) { alert(e.message); });
   }

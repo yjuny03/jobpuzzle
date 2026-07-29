@@ -365,8 +365,9 @@
     }
 
     if (report.analysisCaseId) {
-      html += '<div style="margin-top:24px;"><a class="btn btn--secondary" href="/api/analysis/' +
-        encodeURIComponent(report.analysisCaseId) + '">공고 요구사항 연결 분석 결과 보기</a></div>';
+      html += '<div style="margin-top:24px;"><a class="btn btn--secondary" href="' +
+        window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(report.analysisCaseId)) +
+        '">공고 요구사항 연결 분석 결과 보기</a></div>';
     }
 
     panel.innerHTML = html;
@@ -540,11 +541,11 @@
         alert('이어갈 질문을 하나 이상 선택해 주세요.');
         return;
       }
-      api('/api/interview-sessions/' + sessionId + '/questions', {
+      api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/questions'), {
         method: 'POST',
         json: { questionIds: ids }
       }).then(function () {
-        window.location.href = '/interview.html?resumeSessionId=' + encodeURIComponent(sessionId);
+        window.location.href = window.JobPuzzleRoutes.path('/interview?resumeSessionId=' + encodeURIComponent(sessionId));
       }).catch(function (error) { alert(error.message); });
     });
   }
@@ -553,9 +554,9 @@
     if (!window.confirm(
       '이 면접을 최종 확정할까요?\n\n확정하면 선택하지 않은 질문은 더 이상 추가할 수 없고, 리포트 생성 대상으로 전달됩니다.'
     )) return;
-    api('/api/interview-sessions/' + sessionId + '/complete', { method: 'POST' })
+    api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/complete'), { method: 'POST' })
       .then(function () {
-        window.location.replace('/interview-result.html?sessionId=' + encodeURIComponent(sessionId));
+        window.location.replace(window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(sessionId)));
       })
       .catch(function (error) { alert(error.message); });
   }
@@ -590,8 +591,8 @@
 
   // 완료된 면접(리포트)을 보고 있을 때는 헤더에서 "면접 준비" 대신 "리포트"를 활성 표시한다.
   function highlightReportsNav() {
-    var interviewLink = document.querySelector('.site-header__nav a[href="/interview.html"]');
-    var reportsLink = document.querySelector('.site-header__nav a[href="/reports.html"]');
+    var interviewLink = document.querySelector('.site-header__nav a[href="' + window.JobPuzzleRoutes.path('/interview') + '"]');
+    var reportsLink = document.querySelector('.site-header__nav a[href="' + window.JobPuzzleRoutes.path('/reports') + '"]');
     if (interviewLink) interviewLink.classList.remove('is-active');
     if (reportsLink) reportsLink.classList.add('is-active');
   }
@@ -608,8 +609,9 @@
     var list = document.getElementById('q-list');
     list.className = 'history-list';
     list.innerHTML = items.length ? items.map(function (item) {
-      return '<a class="history-card" href="/interview-result.html?sessionId=' +
-        encodeURIComponent(item.sessionId) + '"><div><span>' + esc(modeLabel(item.mode)) +
+      return '<a class="history-card" href="' +
+        window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(item.sessionId)) +
+        '"><div><span>' + esc(modeLabel(item.mode)) +
         '</span><h2>' + item.questionCount + '개 질문 면접</h2><p>' +
         esc(formatDate(item.completedAt)) +
         (item.targetWeaknessTag ? ' · #' + esc(item.targetWeaknessTag) : '') +
@@ -617,21 +619,21 @@
     }).join('') :
       '<div class="history-empty"><h2>첫 면접을 시작해 보세요</h2>' +
       '<p>답변을 하나 이상 제출하고 정상 완료하면 이곳에 결과가 저장됩니다.</p>' +
-      '<a class="btn btn--primary" href="/interview.html">면접 시작</a></div>';
+      '<a class="btn btn--primary" href="' + window.JobPuzzleRoutes.path('/interview') + '">면접 시작</a></div>';
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     if (!sessionId) {
-      api('/api/interview-sessions/history').then(renderHistory).catch(function (error) {
+      api(window.JobPuzzleRoutes.path('/interview-sessions/history')).then(renderHistory).catch(function (error) {
         document.getElementById('result-meta').textContent = error.message;
       });
       return;
     }
     Promise.all([
-      api('/api/interview-sessions/' + sessionId),
-      api('/api/interview-sessions/' + sessionId + '/score'),
-      api('/api/interview-sessions/' + sessionId + '/questions'),
-      api('/api/interview-sessions/' + sessionId + '/questions/remaining')
+      api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId)),
+      api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/score')),
+      api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/questions')),
+      api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/questions/remaining'))
     ]).then(function (values) {
       sessionInfo = values[0];
       remainingQuestions = values[3] || [];
@@ -647,7 +649,7 @@
     });
 
     // 최종 리포트는 별도 호출로 분리
-    api('/api/final-report/sessions/' + sessionId).then(renderFinalReport).catch(function (error) {
+    api(window.JobPuzzleRoutes.path('/final-report/sessions/' + sessionId)).then(renderFinalReport).catch(function (error) {
       document.getElementById('final-report-panel').innerHTML =
         '<p class="result-empty-copy">' + esc(error.message) + '</p>';
     });
