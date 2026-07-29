@@ -10,12 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 @Controller
 public class PageViewController {
 
-    @GetMapping("/job-analysis.html")
-    public String legacyJobAnalysis() {
-        return "redirect:/interview.html";
-    }
-
-    @GetMapping("/{page:index|dashboard|my-data|interview|interview-result|reports|settings|job-category-setup}.html")
+    @GetMapping("/{page:index|dashboard|my-data|job-analysis|interview|interview-result|reports|settings|job-category-setup}.html")
     public String page(@PathVariable String page) {
         return page;
     }
