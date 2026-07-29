@@ -70,6 +70,11 @@ public class FinalReport extends BaseTimeEntity {
     @Column(name = "category_scores", columnDefinition = "json", nullable = false)
     private CategoryScores categoryScores;
 
+    // 관점별 점수의 근거 서술. AI가 못 만들었을 수 있어 다른 JSON 컬럼과 달리 nullable
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "category_score_reasons", columnDefinition = "json")
+    private CategoryScoreReasons categoryScoreReasons;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "basis_summary", columnDefinition = "json", nullable = false)
     private BasisSummary basisSummary;
@@ -105,6 +110,7 @@ public class FinalReport extends BaseTimeEntity {
             String scoreLabel,
             String overallAssessment,
             CategoryScores categoryScores,
+            CategoryScoreReasons categoryScoreReasons,
             BasisSummary basisSummary,
             List<WeaknessTagSummary> weaknessTagSummary,
             List<NextPracticeRecommendation> nextPracticeRecommendation,
@@ -123,6 +129,7 @@ public class FinalReport extends BaseTimeEntity {
         this.scoreLabel = scoreLabel;
         this.overallAssessment = overallAssessment;
         this.categoryScores = categoryScores;
+        this.categoryScoreReasons = categoryScoreReasons;
         this.basisSummary = basisSummary;
         this.weaknessTagSummary = weaknessTagSummary;
         this.nextPracticeRecommendation = nextPracticeRecommendation;
@@ -149,6 +156,21 @@ public class FinalReport extends BaseTimeEntity {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    public static class CategoryScoreReasons {
+        private String intentMatch;
+        private String specificity;
+        private String ownRole;
+        private String problemSolving;
+        private String resultExpression;
+        private String requirementConnection;
+        private String guideAlignment;
+        private String deliveryClarity;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class BasisSummary {
         private String jobCategory;
         private JobCategoryCareerLevel careerLevel;
@@ -168,6 +190,7 @@ public class FinalReport extends BaseTimeEntity {
     public static class WeaknessTagSummary {
         private String tag;
         private int count;
+        private String reason;
     }
 
     @Data

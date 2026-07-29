@@ -1,6 +1,10 @@
 package com.example.jobpuzzle.interview.service;
 
 import com.example.jobpuzzle.analysis.dto.CompanyFitQuestionSetResponse;
+import com.example.jobpuzzle.analysis.entity.CandidateMaterialAnalysis;
+import com.example.jobpuzzle.analysis.entity.JobPostingAnalysis;
+import com.example.jobpuzzle.analysis.repository.CandidateMaterialAnalysisRepository;
+import com.example.jobpuzzle.analysis.repository.JobPostingAnalysisRepository;
 import com.example.jobpuzzle.analysis.service.CompanyFitQuestionSetQueryService;
 import com.example.jobpuzzle.evaluation.service.AnswerEvaluationService;
 import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
@@ -35,6 +39,8 @@ public class InterviewSessionService {
     private final InterviewSessionQuestionRepository sessionQuestionRepository;
     private final InterviewMessageRepository interviewMessageRepository;
     private final CompanyFitQuestionSetQueryService companyFitQuestionSetQueryService;
+    private final JobPostingAnalysisRepository jobPostingAnalysisRepository;
+    private final CandidateMaterialAnalysisRepository candidateMaterialAnalysisRepository;
     private final AnswerEvaluationService answerEvaluationService;
     private final AnswerEvaluationRepository answerEvaluationRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
@@ -216,7 +222,12 @@ public class InterviewSessionService {
         }
         selectedQuestions.sort(Comparator.comparingInt(InterviewQuestion::getDisplayOrder));
 
-        InterviewSession session = interviewSessionRepository.save(InterviewSession.create(questionSet));
+        InterviewSession session = interviewSessionRepository.save(
+                questionSet.getInterviewMode() == InterviewSessionMode.COMPANY_FIT
+                        ? InterviewSession.create(
+                                questionSet, jobPostingAnalysisOf(questionSet), candidateAnalysisOf(questionSet))
+                        : InterviewSession.create(questionSet)
+        );
         int order = 1;
         for (InterviewQuestion question : selectedQuestions) {
             InterviewSessionQuestion snapshot = sessionQuestionRepository.save(
@@ -225,6 +236,19 @@ public class InterviewSessionService {
             interviewMessageRepository.save(InterviewMessage.originalQuestion(snapshot));
         }
         return SessionResponse.from(session, selectedQuestions.size());
+    }
+
+    // COMPANY_FIT 세션 생성 당시 스냅샷에 연결된 분석 결과를 고정해서 저장한다.
+    private JobPostingAnalysis jobPostingAnalysisOf(QuestionSet questionSet) {
+        return jobPostingAnalysisRepository
+                .findBySnapshot_SnapshotId(questionSet.getSnapshot().getSnapshotId())
+                .orElse(null);
+    }
+
+    private CandidateMaterialAnalysis candidateAnalysisOf(QuestionSet questionSet) {
+        return candidateMaterialAnalysisRepository
+                .findBySnapshot_SnapshotId(questionSet.getSnapshot().getSnapshotId())
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

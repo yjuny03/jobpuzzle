@@ -11,6 +11,7 @@ import com.example.jobpuzzle.ai.prompt.PromptTemplate;
 import com.example.jobpuzzle.ai.prompt.PromptTemplateRepository;
 import com.example.jobpuzzle.ai.service.AiClientService;
 import com.example.jobpuzzle.ai.service.GenerationClientSelection;
+import com.example.jobpuzzle.document.entity.UserDocumentType;
 import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
 import com.example.jobpuzzle.evaluation.dto.SessionScoreSummary;
 import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
@@ -43,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class FinalReportService {
@@ -162,6 +164,7 @@ public class FinalReportService {
                 .scoreLabel(report.getScoreLabel())
                 .overallAssessment(report.getOverallAssessment())
                 .categoryScores(toResponseCategoryScores(report.getCategoryScores()))
+                .categoryScoreReasons(toResponseCategoryScoreReasons(report.getCategoryScoreReasons()))
                 .basisSummary(toResponseBasisSummary(report.getBasisSummary()))
                 .weaknessTagSummary(toResponseWeaknessTagSummaries(report.getWeaknessTagSummary()))
                 .nextPracticeRecommendation(toResponseNextPracticeRecommendations(report.getNextPracticeRecommendation()))
@@ -184,6 +187,24 @@ public class FinalReportService {
             return null;
         }
         return FinalReportResponse.CategoryScores.builder()
+                .intentMatch(source.getIntentMatch())
+                .specificity(source.getSpecificity())
+                .ownRole(source.getOwnRole())
+                .problemSolving(source.getProblemSolving())
+                .resultExpression(source.getResultExpression())
+                .requirementConnection(source.getRequirementConnection())
+                .guideAlignment(source.getGuideAlignment())
+                .deliveryClarity(source.getDeliveryClarity())
+                .build();
+    }
+
+    private FinalReportResponse.CategoryScoreReasons toResponseCategoryScoreReasons(
+            FinalReport.CategoryScoreReasons source
+    ) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReportResponse.CategoryScoreReasons.builder()
                 .intentMatch(source.getIntentMatch())
                 .specificity(source.getSpecificity())
                 .ownRole(source.getOwnRole())
@@ -234,6 +255,7 @@ public class FinalReportService {
                 .map(tag -> FinalReportResponse.WeaknessTagSummary.builder()
                         .tag(tag.getTag())
                         .count(tag.getCount())
+                        .reason(tag.getReason())
                         .build())
                 .toList();
     }
@@ -397,6 +419,7 @@ public class FinalReportService {
         prompt.append("\n\n[이번 세션 정보]\n");
         prompt.append("세션 ").append(lease.sessionId())
                 .append(" 모드=").append(lease.session().getMode())
+                .append(" 제출자료=").append(submittedDocumentTypes(lease.session()))
                 .append(" 총질문=").append(score.getTotalQuestionCount())
                 .append(" 제출=").append(score.getSubmittedQuestionCount())
                 .append(" 평가성공=").append(score.getEvaluatedQuestionCount())
@@ -409,9 +432,29 @@ public class FinalReportService {
             prompt.append("- score=").append(evaluation.getScore())
                     .append(" weaknessTags=").append(evaluation.getWeaknessTags())
                     .append(" summary=").append(evaluation.getSummary())
+                    .append(" evaluationDetail=").append(evaluationDetailText(evaluation.getEvaluationDetail()))
                     .append('\n');
         }
         return prompt.toString();
+    }
+
+    // categoryScoreReasons가 실제 근거(관점별 comment)를 인용할 수 있도록 evaluationDetail을 읽을 수 있게 펼친다.
+    private String evaluationDetailText(Map<String, AnswerEvaluation.DimensionEvaluation> detail) {
+        if (detail == null || detail.isEmpty()) {
+            return "{}";
+        }
+        return detail.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && entry.getValue().getScore() != null)
+                .map(entry -> entry.getKey() + "=" + entry.getValue().getScore()
+                        + "(" + entry.getValue().getComment() + ")")
+                .collect(Collectors.joining(", ", "{", "}"));
+    }
+
+    // BASIC 세션은 candidateAnalysis가 없어 제출자료를 알 수 없으므로 빈 목록으로 취급한다.
+    private List<UserDocumentType> submittedDocumentTypes(InterviewSession session) {
+        return session.getCandidateAnalysis() == null
+                ? List.of()
+                : session.getCandidateAnalysis().getAvailableDocumentTypes();
     }
 
     // AI 응답을 FinalReport(+ COMPANY_FIT이면 ImprovementSuggestion)로 저장하고 로그를 SUCCEEDED로 종결한다.
@@ -443,6 +486,7 @@ public class FinalReportService {
                             ? "이번 세션의 총평을 생성하지 못했습니다."
                             : result.getOverallAssessment())
                     .categoryScores(toCategoryScores(score.getCategoryScores()))
+                    .categoryScoreReasons(toCategoryScoreReasons(result.getCategoryScoreReasons()))
                     .basisSummary(toBasisSummary(result.getBasisSummary()))
                     .weaknessTagSummary(toWeaknessTagSummaries(result.getWeaknessTagSummary()))
                     .nextPracticeRecommendation(toNextPracticeRecommendations(result.getNextPracticeRecommendation()))
@@ -452,26 +496,31 @@ public class FinalReportService {
             finalReportRepository.saveAndFlush(report);
 
             if (session.getMode() == InterviewSessionMode.COMPANY_FIT && result.getImprovementSuggestion() != null) {
-                saveImprovementSuggestions(report.getReportId(), result.getImprovementSuggestion());
+                saveImprovementSuggestions(
+                        report.getReportId(), result.getImprovementSuggestion(), submittedDocumentTypes(session));
             }
 
             log.succeed();
         });
     }
 
-    private void saveImprovementSuggestions(Long reportId, FinalReportResult.ImprovementSuggestion suggestion) {
+    private void saveImprovementSuggestions(
+            Long reportId, FinalReportResult.ImprovementSuggestion suggestion, List<UserDocumentType> submittedTypes
+    ) {
         List<ImprovementSuggestion> rows = new ArrayList<>();
-        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.RESUME, suggestion.getResume()));
-        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.COVER_LETTER, suggestion.getCoverLetter()));
-        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.PORTFOLIO, suggestion.getPortfolio()));
-        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.EXPERIENCE_NOTE, suggestion.getExperienceNote()));
+        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.RESUME, suggestion.getResume(), submittedTypes));
+        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.COVER_LETTER, suggestion.getCoverLetter(), submittedTypes));
+        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.PORTFOLIO, suggestion.getPortfolio(), submittedTypes));
+        rows.addAll(toSuggestionRows(reportId, ImprovementSuggestionTargetType.EXPERIENCE_NOTE, suggestion.getExperienceNote(), submittedTypes));
         improvementSuggestionRepository.saveAll(rows);
     }
 
+    // AI가 프롬프트 지시를 어기고 제출하지 않은 자료에 보완 제안을 만들어도 여기서 걸러낸다.
     private List<ImprovementSuggestion> toSuggestionRows(
-            Long reportId, ImprovementSuggestionTargetType targetType, List<String> texts
+            Long reportId, ImprovementSuggestionTargetType targetType, List<String> texts,
+            List<UserDocumentType> submittedTypes
     ) {
-        if (texts == null) {
+        if (texts == null || !submittedTypes.contains(UserDocumentType.valueOf(targetType.name()))) {
             return List.of();
         }
         List<ImprovementSuggestion> rows = new ArrayList<>();
@@ -555,6 +604,22 @@ public class FinalReportService {
                 .build();
     }
 
+    private FinalReport.CategoryScoreReasons toCategoryScoreReasons(FinalReportResult.CategoryScoreReasons source) {
+        if (source == null) {
+            return null;
+        }
+        return FinalReport.CategoryScoreReasons.builder()
+                .intentMatch(source.getIntentMatch())
+                .specificity(source.getSpecificity())
+                .ownRole(source.getOwnRole())
+                .problemSolving(source.getProblemSolving())
+                .resultExpression(source.getResultExpression())
+                .requirementConnection(source.getRequirementConnection())
+                .guideAlignment(source.getGuideAlignment())
+                .deliveryClarity(source.getDeliveryClarity())
+                .build();
+    }
+
     private FinalReport.BasisSummary toBasisSummary(FinalReportResult.BasisSummary source) {
         if (source == null) {
             return null;
@@ -589,6 +654,7 @@ public class FinalReportService {
                 .map(tag -> FinalReport.WeaknessTagSummary.builder()
                         .tag(tag.getTag())
                         .count(tag.getCount())
+                        .reason(tag.getReason())
                         .build())
                 .toList();
     }
