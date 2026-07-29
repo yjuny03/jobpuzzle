@@ -506,14 +506,42 @@
   z-index: 4;
   margin: 12px -28px 0 !important;
   padding: 16px 28px;
-  border-top: 1px solid #e0e7ef;
-  background: rgba(255,255,255,.96);
-  box-shadow: 0 -10px 25px rgba(24,52,78,.06);
+  border-top: 2px solid var(--jp-line);
+  background: linear-gradient(135deg, rgba(236, 244, 248, .98), rgba(213, 229, 238, .98));
+  box-shadow: 0 -9px 22px rgba(24, 52, 78, .12);
   backdrop-filter: blur(10px);
 }
-.material-select-card #material-select-next {
-  min-width: 176px;
-  box-shadow: 0 8px 18px rgba(25,101,165,.18);
+.jp-interview-page .material-select-card #material-select-next {
+  min-width: 250px;
+  min-height: 52px;
+  padding: 12px 22px;
+  border: 3px solid #183d59;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #5b99bd 0%, #397aa3 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  box-shadow:
+    0 6px 0 rgba(24, 61, 89, .2),
+    0 12px 22px rgba(25, 80, 116, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .25);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.jp-interview-page .material-select-card #material-select-next:hover {
+  border-color: #102f47;
+  background: linear-gradient(145deg, #397fa9 0%, #28668f 100%);
+  box-shadow:
+    0 7px 0 rgba(16, 47, 71, .22),
+    0 14px 26px rgba(25, 80, 116, .28),
+    inset 0 1px 0 rgba(255, 255, 255, .2);
+  transform: translateY(-2px);
+}
+.jp-interview-page .material-select-card #material-select-next:active {
+  box-shadow:
+    0 3px 0 rgba(16, 47, 71, .2),
+    0 7px 14px rgba(25, 80, 116, .2);
+  transform: translateY(2px);
 }
 .material-job-note {
   margin: 10px 0 0;
@@ -684,6 +712,64 @@
 }
 
 .prepared-analysis-section { margin-top: 28px; }
+.jp-interview-page .prepared-analysis-section .prepared-analysis-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 2px solid #286f9b;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #d9edf5 0%, #b8d8e8 100%);
+  color: #124f78;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow:
+    0 4px 0 rgba(40, 111, 155, .18),
+    0 8px 16px rgba(24, 76, 108, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .72);
+}
+.jp-interview-page .active-session-heading .session-status-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 34px;
+  padding: 6px 11px;
+  border: 2px solid;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 2px 3px 0 rgba(35, 53, 69, .16), inset 0 1px 0 rgba(255, 255, 255, .65);
+}
+.jp-interview-page .active-session-heading .session-status-count.is-interview {
+  border-color: #666A9D;
+  background: #DDDDEC;
+  color: #424675;
+}
+.jp-interview-page .active-session-heading .session-status-count.is-review {
+  border-color: #B8782D;
+  background: #F4E2C5;
+  color: #754713;
+}
+.jp-interview-page .active-session-heading .session-status-count.is-analyzing {
+  border-color: #287D82;
+  background: linear-gradient(145deg, #D3ECE9, #B9DDD9);
+  color: #15575B;
+  box-shadow: 2px 3px 0 rgba(21, 87, 91, .2), inset 0 1px 0 rgba(255, 255, 255, .7);
+}
+.jp-interview-page .active-session-heading .session-status-count.is-attention {
+  border-color: #B84A43;
+  background: #F2D8D3;
+  color: #842E2A;
+}
+.jp-interview-page .active-session-heading .session-status-count.is-prepared {
+  border-color: #347657;
+  background: linear-gradient(145deg, #DDF0E5, #C3E1CF);
+  color: #205A3E;
+}
 .prepared-analysis-list { display: grid; gap: 10px; }
 .prepared-analysis-card {
   display: grid;
@@ -1142,4 +1228,738 @@
 .q-gen-item__content small b {
   color: #245986;
   margin-right: 10px;
+}
+
+/* Dashboard-derived interview preparation theme. */
+.jp-interview-page .page-subtitle {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.jp-interview-page #step-root > .card,
+.jp-interview-page .mode-card,
+.jp-interview-page .weak-pick-row,
+.jp-interview-page .material-category,
+.jp-interview-page .review-card,
+.jp-interview-page .chat-panel,
+.jp-interview-page .evaluation-guide,
+.jp-interview-page .prepared-analysis-card,
+.jp-interview-page .active-analysis-card,
+.jp-interview-page .analysis-attention-card,
+.jp-interview-page .review-ready-card,
+.jp-interview-page .live-interview-card,
+.jp-interview-page .active-session-card {
+  border: 2px solid var(--jp-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(201, 222, 237, 0.22), transparent 48%),
+    var(--jp-paper);
+  color: var(--jp-ink);
+  box-shadow: var(--jp-shadow);
+}
+
+.jp-interview-page .mode-card,
+.jp-interview-page .weak-pick-row,
+.jp-interview-page .material-doc-row,
+.jp-interview-page .q-gen-item,
+.jp-interview-page .review-card {
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+
+.jp-interview-page .mode-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.jp-interview-page .mode-card > :not(.mode-puzzle-canvas) {
+  position: relative;
+  z-index: 1;
+}
+
+.jp-interview-page .mode-puzzle-canvas {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: -8px;
+  width: 116px;
+  height: 108px;
+  transform: translateY(-50%);
+  opacity: .58;
+  filter: drop-shadow(0 6px 8px rgba(40, 90, 122, .2));
+  pointer-events: none;
+}
+
+.jp-interview-page .mode-card:hover,
+.jp-interview-page .weak-pick-row:hover,
+.jp-interview-page .material-doc-row:hover,
+.jp-interview-page .q-gen-item:hover,
+.jp-interview-page .review-card:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  transform: translateY(-1px);
+}
+
+.jp-interview-page .mode-card__icon,
+.jp-interview-page .q-gen-item__num,
+.jp-interview-page .prepared-analysis-check {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .mode-card__title,
+.jp-interview-page .weak-pick-name,
+.jp-interview-page .active-session-card h3,
+.jp-interview-page .evaluation-guide__grid strong {
+  color: var(--jp-ink);
+}
+
+.jp-interview-page .mode-card__desc,
+.jp-interview-page .weak-pick-row p,
+.jp-interview-page .review-mini-label,
+.jp-interview-page .evaluation-guide summary small,
+.jp-interview-page .evaluation-guide__grid p,
+.jp-interview-page .prepared-analysis-card p,
+.jp-interview-page .active-analysis-copy p,
+.jp-interview-page .review-ready-card p,
+.jp-interview-page .active-session-heading p,
+.jp-interview-page .active-session-card p,
+.jp-interview-page .voice-input-row p {
+  color: var(--jp-text-secondary);
+  font-weight: 500;
+}
+
+.jp-interview-page .material-columns {
+  gap: 20px;
+}
+
+.jp-interview-page .material-select-intro,
+.jp-interview-page .material-column-title,
+.jp-interview-page .material-job-label,
+.jp-interview-page .material-doc-title,
+.jp-interview-page .material-doc-meta,
+.jp-interview-page .material-empty,
+.jp-interview-page .material-job-note {
+  color: var(--jp-ink);
+}
+
+.jp-interview-page .material-select-intro {
+  margin: 0 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.jp-interview-page .material-column-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.jp-interview-page .material-job-card {
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 2px solid var(--jp-line);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(75, 131, 168, .16), transparent 54%),
+    #C7D9E5;
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .material-job-label {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 12px;
+  padding: 5px 9px;
+  border: 2px solid var(--jp-blue-deep);
+  border-radius: 8px;
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .2);
+}
+
+.jp-interview-page .material-job-selects {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.jp-interview-page .material-job-selects .select-input {
+  min-width: 132px;
+  border-color: var(--jp-line);
+  background: var(--jp-paper);
+  color: var(--jp-ink);
+  font-size: 13px !important;
+  font-weight: 700;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, .14);
+}
+
+.jp-interview-page .material-job-selects .select-input:disabled {
+  border-color: var(--jp-line-soft);
+  background: #D9E1E5;
+  color: var(--jp-text-secondary);
+}
+
+.jp-interview-page .material-job-note {
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.65;
+}
+
+.jp-interview-page .material-doc-title {
+  margin: 0;
+  color: var(--jp-ink);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.jp-interview-page .material-doc-meta {
+  margin: 4px 0 0;
+  color: var(--jp-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.jp-interview-page .material-doc-row:not([data-toggle-doc]) .material-doc-meta {
+  color: var(--jp-danger) !important;
+}
+
+.jp-interview-page .material-empty {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.jp-interview-page .material-category {
+  padding: 18px;
+}
+
+.jp-interview-page .material-category:has(.material-doc-row.is-checked) {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  box-shadow: var(--jp-shadow);
+}
+
+.jp-interview-page .material-doc-row {
+  border: 2px solid var(--jp-line-soft);
+  border-radius: 10px;
+  background: var(--jp-paper-soft);
+  color: var(--jp-ink);
+}
+
+.jp-interview-page .material-doc-row.is-checked {
+  border-color: var(--jp-line);
+  background: #B8D3E4;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .18);
+}
+
+.jp-interview-page .material-doc-row:not(.is-checked)[data-toggle-doc]:hover {
+  border-color: var(--jp-warning);
+  background: #F3EBDD;
+}
+
+.jp-interview-page .material-doc-row.is-checked:hover {
+  border-color: var(--jp-blue-deep);
+  background: #A9C9DD;
+}
+
+.jp-interview-page .material-checkbox {
+  border-color: var(--jp-line-soft);
+}
+
+.jp-interview-page .material-doc-row.is-checked .material-checkbox {
+  border-color: var(--jp-blue-deep);
+  background: var(--jp-blue);
+}
+
+.jp-interview-page .material-register-btn,
+.jp-interview-page .review-sub-tabbar,
+.jp-interview-page .review-sub-tabbar button {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper);
+  color: var(--jp-text-secondary);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .material-register-btn:hover,
+.jp-interview-page .review-sub-tabbar button:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  color: var(--jp-blue-deep);
+}
+
+.jp-interview-page .material-register-btn--primary,
+.jp-interview-page .review-sub-tabbar button.is-active {
+  border-color: var(--jp-line);
+  background: var(--jp-blue);
+  color: #FFFFFF;
+}
+
+.jp-interview-page .q-gen-list {
+  gap: 9px;
+  border: 2px solid var(--jp-line);
+  border-radius: 14px;
+  background: var(--jp-paper-soft);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .q-gen-item {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper);
+  color: var(--jp-ink);
+}
+
+.jp-interview-page .q-gen-item.is-active {
+  border-color: var(--jp-line);
+  background: var(--jp-blue-soft);
+}
+
+.jp-interview-page .evaluation-guide {
+  overflow: hidden;
+}
+
+.jp-interview-page .evaluation-guide summary {
+  min-height: 72px;
+  color: var(--jp-ink);
+  background: var(--jp-paper);
+}
+
+.jp-interview-page .evaluation-guide summary > span {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.jp-interview-page .evaluation-puzzle-canvas {
+  width: 96px;
+  height: 58px;
+  margin: -12px auto;
+  flex: 0 0 auto;
+  opacity: .78;
+  filter: drop-shadow(0 5px 7px rgba(40, 90, 122, .18));
+  pointer-events: none;
+}
+
+.jp-interview-page .evaluation-guide summary::after {
+  color: var(--jp-blue-deep);
+  font-weight: 800;
+}
+
+.jp-interview-page .evaluation-guide__grid {
+  gap: 12px;
+  padding: 16px;
+  border-top: 2px solid var(--jp-line);
+  background: var(--jp-paper);
+}
+
+.jp-interview-page .evaluation-guide__grid article {
+  position: relative;
+  min-height: 132px;
+  padding: 18px;
+  border: 2px solid var(--jp-line-soft);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(201, 222, 237, .34), transparent 52%),
+    var(--jp-paper-soft);
+  box-shadow: var(--jp-shadow-small);
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+
+.jp-interview-page .evaluation-guide__grid article:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  transform: translateY(-2px);
+}
+
+.jp-interview-page .evaluation-guide__grid article strong {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 9px;
+  border: 2px solid var(--jp-blue);
+  border-radius: 8px;
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .18);
+}
+
+.jp-interview-page .evaluation-guide__grid article p {
+  margin-top: 12px;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.jp-interview-page .prepared-analysis-card {
+  border-left: 6px solid var(--jp-success);
+}
+
+.jp-interview-page .active-analysis-card,
+.jp-interview-page .review-ready-card {
+  border-left: 6px solid var(--jp-blue);
+}
+
+.jp-interview-page .analysis-attention-card {
+  border-color: #C99A93;
+  border-left: 6px solid var(--jp-danger);
+  background: #F6EAE7;
+}
+
+.jp-interview-page .active-analysis-card,
+.jp-interview-page .prepared-analysis-card,
+.jp-interview-page .analysis-attention-card,
+.jp-interview-page .review-ready-card {
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.jp-interview-page .active-analysis-card:hover,
+.jp-interview-page .prepared-analysis-card:hover,
+.jp-interview-page .analysis-attention-card:hover,
+.jp-interview-page .review-ready-card:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  box-shadow: 6px 7px 0 rgba(38, 59, 75, .18);
+  transform: translateY(-2px);
+}
+
+.jp-interview-page .prepared-analysis-actions .btn--outline {
+  border: 2px solid var(--jp-cyan);
+  background: var(--jp-cyan-soft);
+  color: #285F62;
+  box-shadow: 2px 3px 0 rgba(61, 143, 146, .2);
+}
+
+.jp-interview-page .prepared-analysis-actions .btn--outline:hover {
+  border-color: #285F62;
+  background: var(--jp-cyan);
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(40, 95, 98, .28);
+}
+
+.jp-interview-page .active-session-card {
+  border-left: 6px solid var(--jp-blue);
+}
+
+.jp-interview-page .active-session-section,
+.jp-interview-page .review-ready-section,
+.jp-interview-page .active-analysis-section,
+.jp-interview-page .analysis-attention-section,
+.jp-interview-page .prepared-analysis-section {
+  margin-top: 28px;
+  padding: 22px;
+  border: 2px solid var(--jp-line);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(201, 222, 237, .2), transparent 50%),
+    var(--jp-paper);
+  box-shadow: var(--jp-shadow);
+}
+
+.jp-interview-page .active-session-section .active-session-heading {
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.jp-interview-page .active-session-section .active-session-heading h2 {
+  color: var(--jp-ink);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.jp-interview-page .active-session-section .active-session-heading > span:not(.session-status-count) {
+  padding: 6px 10px;
+  border: 2px solid #6B6FA8;
+  border-radius: 8px;
+  background: #D9D9EA;
+  color: #464B82;
+  box-shadow: 2px 3px 0 rgba(70, 75, 130, .18);
+}
+
+.jp-interview-page .active-session-section .active-session-card {
+  background: var(--jp-paper-soft);
+}
+
+.jp-interview-page .active-session-section .active-session-mode {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 2px solid #6B6FA8;
+  border-radius: 7px;
+  background: #D9D9EA;
+  color: #464B82;
+  font-weight: 800;
+  box-shadow: 2px 3px 0 rgba(70, 75, 130, .16);
+}
+
+.jp-interview-page .active-session-section .active-session-actions .btn {
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .active-session-card.mode-weakness-review {
+  border-left-color: var(--jp-warning);
+}
+
+.jp-interview-page .active-session-card.mode-company-fit {
+  border-left-color: #6B6FA8;
+}
+
+.jp-interview-page .active-session-card:hover,
+.jp-interview-page .active-session-card:focus-within,
+.jp-interview-page .active-session-card:focus {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+  box-shadow: var(--jp-shadow);
+}
+
+.jp-interview-page .question-selection-dialog {
+  border: 2px solid var(--jp-line);
+  background: var(--jp-paper);
+  color: var(--jp-ink);
+  box-shadow: 7px 9px 0 rgba(23, 40, 58, 0.22);
+}
+
+.jp-interview-page .question-selection-dialog > footer {
+  border-top: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper-soft);
+}
+
+.jp-interview-page .question-selection-dialog header p,
+.jp-interview-page .question-selection-dialog footer span {
+  color: var(--jp-text-secondary);
+}
+
+.jp-interview-page .question-selection-close {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper-soft);
+  color: var(--jp-ink);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .question-selection-close:hover {
+  border-color: var(--jp-danger);
+  background: #F0E2DE;
+  color: var(--jp-danger);
+}
+
+.jp-interview-page .material-review-dialog > header {
+  border-bottom: 2px solid var(--jp-line-soft);
+  background: linear-gradient(135deg, #F6F2E9 0%, #E6EFF3 100%);
+}
+
+.jp-interview-page .material-review-dialog h2 {
+  color: #132B3E;
+  font-size: 23px;
+  font-weight: 900;
+}
+
+.jp-interview-page .material-review-dialog header p {
+  color: #29475E;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.jp-interview-page .material-review-dialog .question-selection-mode {
+  display: inline-flex;
+  padding: 5px 9px;
+  border: 2px solid #53689D;
+  border-radius: 8px;
+  background: #D9DDEA;
+  color: #354778;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(53, 71, 120, .16);
+}
+
+.jp-interview-page .material-review-dialog .question-selection-close {
+  border: 2px solid #B94343;
+  background: #FFF3F1;
+  color: #B12E2E;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(177, 46, 46, .18);
+}
+
+.jp-interview-page .material-review-dialog .question-selection-close:hover {
+  border-color: #982323;
+  background: #C83D3D;
+  color: #FFFFFF;
+  box-shadow: 3px 4px 0 rgba(125, 27, 27, .24);
+  transform: translateY(-1px);
+}
+
+.jp-interview-page .material-review-scroll {
+  padding-top: 20px;
+  background: #F8F4EB;
+}
+
+.jp-interview-page .material-review-lead {
+  margin: 0 0 6px;
+  color: #142C3E;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.jp-interview-page .material-review-description {
+  margin: 0 0 18px;
+  color: #304D62;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.jp-interview-page .material-review-job {
+  margin-bottom: 20px;
+  padding: 15px 16px;
+  border: 2px solid #547A95;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #DCE9EF 0%, #C5D9E3 100%);
+  box-shadow: 3px 4px 0 rgba(45, 79, 102, .17);
+}
+
+.jp-interview-page .material-review-job-label {
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 3px 7px;
+  border: 1px solid #547A95;
+  border-radius: 6px;
+  background: #EEF5F7;
+  color: #23475F;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.jp-interview-page .material-review-job-value {
+  margin: 0;
+  color: #102C40;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.jp-interview-page .material-review-group {
+  margin-bottom: 18px;
+}
+
+.jp-interview-page .material-review-group-title {
+  width: fit-content;
+  margin: 0 0 9px;
+  padding: 4px 9px;
+  border: 2px solid #6A789D;
+  border-radius: 7px;
+  background: #DEE1EA;
+  color: #354367;
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(53, 67, 103, .14);
+}
+
+.jp-interview-page .material-review-content .material-review-item {
+  margin-bottom: 9px;
+  padding: 13px 16px;
+  border: 2px solid #8299AA;
+  background: #F7FAFA;
+  box-shadow: 2px 3px 0 rgba(46, 72, 91, .13);
+}
+
+.jp-interview-page .material-review-item-name {
+  margin: 0;
+  color: #142C3E;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.jp-interview-page .material-review-item-version {
+  margin: 5px 0 0;
+  color: #36566D;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.jp-interview-page .material-review-dialog > footer .btn-sm {
+  border: 2px solid #B94343;
+  background: #FFF3F1;
+  color: #A92D2D;
+  font-weight: 800;
+  box-shadow: 2px 3px 0 rgba(169, 45, 45, .16);
+  transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.jp-interview-page .material-review-dialog > footer .btn-sm:hover {
+  border-color: #982323;
+  background: #C83D3D;
+  color: #FFFFFF;
+  box-shadow: 3px 4px 0 rgba(125, 27, 27, .22);
+  transform: translateY(-1px);
+}
+
+.jp-interview-page .live-interview-card textarea {
+  border: 2px solid var(--jp-line-soft);
+  background: #FFFFFF;
+  color: var(--jp-ink);
+}
+
+.jp-interview-page .live-interview-card textarea:focus {
+  border-color: var(--jp-blue);
+  outline: 3px solid rgba(75, 131, 168, .15);
+}
+
+.jp-interview-page .voice-input-button {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper);
+  color: var(--jp-blue-deep);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .voice-input-button:hover:not(:disabled) {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+}
+
+.jp-interview-page .voice-input-button.is-listening {
+  border-color: #8E332D;
+  background: #B5433D;
+  color: #FFFFFF;
+}
+
+.jp-interview-page #material-register-cancel {
+  border-color: #C99A93 !important;
+  background: #F0E2DE;
+  color: var(--jp-danger);
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, .14);
+}
+
+.jp-interview-page #material-register-cancel:hover {
+  border-color: #8E332D !important;
+  background: #B5433D;
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, .25);
+}
+
+.jp-interview-page .file-input {
+  border: 2px dashed var(--jp-blue);
+  background: var(--jp-paper-blue);
+  color: var(--jp-ink);
+}
+
+@media (max-width: 700px) {
+  .jp-interview-page .mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-interview-page .prepared-analysis-card,
+  .jp-interview-page .active-analysis-card,
+  .jp-interview-page .analysis-attention-card,
+  .jp-interview-page .review-ready-card {
+    align-items: stretch;
+  }
+
+  .jp-interview-page .evaluation-puzzle-canvas {
+    width: 72px;
+    height: 46px;
+}
 }

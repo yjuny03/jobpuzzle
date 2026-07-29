@@ -10,6 +10,14 @@
   var versionLabel = DF.versionLabel;
   var statusLabel = DF.statusLabel;
 
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    window.alert(message);
+    return null;
+  }
+
   var state = {
     tab: 'docs',
     categoryFilter: 'all',
@@ -73,7 +81,7 @@
       renderDocsList();
       renderDocsPagination();
       if (state.tab === 'extract') renderExtractNav();
-    }).catch(function (e) { alert(e.message); });
+    }).catch(function (e) { notify('error', e.message); });
   }
 
   function renderDocsList() {
@@ -139,7 +147,7 @@
     function jumpToPage() {
       var input = document.getElementById('page-jump-input');
       var target = parseInt(input.value, 10);
-      if (!target || target < 1 || target > total) { alert('1~' + total + ' 사이의 페이지 번호를 입력해주세요.'); return; }
+      if (!target || target < 1 || target > total) { notify('warning', '1~' + total + ' 사이의 페이지 번호를 입력해주세요.'); return; }
       state.docsPage = target - 1;
       loadDocuments();
     }
@@ -154,7 +162,7 @@
     state.selectedDocumentId = documentId;
     switchToExtractTab();
     renderExtractNav();
-    extractPanel.load(documentId).catch(function (e) { alert(e.message); });
+    extractPanel.load(documentId).catch(function (e) { notify('error', e.message); });
   }
 
   function renderExtractNav() {
@@ -254,32 +262,34 @@
     document.getElementById('register-submit').addEventListener('click', function () {
       var category = state.registerCategory;
       var name = document.getElementById('register-name').value.trim();
-      if (!category || !name) { alert('자료 종류와 자료명을 입력해주세요.'); return; }
+      if (!category || !name) { notify('warning', '자료 종류와 자료명을 입력해주세요.'); return; }
 
       if (state.registerMethod === 'file') {
         var files = state.registerFiles;
-        if (!files.length) { alert('파일을 선택해주세요.'); return; }
+        if (!files.length) { notify('warning', '파일을 선택해주세요.'); return; }
         var keepOriginal = document.getElementById('register-keep-original').checked;
         DF.registerDocument({ method: 'file', category: category, name: name, files: files, keepOriginal: keepOriginal })
           .then(function (doc) {
             document.getElementById('register-modal').hidden = true;
             state.docsPage = 0;
+            notify('success', '자료를 등록했습니다.');
             loadDocuments();
             selectDocument(doc.documentId);
             DF.pollExtraction(doc.documentId, function () {
               loadDocuments();
               if (state.selectedDocumentId === doc.documentId) extractPanel.reload();
             });
-          }).catch(function (e) { alert(e.message); });
+          }).catch(function (e) { notify('error', e.message); });
       } else {
         var content = document.getElementById('register-content').value.trim();
-        if (!content) { alert('내용을 입력해주세요.'); return; }
+        if (!content) { notify('warning', '내용을 입력해주세요.'); return; }
         DF.registerDocument({ method: 'text', category: category, name: name, content: content })
           .then(function (doc) {
             document.getElementById('register-modal').hidden = true;
             state.docsPage = 0;
+            notify('success', '자료를 등록했습니다.');
             loadDocuments().then(function () { selectDocument(doc.documentId); });
-          }).catch(function (e) { alert(e.message); });
+          }).catch(function (e) { notify('error', e.message); });
       }
     });
   }
@@ -327,8 +337,9 @@
       api('/documents/' + id, { method: 'DELETE' }).then(function () {
         document.getElementById('delete-modal').hidden = true;
         if (state.selectedDocumentId === id) { state.selectedDocumentId = null; extractPanel.clear(); }
+        notify('success', '자료를 삭제했습니다.');
         loadDocuments();
-      }).catch(function (e) { alert(e.message); document.getElementById('delete-modal').hidden = true; });
+      }).catch(function (e) { notify('error', e.message); document.getElementById('delete-modal').hidden = true; });
     });
   }
 

@@ -1,6 +1,14 @@
 (function () {
   'use strict';
 
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    window.alert(message);
+    return null;
+  }
+
   var params = new URLSearchParams(window.location.search);
   var analysisCaseId = params.get('analysisCaseId');
   var resumeSessionId = params.get('resumeSessionId');
@@ -307,7 +315,7 @@
     )
       .map(function (input) { return Number(input.value); });
     if (!selected.length) {
-      alert('질문을 하나 이상 선택해주세요.');
+      notify('warning', '질문을 하나 이상 선택해주세요.');
       return;
     }
     closeSelectionModal(true);
@@ -426,7 +434,7 @@
         messageText: text
       });
       if (result.evaluationFailed) {
-        alert(result.summary);
+        notify('warning', result.summary);
       }
       if (result.followUpQuestion) {
         followUpMessageId = result.followUpQuestionMessageId;
@@ -450,7 +458,7 @@
     }).catch(function (error) {
       button.disabled = false;
       button.textContent = '다시 제출';
-      alert(error.message);
+      notify('error', error.message);
     });
   }
 
@@ -505,7 +513,7 @@
     activeSection.innerHTML =
       '<div class="active-session-heading"><div><h2>진행 중인 면접</h2>' +
       '<p>새 모드를 선택하거나, 저장된 위치에서 이어갈 수 있습니다.</p></div>' +
-      '<span>' + items.length + '개 진행 중</span></div>' +
+      '<span class="session-status-count is-interview">' + items.length + '개 진행 중</span></div>' +
       '<div class="active-session-list">' + pageItems(items, 'activeSessions').map(function (item) {
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR', {
           month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -527,9 +535,8 @@
           '<h3>' + esc(item.questionCount) + '개 질문으로 진행 중</h3>' +
           '<p>' + esc(created) + (item.targetWeaknessTag ? ' · #' + esc(item.targetWeaknessTag) : '') + '</p></div>' +
           '<div class="active-session-actions">' +
-          (item.analysisCaseId ? '<a class="btn btn--outline" href="/api/analysis/' +
-          encodeURIComponent(item.analysisCaseId) + '?fromSession=' +
-          encodeURIComponent(item.sessionId) + '">분석 결과 보기</a>' : '') +
+          (item.analysisCaseId ? '<a class="btn btn--outline" href="/analysis-results/' +
+          encodeURIComponent(item.analysisCaseId) + '">분석 결과 보기</a>' : '') +
           '<button class="btn btn--primary" data-resume-session="' +
           item.sessionId + '">이어서 진행</button>' +
           (item.answerSubmitted ? '' : '<button class="btn btn--ghost" data-cancel-session="' +
@@ -556,7 +563,7 @@
         if (!window.confirm('답변을 제출하지 않은 세션만 취소할 수 있습니다. 취소할까요?')) return;
         api('/api/interview-sessions/' + button.dataset.cancelSession + '/cancel', { method: 'POST' })
           .then(function () { activeSection.remove(); activeSection = null; loadActiveSessions(); })
-          .catch(function (error) { alert(error.message); });
+          .catch(function (error) { notify('error', error.message); });
       });
     });
     bindPagination(activeSection, 'activeSessions', function () {
@@ -583,7 +590,7 @@
     reviewSection.innerHTML =
       '<div class="active-session-heading"><div><h2>결과 검토 중인 면접</h2>' +
       '<p>선택한 질문의 답변은 끝났습니다. 남은 질문을 더 연습하거나 현재 결과를 확정할 수 있어요.</p></div>' +
-      '<span>' + items.length + '개 검토 중</span></div><div class="review-ready-list">' +
+      '<span class="session-status-count is-review">' + items.length + '개 검토 중</span></div><div class="review-ready-list">' +
       pageItems(items, 'reviewSessions').map(function (item) {
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
         return '<article class="review-ready-card"><div><span>' + esc(modeLabel(item.mode)) +
@@ -636,7 +643,7 @@
     analysisSection.innerHTML =
       '<div class="active-session-heading"><div><h2>진행 중인 맞춤 분석</h2>' +
       '<p>자료를 분석하는 동안 다른 화면을 이용해도 괜찮아요.</p></div>' +
-      '<span>' + items.length + '개 확인 중</span></div>' +
+      '<span class="session-status-count is-analyzing">' + items.length + '개 확인 중</span></div>' +
       '<div class="active-analysis-list">' + pageItems(items, 'activeAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         var steps = analysisStages(item);
@@ -677,7 +684,7 @@
     analysisAttentionSection.innerHTML =
       '<div class="active-session-heading"><div><h2>분석 확인 필요</h2>' +
       '<p>멈춘 분석입니다. 선택한 자료와 앞선 분석 결과는 보존되어 있어요.</p></div>' +
-      '<span>' + items.length + '개 확인 필요</span></div>' +
+      '<span class="session-status-count is-attention">' + items.length + '개 확인 필요</span></div>' +
       '<div class="analysis-attention-list">' + pageItems(items, 'failedAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         return '<article class="analysis-attention-card">' +
@@ -703,7 +710,7 @@
     preparedAnalysisSection.innerHTML =
       '<div class="active-session-heading"><div><h2>면접 질문이 준비된 맞춤 분석</h2>' +
       '<p>분석 결과를 다시 확인하거나, 준비된 질문으로 면접을 이어갈 수 있어요.</p></div>' +
-      '<span>' + items.length + '개 준비됨</span></div>' +
+      '<span class="session-status-count is-prepared prepared-analysis-count">' + items.length + '개 준비됨</span></div>' +
       '<div class="prepared-analysis-list">' + pageItems(items, 'preparedAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
@@ -715,7 +722,7 @@
           '<div class="prepared-analysis-copy" tabindex="0"><span>분석 완료</span><h3>' + esc(label) + '</h3>' +
           '<p>' + esc(created) + ' · ' + esc(item.careerLevel || '경력 기준 미지정') + '</p>' +
           '<small class="prepared-analysis-detail">' + esc(detail) + '</small></div>' +
-          '<div class="prepared-analysis-actions"><a class="btn btn--outline" href="/api/analysis/' +
+          '<div class="prepared-analysis-actions"><a class="btn btn--outline" href="/analysis-results/' +
           encodeURIComponent(item.analysisCaseId) + '">분석 결과 보기</a>' +
           '<a class="btn btn--primary" href="/interview.html?analysisCaseId=' +
           encodeURIComponent(item.analysisCaseId) + '">질문 선택</a></div></article>';
