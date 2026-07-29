@@ -15,6 +15,9 @@ public class AnalysisResultResponse {
     private CandidateMaterialAnalysisResult candidateMaterialAnalysis; private GuideContextResultDto guideContext;
     private Readiness readiness; private List<RequirementMatch> requirementMatches; private List<ActionPlan> actionPlans;
     private QuestionSet questionSet;
+    private boolean interviewStartAllowed;
+    private Long linkedSessionId;
+    private String linkedSessionStatus;
     @Getter @Builder public static class JobCategory { private String mainCategory; private String subCategory; private String careerLevel; }
     @Getter @Builder public static class Readiness { private String status; private boolean canGenerateQuestions; private String reason; private List<String> limitations; }
     @Getter @Builder public static class RequirementMatch { private Long matchId; private String requirementId; private String requirementType; private String requirement; private Object postingSourceRefs; private String candidateEvidence; private Object candidateSourceRefs; private String matchLevel; private String reason; private String missingPoint; }

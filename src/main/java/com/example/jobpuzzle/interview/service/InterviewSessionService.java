@@ -44,11 +44,14 @@ public class InterviewSessionService {
     @Transactional(readOnly = true)
     public InterviewModeAvailabilityResponse getAvailableModes(Long userId) {
         boolean companyFitAvailable = questionSetRepository
-                .existsByUser_UserIdAndInterviewModeAndStatus(
+                .findByUser_UserIdAndInterviewModeAndStatus(
                         userId,
                         InterviewSessionMode.COMPANY_FIT,
                         QuestionSetStatus.ACTIVE
-                );
+                )
+                .stream()
+                .anyMatch(questionSet -> !interviewSessionRepository
+                        .existsByQuestionSet_QuestionSetId(questionSet.getQuestionSetId()));
         boolean weaknessAvailable = weaknessTagStatusRepository
                 .existsByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED);
         return InterviewModeAvailabilityResponse.builder()
@@ -189,9 +192,8 @@ public class InterviewSessionService {
         if (!questionSet.isActive()) {
             throw new CustomException(ErrorCode.QUESTION_SET_NOT_READY);
         }
-        if (interviewSessionRepository.existsByQuestionSet_QuestionSetIdAndStatusIn(
-                questionSet.getQuestionSetId(),
-                UNFINISHED_STATUSES
+        if (interviewSessionRepository.existsByQuestionSet_QuestionSetId(
+                questionSet.getQuestionSetId()
         )) {
             throw new CustomException(ErrorCode.INTERVIEW_SESSION_ALREADY_EXISTS);
         }

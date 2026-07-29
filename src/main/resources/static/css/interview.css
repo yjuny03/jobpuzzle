@@ -1100,3 +1100,46 @@
   .active-session-card,
   .active-session-insight { transition: none; }
 }
+.section-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.section-pagination button {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #5b6370;
+  cursor: pointer;
+}
+
+.section-pagination button.is-active {
+  border-color: #1769aa;
+  background: #1769aa;
+  color: #fff;
+  font-weight: 700;
+}
+
+.q-gen-item--detailed {
+  align-items: flex-start;
+}
+
+.q-gen-item__content {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+}
+
+.q-gen-item__content small {
+  color: #5b6370;
+  line-height: 1.55;
+}
+
+.q-gen-item__content small b {
+  color: #245986;
+  margin-right: 10px;
+}

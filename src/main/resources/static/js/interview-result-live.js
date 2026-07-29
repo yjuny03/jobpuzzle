@@ -390,7 +390,7 @@
         ? '<button id="open-remaining-questions" class="btn btn--outline">남은 질문 ' +
           remainingQuestions.length + '개 추가</button>'
         : '<span class="interim-actions__done">준비된 질문을 모두 선택했습니다</span>') +
-      '<button id="finalize-session" class="btn btn--primary">이대로 리포트 확정</button></div>';
+      '<button id="finalize-session" class="btn btn--primary">면접 끝내고 리포트 확정</button></div>';
     var addButton = document.getElementById('open-remaining-questions');
     if (addButton) addButton.addEventListener('click', openRemainingModal);
     document.getElementById('finalize-session').addEventListener('click', finalizeSession);
@@ -444,17 +444,23 @@
       remainingQuestions = values[3] || [];
       renderSession(values[1], values[2]);
       if (sessionInfo.status !== 'COMPLETED') {
+        var finalTabButton = document.querySelector('.tabbar__btn[data-tab="final"]');
+        var finalPanel = document.querySelector('.tab-panel[data-panel="final"]');
+        if (finalTabButton) finalTabButton.remove();
+        if (finalPanel) finalPanel.remove();
         var listTabButton = document.querySelector('.tabbar__btn[data-tab="list"]');
         if (listTabButton) listTabButton.click();
+      } else {
+        api('/api/final-report/sessions/' + sessionId)
+          .then(renderFinalReport)
+          .catch(function (error) {
+            document.getElementById('final-report-panel').innerHTML =
+              '<p class="result-empty-copy">' + esc(error.message) + '</p>';
+          });
       }
     }).catch(function (error) {
       document.getElementById('overall-score-label').textContent = error.message;
     });
 
-    // 최종 리포트는 별도 호출로 분리
-    api('/api/final-report/sessions/' + sessionId).then(renderFinalReport).catch(function (error) {
-      document.getElementById('final-report-panel').innerHTML =
-        '<p class="result-empty-copy">' + esc(error.message) + '</p>';
-    });
   });
 })();

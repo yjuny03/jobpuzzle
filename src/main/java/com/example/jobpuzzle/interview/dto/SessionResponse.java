@@ -15,6 +15,7 @@ public class SessionResponse {
     private InterviewSessionMode mode;
     private InterviewSessionStatus status;
     private Long questionSetId;
+    private Long analysisCaseId;
     private Long jobCategoryId;
     private String careerLevel;
     private int questionCount;
@@ -56,6 +57,7 @@ public class SessionResponse {
                 .mode(session.getMode())
                 .status(session.getStatus())
                 .questionSetId(session.getQuestionSet().getQuestionSetId())
+                .analysisCaseId(resolveAnalysisCaseId(session))
                 .jobCategoryId(session.getJobCategory().getJobCategoryId())
                 .careerLevel(session.getCareerLevel().name())
                 .questionCount(questionCount)
@@ -72,6 +74,14 @@ public class SessionResponse {
                 .completedAt(session.getCompletedAt())
                 .canceledAt(session.getCanceledAt())
                 .build();
+    }
+
+    private static Long resolveAnalysisCaseId(InterviewSession session) {
+        if (session.getQuestionSet().getSnapshot() == null
+                || session.getQuestionSet().getSnapshot().getAnalysisCase() == null) {
+            return null;
+        }
+        return session.getQuestionSet().getSnapshot().getAnalysisCase().getAnalysisCaseId();
     }
 
     public SessionResponse withReviewReady(boolean value) {

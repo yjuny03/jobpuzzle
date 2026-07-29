@@ -23,6 +23,37 @@
   var speechListening = false;
   var selectionModal = null;
   var selectionHistoryActive = false;
+  var PAGE_SIZE = 5;
+  var sectionPages = {};
+
+  function pageItems(items, key) {
+    var pageCount = Math.max(1, Math.ceil((items || []).length / PAGE_SIZE));
+    var page = Math.min(sectionPages[key] || 1, pageCount);
+    sectionPages[key] = page;
+    return (items || []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }
+
+  function paginationHtml(items, key) {
+    var pageCount = Math.ceil((items || []).length / PAGE_SIZE);
+    if (pageCount <= 1) return '';
+    var current = sectionPages[key] || 1;
+    var buttons = '';
+    for (var page = 1; page <= pageCount; page += 1) {
+      buttons += '<button type="button" class="' + (page === current ? 'is-active' : '') +
+        '" data-page-key="' + key + '" data-page="' + page + '" aria-label="' + page +
+        '페이지">' + page + '</button>';
+    }
+    return '<nav class="section-pagination" aria-label="목록 페이지">' + buttons + '</nav>';
+  }
+
+  function bindPagination(section, key, render) {
+    section.querySelectorAll('[data-page-key="' + key + '"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        sectionPages[key] = Number(button.dataset.page);
+        render();
+      });
+    });
+  }
 
   function esc(value) {
     var element = document.createElement('div');
@@ -61,6 +92,27 @@
     if (mode === 'BASIC') return '기본 질문';
     if (mode === 'COMPANY_FIT') return '회사 맞춤';
     return '약점 보완';
+  }
+
+  function focusLabels(value) {
+    var labels = {
+      intentMatch: '질문 의도 이해',
+      specificity: '경험 구체성',
+      ownRole: '본인 역할',
+      problemSolving: '문제 해결 과정',
+      resultExpression: '성과 및 결과 표현',
+      requirementConnection: '공고 요구사항 연결',
+      guideAlignment: '직무 가이드 적합',
+      deliveryClarity: '답변 전달력'
+    };
+    var items = Array.isArray(value)
+      ? value
+      : value && typeof value === 'object'
+        ? Object.keys(value).map(function (key) { return value[key]; })
+        : value ? [value] : [];
+    return items.length
+      ? items.map(function (item) { return labels[item] || item; }).join(' · ')
+      : '질문의 의도와 답변 근거';
   }
 
   function hideActiveSection() {
@@ -203,10 +255,14 @@
 
   function renderSelection() {
     var rows = questionSet.questions.map(function (question) {
-      return '<label class="q-gen-item" style="cursor:pointer;">' +
+      return '<label class="q-gen-item q-gen-item--detailed" style="cursor:pointer;">' +
         '<input type="checkbox" name="question" value="' + question.questionId + '" checked>' +
         '<span class="q-gen-item__num">' + question.displayOrder + '</span>' +
-        '<span class="q-gen-item__text">' + esc(question.question) + '</span></label>';
+        '<span class="q-gen-item__content"><strong class="q-gen-item__text">' +
+        esc(question.question) + '</strong><small><b>이 질문의 의도</b>' +
+        esc(question.intent || '답변의 구체적인 근거와 본인 역할을 확인합니다.') +
+        '</small><small><b>집중 평가 기준</b>' +
+        esc(focusLabels(question.evaluationFocus)) + '</small></span></label>';
     }).join('');
     if (window.InterviewPage && window.InterviewPage.showModes) window.InterviewPage.showModes();
     if (activeSection) activeSection.hidden = false;
@@ -274,6 +330,11 @@
   }
 
   function resumeSession(active) {
+    if (active.status === 'COMPLETED') {
+      window.location.replace('/interview-result.html?sessionId=' +
+        encodeURIComponent(active.sessionId));
+      return;
+    }
     hideActiveSection();
     session = active;
     api('/api/interview-sessions/' + session.sessionId + '/questions').then(function (items) {
@@ -299,7 +360,7 @@
     followUpMessageId = question.pendingFollowUpMessageId || null;
     var followUpCount = question.followUpCount || 0;
     var hasAnyAnswer = questions.some(function (item) { return item.answerSubmitted; });
-    var actionLabel = hasAnyAnswer ? '여기서 면접 완료' : '답변 전 세션 취소';
+    var actionLabel = hasAnyAnswer ? '선택한 질문 답변 마치기' : '답변 전 세션 취소';
     var submitLabel = followUpMessageId ? '심화 답변 제출' : '첫 답변 제출';
     var conversation = (question.conversation || []).filter(function (item) {
       return item.messageType !== 'ORIGINAL_QUESTION';
@@ -436,6 +497,8 @@
 
   function renderActiveSessions(items) {
     activeSessions = items || [];
+    if (activeSection) activeSection.remove();
+    activeSection = null;
     if (!items || !items.length || analysisCaseId) return;
     activeSection = document.createElement('section');
     activeSection.className = 'active-session-section';
@@ -443,7 +506,7 @@
       '<div class="active-session-heading"><div><h2>진행 중인 면접</h2>' +
       '<p>새 모드를 선택하거나, 저장된 위치에서 이어갈 수 있습니다.</p></div>' +
       '<span>' + items.length + '개 진행 중</span></div>' +
-      '<div class="active-session-list">' + items.map(function (item) {
+      '<div class="active-session-list">' + pageItems(items, 'activeSessions').map(function (item) {
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR', {
           month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
         }) : '';
@@ -463,7 +526,11 @@
           esc(modeLabel(item.mode)) + '</span>' +
           '<h3>' + esc(item.questionCount) + '개 질문으로 진행 중</h3>' +
           '<p>' + esc(created) + (item.targetWeaknessTag ? ' · #' + esc(item.targetWeaknessTag) : '') + '</p></div>' +
-          '<div class="active-session-actions"><button class="btn btn--primary" data-resume-session="' +
+          '<div class="active-session-actions">' +
+          (item.analysisCaseId ? '<a class="btn btn--outline" href="/api/analysis/' +
+          encodeURIComponent(item.analysisCaseId) + '?fromSession=' +
+          encodeURIComponent(item.sessionId) + '">분석 결과 보기</a>' : '') +
+          '<button class="btn btn--primary" data-resume-session="' +
           item.sessionId + '">이어서 진행</button>' +
           (item.answerSubmitted ? '' : '<button class="btn btn--ghost" data-cancel-session="' +
           item.sessionId + '">답변 전 취소</button>') + '</div>' +
@@ -474,7 +541,7 @@
           item.questionCount + '</dd></div><div><dt>답변 단계</dt><dd>' + displayDepth +
           ' / 최대 3단계</dd></div><div><dt>현재 위치</dt><dd>' + esc(qaLabel) +
           '</dd></div></dl></div></article>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + paginationHtml(items, 'activeSessions');
     root.insertAdjacentElement('afterend', activeSection);
     activeSection.querySelectorAll('[data-resume-session]').forEach(function (button) {
       button.addEventListener('click', function () {
@@ -491,6 +558,9 @@
           .then(function () { activeSection.remove(); activeSection = null; loadActiveSessions(); })
           .catch(function (error) { alert(error.message); });
       });
+    });
+    bindPagination(activeSection, 'activeSessions', function () {
+      renderActiveSessions(activeSessions);
     });
   }
 
@@ -514,15 +584,18 @@
       '<div class="active-session-heading"><div><h2>결과 검토 중인 면접</h2>' +
       '<p>선택한 질문의 답변은 끝났습니다. 남은 질문을 더 연습하거나 현재 결과를 확정할 수 있어요.</p></div>' +
       '<span>' + items.length + '개 검토 중</span></div><div class="review-ready-list">' +
-      items.map(function (item) {
+      pageItems(items, 'reviewSessions').map(function (item) {
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
         return '<article class="review-ready-card"><div><span>' + esc(modeLabel(item.mode)) +
           '</span><h3>' + esc(item.completedQuestionCount) + '개 질문 답변 완료</h3><p>' +
           esc(created) + '</p></div><a class="btn btn--primary" href="/interview-result.html?sessionId=' +
           encodeURIComponent(item.sessionId) + '">중간 결과 확인</a></article>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + paginationHtml(items, 'reviewSessions');
     var anchor = activeSection || root;
     anchor.insertAdjacentElement('afterend', reviewSection);
+    bindPagination(reviewSection, 'reviewSessions', function () {
+      renderReviewReadySessions(items);
+    });
   }
 
   function analysisStatusLabel(status) {
@@ -564,7 +637,7 @@
       '<div class="active-session-heading"><div><h2>진행 중인 맞춤 분석</h2>' +
       '<p>자료를 분석하는 동안 다른 화면을 이용해도 괜찮아요.</p></div>' +
       '<span>' + items.length + '개 확인 중</span></div>' +
-      '<div class="active-analysis-list">' + items.map(function (item) {
+      '<div class="active-analysis-list">' + pageItems(items, 'activeAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         var steps = analysisStages(item);
         var completed = steps.filter(function (stage) { return stage.status === 'SUCCEEDED'; }).length;
@@ -586,9 +659,12 @@
           '<ol class="active-analysis-stages">' + detail + '</ol>' +
           '<div class="active-analysis-progress" aria-label="분석 진행률 ' + progress + '%"><i style="width:' + progress + '%"></i></div></div>' +
           '<a class="btn btn--primary" href="/api/analysis/' + item.analysisCaseId + '">상태 확인</a></article>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + paginationHtml(items, 'activeAnalyses');
     var anchor = activeSection || root;
     anchor.insertAdjacentElement('afterend', analysisSection);
+    bindPagination(analysisSection, 'activeAnalyses', function () {
+      renderActiveAnalyses(items);
+    });
   }
 
   function renderAnalysisAttention(items) {
@@ -602,7 +678,7 @@
       '<div class="active-session-heading"><div><h2>분석 확인 필요</h2>' +
       '<p>멈춘 분석입니다. 선택한 자료와 앞선 분석 결과는 보존되어 있어요.</p></div>' +
       '<span>' + items.length + '개 확인 필요</span></div>' +
-      '<div class="analysis-attention-list">' + items.map(function (item) {
+      '<div class="analysis-attention-list">' + pageItems(items, 'failedAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         return '<article class="analysis-attention-card">' +
           '<div class="analysis-attention-visual" aria-hidden="true">!</div>' +
@@ -610,9 +686,12 @@
           '<h3>' + esc(label) + '</h3><p>' + esc(item.userMessage || '분석 결과를 생성하지 못했어요.') + '</p>' +
           '<small>자료를 다시 선택하지 않아도 상태 화면에서 다시 실행할 수 있습니다.</small></div>' +
           '<a class="btn btn--outline" href="/api/analysis/' + encodeURIComponent(item.analysisCaseId) + '">상태 확인</a></article>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + paginationHtml(items, 'failedAnalyses');
     var anchor = analysisSection || activeSection || root;
     anchor.insertAdjacentElement('afterend', analysisAttentionSection);
+    bindPagination(analysisAttentionSection, 'failedAnalyses', function () {
+      renderAnalysisAttention(items);
+    });
   }
 
   function renderPreparedAnalyses(items) {
@@ -625,7 +704,7 @@
       '<div class="active-session-heading"><div><h2>면접 질문이 준비된 맞춤 분석</h2>' +
       '<p>분석 결과를 다시 확인하거나, 준비된 질문으로 면접을 이어갈 수 있어요.</p></div>' +
       '<span>' + items.length + '개 준비됨</span></div>' +
-      '<div class="prepared-analysis-list">' + items.map(function (item) {
+      '<div class="prepared-analysis-list">' + pageItems(items, 'preparedAnalyses').map(function (item) {
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
         var sourceNames = (item.sources || []).map(function (source) {
@@ -640,9 +719,12 @@
           encodeURIComponent(item.analysisCaseId) + '">분석 결과 보기</a>' +
           '<a class="btn btn--primary" href="/interview.html?analysisCaseId=' +
           encodeURIComponent(item.analysisCaseId) + '">질문 선택</a></div></article>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + paginationHtml(items, 'preparedAnalyses');
     var anchor = analysisAttentionSection || analysisSection || activeSection || root;
     anchor.insertAdjacentElement('afterend', preparedAnalysisSection);
+    bindPagination(preparedAnalysisSection, 'preparedAnalyses', function () {
+      renderPreparedAnalyses(items);
+    });
   }
 
   function loadActiveAnalyses() {
@@ -696,18 +778,6 @@
     }).catch(function () {});
   }
 
-  function bindResultTabGuard() {
-    var tab = document.getElementById('interview-result-tab');
-    if (!tab) return;
-    tab.addEventListener('click', function (event) {
-      if (!session || !root.querySelector('.live-interview-card')) return;
-      var shouldLeave = window.confirm(
-        '진행 중인 면접이 있습니다.\n\n작성한 내용은 저장되어 있어 나중에 이어서 진행할 수 있습니다. 답변 평가 화면으로 이동할까요?'
-      );
-      if (!shouldLeave) event.preventDefault();
-    });
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
     root = document.getElementById('step-root');
     var evaluationGuide = document.getElementById('evaluation-guide');
@@ -729,7 +799,6 @@
         }, 0);
       }
     }
-    bindResultTabGuard();
   });
   window.addEventListener('popstate', function () {
     if (!selectionModal) return;

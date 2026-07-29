@@ -6,10 +6,16 @@ import com.example.jobpuzzle.interview.entity.QuestionSetStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface QuestionSetRepository extends JpaRepository<QuestionSet, Long> {
     Optional<QuestionSet> findByQuestionSetIdAndUser_UserId(Long questionSetId, Long userId);
     boolean existsByUser_UserIdAndInterviewModeAndStatus(
+            Long userId,
+            InterviewSessionMode interviewMode,
+            QuestionSetStatus status
+    );
+    List<QuestionSet> findByUser_UserIdAndInterviewModeAndStatus(
             Long userId,
             InterviewSessionMode interviewMode,
             QuestionSetStatus status
