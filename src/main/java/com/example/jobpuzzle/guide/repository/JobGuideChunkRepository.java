@@ -9,4 +9,6 @@ public interface JobGuideChunkRepository extends JpaRepository<JobGuideChunk, Lo
     List<JobGuideChunk> findByGuide_GuideIdOrderByChunkIndexAsc(Long guideId);
 
     long countByGuide_GuideId(Long guideId);
+
+    void deleteByGuide_GuideId(Long guideId);
 }

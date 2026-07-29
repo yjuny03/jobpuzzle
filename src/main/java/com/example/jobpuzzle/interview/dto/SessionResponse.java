@@ -22,6 +22,7 @@ public class SessionResponse {
     private int completedQuestionCount;
     private int currentQuestionOrder;
     private int currentQaDepth;
+    private boolean reviewReady;
     private Long guideId;
     private String guideVersion;
     private String targetWeaknessTag;
@@ -62,6 +63,7 @@ public class SessionResponse {
                 .completedQuestionCount(completedQuestionCount)
                 .currentQuestionOrder(currentQuestionOrder)
                 .currentQaDepth(currentQaDepth)
+                .reviewReady(false)
                 .guideId(session.getGuideDocument() == null ? null : session.getGuideDocument().getGuideId())
                 .guideVersion(session.getGuideVersion())
                 .targetWeaknessTag(session.getTargetWeaknessTag())
@@ -70,5 +72,10 @@ public class SessionResponse {
                 .completedAt(session.getCompletedAt())
                 .canceledAt(session.getCanceledAt())
                 .build();
+    }
+
+    public SessionResponse withReviewReady(boolean value) {
+        this.reviewReady = value;
+        return this;
     }
 }

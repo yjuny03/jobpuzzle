@@ -1,8 +1,18 @@
 (function () {
   'use strict';
 
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    window.alert(message);
+    return null;
+  }
+
   var params = new URLSearchParams(window.location.search);
   var analysisCaseId = params.get('analysisCaseId');
+  var resumeSessionId = params.get('resumeSessionId');
+  var requestedMode = params.get('mode');
 
   var root;
   var questionSet;
@@ -11,6 +21,11 @@
   var currentIndex = 0;
   var followUpMessageId = null;
   var activeSection;
+  var reviewSection;
+  var activeSessions = [];
+  var analysisSection;
+  var analysisAttentionSection;
+  var preparedAnalysisSection;
   var completing = false;
   var speechRecognition = null;
   var speechListening = false;
@@ -222,7 +237,9 @@
     selectionHistoryActive = true;
     selectionModal.querySelectorAll('[data-close-selection]').forEach(function (button) {
       button.addEventListener('click', function () {
-        if (selectionHistoryActive) window.history.back();
+        if (analysisCaseId) {
+          window.location.href = '/api/analysis/' + encodeURIComponent(analysisCaseId);
+        } else if (selectionHistoryActive) window.history.back();
         else closeSelectionModal(true);
       });
     });
@@ -242,7 +259,7 @@
     )
       .map(function (input) { return Number(input.value); });
     if (!selected.length) {
-      alert('질문을 하나 이상 선택해주세요.');
+      notify('warning', '질문을 하나 이상 선택해주세요.');
       return;
     }
     closeSelectionModal(true);
@@ -356,7 +373,7 @@
         messageText: text
       });
       if (result.evaluationFailed) {
-        alert(result.summary);
+        notify('warning', result.summary);
       }
       if (result.followUpQuestion) {
         followUpMessageId = result.followUpQuestionMessageId;
@@ -380,12 +397,15 @@
     }).catch(function (error) {
       button.disabled = false;
       button.textContent = '다시 제출';
-      alert(error.message);
+      notify('error', error.message);
     });
   }
 
   function renderFinish() {
-    completeSession();
+    if (!session) return;
+    stopSpeechInput();
+    window.location.href = '/interview-result.html?sessionId=' +
+      encodeURIComponent(session.sessionId) + '&interim=true';
   }
 
   function completeSession() {
@@ -409,7 +429,7 @@
     if (!session) return;
     var hasAnyAnswer = questions.some(function (item) { return item.answerSubmitted; });
     if (hasAnyAnswer) {
-      completeSession();
+      renderFinish();
       return;
     }
     if (!window.confirm('아직 제출한 답변이 없습니다. 이 세션을 취소할까요?')) return;
@@ -423,13 +443,14 @@
   }
 
   function renderActiveSessions(items) {
+    activeSessions = items || [];
     if (!items || !items.length || analysisCaseId) return;
     activeSection = document.createElement('section');
     activeSection.className = 'active-session-section';
     activeSection.innerHTML =
       '<div class="active-session-heading"><div><h2>진행 중인 면접</h2>' +
       '<p>새 모드를 선택하거나, 저장된 위치에서 이어갈 수 있습니다.</p></div>' +
-      '<span>' + items.length + '개 진행 중</span></div>' +
+      '<span class="session-status-count is-interview">' + items.length + '개 진행 중</span></div>' +
       '<div class="active-session-list">' + items.map(function (item) {
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR', {
           month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -437,9 +458,10 @@
         var questionOrder = item.currentQuestionOrder || 1;
         var qaDepth = item.currentQaDepth || 0;
         var qaLabel = qaDepth === 0 ? '첫 답변 작성 전'
-          : qaDepth === 1 ? '첫 답변 완료 · 심화 질문 진행 중'
+          : qaDepth === 1 ? '첫 답변 완료 · 심화 질문 확인 단계'
             : qaDepth === 2 ? '첫 번째 심화 답변 완료'
-              : '두 번째 심화 답변 완료';
+              : '두 번째 심화 답변 완료 · 결과 확인 가능';
+        var displayDepth = Math.min(3, Math.max(1, qaDepth));
         var progress = item.questionCount
           ? Math.round((item.completedQuestionCount || 0) / item.questionCount * 100)
           : 0;
@@ -457,7 +479,7 @@
           '<div class="active-session-progress-head"><strong>현재 진행 위치</strong><span>' +
           progress + '%</span></div><div class="active-session-progress"><i style="width:' +
           progress + '%"></i></div><dl><div><dt>질문</dt><dd>' + questionOrder + ' / ' +
-          item.questionCount + '</dd></div><div><dt>답변 단계</dt><dd>' + (qaDepth + 1) +
+          item.questionCount + '</dd></div><div><dt>답변 단계</dt><dd>' + displayDepth +
           ' / 최대 3단계</dd></div><div><dt>현재 위치</dt><dd>' + esc(qaLabel) +
           '</dd></div></dl></div></article>';
       }).join('') + '</div>';
@@ -475,27 +497,255 @@
         if (!window.confirm('답변을 제출하지 않은 세션만 취소할 수 있습니다. 취소할까요?')) return;
         api('/api/interview-sessions/' + button.dataset.cancelSession + '/cancel', { method: 'POST' })
           .then(function () { activeSection.remove(); activeSection = null; loadActiveSessions(); })
-          .catch(function (error) { alert(error.message); });
+          .catch(function (error) { notify('error', error.message); });
       });
     });
   }
 
   function loadActiveSessions() {
-    api('/api/interview-sessions/active-list')
-      .then(renderActiveSessions)
-      .catch(function () {});
+    Promise.all([
+      api('/api/interview-sessions/active-list'),
+      api('/api/interview-sessions/review-list')
+    ]).then(function (values) {
+      renderActiveSessions(values[0]);
+      renderReviewReadySessions(values[1]);
+    }).catch(function () {});
+  }
+
+  function renderReviewReadySessions(items) {
+    if (reviewSection) reviewSection.remove();
+    reviewSection = null;
+    if (!items || !items.length || analysisCaseId) return;
+    reviewSection = document.createElement('section');
+    reviewSection.className = 'review-ready-section';
+    reviewSection.innerHTML =
+      '<div class="active-session-heading"><div><h2>결과 검토 중인 면접</h2>' +
+      '<p>선택한 질문의 답변은 끝났습니다. 남은 질문을 더 연습하거나 현재 결과를 확정할 수 있어요.</p></div>' +
+      '<span class="session-status-count is-review">' + items.length + '개 검토 중</span></div><div class="review-ready-list">' +
+      items.map(function (item) {
+        var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
+        return '<article class="review-ready-card"><div><span>' + esc(modeLabel(item.mode)) +
+          '</span><h3>' + esc(item.completedQuestionCount) + '개 질문 답변 완료</h3><p>' +
+          esc(created) + '</p></div><a class="btn btn--primary" href="/interview-result.html?sessionId=' +
+          encodeURIComponent(item.sessionId) + '">중간 결과 확인</a></article>';
+      }).join('') + '</div>';
+    var anchor = activeSection || root;
+    anchor.insertAdjacentElement('afterend', reviewSection);
+  }
+
+  function analysisStatusLabel(status) {
+    if (status === 'ANALYZING') return '분석 진행 중';
+    if (status === 'FAILED') return '분석 확인 필요';
+    return '분석 시작 전';
+  }
+
+  function analysisStageLabel(stage) {
+    var labels = {
+      JOB_POSTING_ANALYSIS: '채용공고 분석',
+      CANDIDATE_MATERIAL_ANALYSIS: '지원자 자료 분석',
+      GUIDE_CONTEXT_BUILD: '직무 가이드 적용',
+      CUSTOMIZED_SYNTHESIS: '맞춤 결과 생성'
+    };
+    return labels[stage] || '맞춤 결과 생성';
+  }
+
+  function analysisStages(item) {
+    return [
+      { key: 'jobPostingAnalysisStatus', label: '채용공고 분석' },
+      { key: 'candidateMaterialAnalysisStatus', label: '지원자 자료 분석' },
+      { key: 'guideContextStatus', label: '직무 가이드 적용' },
+      { key: 'customizedAnalysisStatus', label: '맞춤 결과 생성' }
+    ].map(function (stage) {
+      return {
+        label: stage.label,
+        status: item[stage.key] || 'NOT_STARTED'
+      };
+    });
+  }
+
+  function renderActiveAnalyses(items) {
+    if (analysisSection) analysisSection.remove();
+    if (!items.length || analysisCaseId) return;
+    analysisSection = document.createElement('section');
+    analysisSection.className = 'active-analysis-section';
+    analysisSection.innerHTML =
+      '<div class="active-session-heading"><div><h2>진행 중인 맞춤 분석</h2>' +
+      '<p>자료를 분석하는 동안 다른 화면을 이용해도 괜찮아요.</p></div>' +
+      '<span class="session-status-count is-analyzing">' + items.length + '개 확인 중</span></div>' +
+      '<div class="active-analysis-list">' + items.map(function (item) {
+        var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
+        var steps = analysisStages(item);
+        var completed = steps.filter(function (stage) { return stage.status === 'SUCCEEDED'; }).length;
+        var runningIndex = steps.findIndex(function (stage) { return stage.status === 'RUNNING'; });
+        var currentIndex = runningIndex >= 0 ? runningIndex : Math.min(completed, steps.length - 1);
+        var current = steps[currentIndex];
+        var progress = item.status === 'INPUT_CONFIRMED' ? 0 : Math.round((completed + (runningIndex >= 0 ? .45 : 0)) / steps.length * 100);
+        var detail = steps.map(function (stage, index) {
+          var stateClass = stage.status === 'SUCCEEDED' ? 'is-done' :
+            stage.status === 'RUNNING' ? 'is-running' : '';
+          return '<li class="' + stateClass + '"><i>' + (index + 1) + '</i><span>' +
+            esc(stage.label) + '</span></li>';
+        }).join('');
+        return '<article class="active-analysis-card ' + (item.status === 'INPUT_CONFIRMED' ? 'is-waiting' : '') + '">' +
+          '<div class="active-analysis-visual"><i></i><span>AI</span></div>' +
+          '<div class="active-analysis-copy"><span>' + analysisStatusLabel(item.status) + '</span>' +
+          '<h3>' + esc(label) + '</h3><p><strong>' + esc(current.label) + '</strong> 단계입니다. ' +
+          (item.status === 'INPUT_CONFIRMED' ? '분석 시작을 기다리고 있어요.' : '자료와 근거를 차근차근 확인하고 있어요.') + '</p>' +
+          '<ol class="active-analysis-stages">' + detail + '</ol>' +
+          '<div class="active-analysis-progress" aria-label="분석 진행률 ' + progress + '%"><i style="width:' + progress + '%"></i></div></div>' +
+          '<a class="btn btn--primary" href="/api/analysis/' + item.analysisCaseId + '">상태 확인</a></article>';
+      }).join('') + '</div>';
+    var anchor = activeSection || root;
+    anchor.insertAdjacentElement('afterend', analysisSection);
+  }
+
+  function renderAnalysisAttention(items) {
+    if (analysisAttentionSection) analysisAttentionSection.remove();
+    analysisAttentionSection = null;
+    if (!items.length || analysisCaseId) return;
+
+    analysisAttentionSection = document.createElement('section');
+    analysisAttentionSection.className = 'analysis-attention-section';
+    analysisAttentionSection.innerHTML =
+      '<div class="active-session-heading"><div><h2>분석 확인 필요</h2>' +
+      '<p>멈춘 분석입니다. 선택한 자료와 앞선 분석 결과는 보존되어 있어요.</p></div>' +
+      '<span class="session-status-count is-attention">' + items.length + '개 확인 필요</span></div>' +
+      '<div class="analysis-attention-list">' + items.map(function (item) {
+        var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
+        return '<article class="analysis-attention-card">' +
+          '<div class="analysis-attention-visual" aria-hidden="true">!</div>' +
+          '<div class="analysis-attention-copy"><span>' + esc(analysisStageLabel(item.latestFailureStage)) + ' 단계 확인 필요</span>' +
+          '<h3>' + esc(label) + '</h3><p>' + esc(item.userMessage || '분석 결과를 생성하지 못했어요.') + '</p>' +
+          '<small>자료를 다시 선택하지 않아도 상태 화면에서 다시 실행할 수 있습니다.</small></div>' +
+          '<a class="btn btn--outline" href="/api/analysis/' + encodeURIComponent(item.analysisCaseId) + '">상태 확인</a></article>';
+      }).join('') + '</div>';
+    var anchor = analysisSection || activeSection || root;
+    anchor.insertAdjacentElement('afterend', analysisAttentionSection);
+  }
+
+  function renderPreparedAnalyses(items) {
+    if (preparedAnalysisSection) preparedAnalysisSection.remove();
+    preparedAnalysisSection = null;
+    if (!items.length || analysisCaseId) return;
+    preparedAnalysisSection = document.createElement('section');
+    preparedAnalysisSection.className = 'prepared-analysis-section';
+    preparedAnalysisSection.innerHTML =
+      '<div class="active-session-heading"><div><h2>면접 질문이 준비된 맞춤 분석</h2>' +
+      '<p>분석 결과를 다시 확인하거나, 준비된 질문으로 면접을 이어갈 수 있어요.</p></div>' +
+      '<span class="session-status-count is-prepared prepared-analysis-count">' + items.length + '개 준비됨</span></div>' +
+      '<div class="prepared-analysis-list">' + items.map(function (item) {
+        var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
+        var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
+        var sourceNames = (item.sources || []).map(function (source) {
+          return source.displayName;
+        }).filter(Boolean);
+        var detail = [label, item.careerLevel, sourceNames.join(', ')].filter(Boolean).join(' | ');
+        return '<article class="prepared-analysis-card"><div class="prepared-analysis-check">✓</div>' +
+          '<div class="prepared-analysis-copy" tabindex="0"><span>분석 완료</span><h3>' + esc(label) + '</h3>' +
+          '<p>' + esc(created) + ' · ' + esc(item.careerLevel || '경력 기준 미지정') + '</p>' +
+          '<small class="prepared-analysis-detail">' + esc(detail) + '</small></div>' +
+          '<div class="prepared-analysis-actions"><a class="btn btn--outline" href="/api/analysis/' +
+          encodeURIComponent(item.analysisCaseId) + '">분석 결과 보기</a>' +
+          '<a class="btn btn--primary" href="/interview.html?analysisCaseId=' +
+          encodeURIComponent(item.analysisCaseId) + '">질문 선택</a></div></article>';
+      }).join('') + '</div>';
+    var anchor = analysisAttentionSection || analysisSection || activeSection || root;
+    anchor.insertAdjacentElement('afterend', preparedAnalysisSection);
+  }
+
+  function loadActiveAnalyses() {
+    var stored;
+    try { stored = JSON.parse(localStorage.getItem('jobpuzzle_analysis_cases') || '[]'); }
+    catch (ignore) { stored = []; }
+    if (!stored.length) return;
+    Promise.all(stored.map(function (item) {
+      return api('/api/analysis/cases/' + item.analysisCaseId + '/status')
+        .then(function (status) {
+        item.status = status.analysisCaseStatus;
+        item.latestFailureStage = status.latestFailureStage;
+        item.userMessage = status.userMessage;
+        item.questionSetAvailable = status.questionSetAvailable;
+        item.jobPostingAnalysisStatus = status.jobPostingAnalysisStatus;
+        item.candidateMaterialAnalysisStatus = status.candidateMaterialAnalysisStatus;
+        item.guideContextStatus = status.guideContextStatus;
+        item.customizedAnalysisStatus = status.customizedAnalysisStatus;
+        return item;
+        }).catch(function () { return null; });
+    })).then(function (items) {
+      var activeItems = items.filter(function (item) {
+        return item && (item.status === 'INPUT_CONFIRMED' || item.status === 'ANALYZING');
+      });
+      var failedItems = items.filter(function (item) {
+        return item && item.status === 'FAILED';
+      });
+      localStorage.setItem(
+        'jobpuzzle_analysis_cases',
+        JSON.stringify(activeItems.concat(failedItems))
+      );
+      renderActiveAnalyses(activeItems);
+      renderAnalysisAttention(failedItems);
+    });
+  }
+
+  function loadPreparedAnalysesFromServer() {
+    api('/api/analysis-cases/completed').then(function (cases) {
+      return Promise.all((cases || []).map(function (item) {
+        return api('/api/analysis/cases/' + item.analysisCaseId + '/status')
+          .then(function (status) {
+            item.questionSetAvailable = status.questionSetAvailable;
+            return item;
+          })
+          .catch(function () { return null; });
+      }));
+    }).then(function (items) {
+      renderPreparedAnalyses(items.filter(function (item) {
+        return item && item.questionSetAvailable;
+      }));
+    }).catch(function () {});
+  }
+
+  function bindResultTabGuard() {
+    var tab = document.getElementById('interview-result-tab');
+    if (!tab) return;
+    tab.addEventListener('click', function (event) {
+      if (!session || !root.querySelector('.live-interview-card')) return;
+      var shouldLeave = window.confirm(
+        '진행 중인 면접이 있습니다.\n\n작성한 내용은 저장되어 있어 나중에 이어서 진행할 수 있습니다. 답변 평가 화면으로 이동할까요?'
+      );
+      if (!shouldLeave) event.preventDefault();
+    });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     root = document.getElementById('step-root');
+    var evaluationGuide = document.getElementById('evaluation-guide');
+    if (evaluationGuide && root) root.parentNode.insertBefore(evaluationGuide, root);
     if (analysisCaseId) {
       load();
+    } else if (resumeSessionId) {
+      api('/api/interview-sessions/' + resumeSessionId)
+        .then(resumeSession)
+        .catch(function (error) { message(error.message, true); });
     } else {
       loadActiveSessions();
+      loadActiveAnalyses();
+      loadPreparedAnalysesFromServer();
+      if (requestedMode === 'weakness') {
+        window.setTimeout(function () {
+          var weaknessCard = document.querySelector('[data-mode="weakness"]');
+          if (weaknessCard) weaknessCard.click();
+        }, 0);
+      }
     }
+    bindResultTabGuard();
   });
   window.addEventListener('popstate', function () {
-    if (selectionModal) closeSelectionModal(true);
+    if (!selectionModal) return;
+    if (analysisCaseId) {
+      window.location.replace('/api/analysis/' + encodeURIComponent(analysisCaseId));
+      return;
+    }
+    closeSelectionModal(true);
   });
   window.InterviewLive = { startBasic: startBasic, startWeakness: startWeakness };
 })();

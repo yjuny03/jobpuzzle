@@ -127,6 +127,8 @@ public class SecurityConfig {
                         // 관리자 전용 경로는 인증 여부보다 먼저 role을 검사해야 해서 anyRequest()보다 위에 둠
                         .requestMatchers(ADMIN_VIEW_URLS).hasRole("ADMIN")
                         .requestMatchers(ADMIN_API_URLS).hasRole("ADMIN")
+                        // 가이드 등록·버전 활성화는 비용과 분석 기준에 영향을 주므로 관리자만 허용
+                        .requestMatchers("/api/guide-admin/**").hasRole("ADMIN")
 
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()

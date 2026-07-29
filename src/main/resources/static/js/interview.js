@@ -7,6 +7,14 @@
 
   var DF = window.DocumentFlow;
 
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    window.alert(message);
+    return null;
+  }
+
   var MODES = [
     { id: 'basic', icon: 'basic', label: '기본 질문 모드', desc: '직무 공통 질문으로 빠르게 연습해요' },
     { id: 'weakness', icon: 'tag', label: '약점 보완 모드', desc: '반복되는 약점 태그를 골라 집중 연습해요' },
@@ -104,7 +112,6 @@
     else if (state.step === 'weaknessPick') root.innerHTML = renderWeaknessPick();
     else if (state.step === 'materialSelect') root.innerHTML = renderMaterialSelect();
     else if (state.step === 'materialReview') root.innerHTML = renderMaterialReview();
-    else if (state.step === 'submitted') root.innerHTML = renderSubmitted();
     else if (state.step === 'connectionResult') root.innerHTML = renderConnectionResult();
     else if (state.step === 'list') root.innerHTML = renderQuestionList();
     bindStepEvents();
@@ -121,7 +128,12 @@
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">질문 모드를 선택하세요</p>' +
       '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">선택한 모드에 맞춰 질문을 생성해드려요</p>' +
       '<div class="mode-grid">' + MODES.map(function (m) {
-        return '<div class="mode-card" data-mode="' + m.id + '"><div class="mode-card__icon">' + icon(m.icon) + '</div><p class="mode-card__title">' + m.label + '</p><p class="mode-card__desc">' + m.desc + '</p></div>';
+        var puzzle = m.id === 'custom'
+          ? '<canvas class="mode-puzzle-canvas" data-puzzle-piece="2" aria-hidden="true"></canvas>'
+          : '';
+        return '<div class="mode-card" data-mode="' + m.id + '">' + puzzle +
+          '<div class="mode-card__icon">' + icon(m.icon) + '</div><p class="mode-card__title">' +
+          m.label + '</p><p class="mode-card__desc">' + m.desc + '</p></div>';
       }).join('') + '</div></div>';
   }
 
@@ -132,9 +144,28 @@
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">보완할 약점 태그를 선택하세요</p>' +
       '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">태그를 선택하면 그 약점에 맞춘 질문을 생성해요 · 해결된 약점은 표시되지 않아요</p>' +
       '<div style="display:flex; flex-direction:column; gap:10px;">' +
-      state.weaknessTags.map(function (tag) {
-        return '<div class="weak-pick-row" data-weak-tag="' + esc(tag) + '"><div><span style="font-size:13.5px; font-weight:700;">#' + esc(tag) + '</span><p style="font-size:12.5px; color:#5B6370; margin:6px 0 0;">이전 평가에서 확인된 관점을 집중적으로 보완합니다.</p></div>' +
-          '<span class="badge-pill" style="background:#FDF0E4; color:#B5622E; white-space:nowrap;">미해결</span></div>';
+      state.weaknessTags.map(function (item) {
+        var tag = typeof item === 'string' ? item : item.tag;
+        var displayName = typeof item === 'string' ? item : item.displayName;
+        var description = typeof item === 'string'
+          ? '이전 평가에서 확인된 관점을 집중적으로 보완합니다.'
+          : item.description;
+        var occurrences = typeof item === 'string' ? [] : (item.recentOccurrences || []);
+        var history = occurrences.length
+          ? '<div class="weak-pick-history"><strong>최근 확인 기록</strong>' +
+            occurrences.map(function (occurrence) {
+              var occurredAt = occurrence.occurredAt
+                ? new Date(occurrence.occurredAt).toLocaleString('ko-KR')
+                : '';
+              return '<span>' + esc(occurredAt) + ' · ' + esc(occurrence.mode || '') +
+                (occurrence.score == null ? '' : ' · ' + esc(occurrence.score) + '점') + '</span>';
+            }).join('') + '</div>'
+          : '';
+        return '<div class="weak-pick-row" tabindex="0" data-weak-tag="' + esc(tag) + '">' +
+          '<div><span class="weak-pick-name">#' + esc(displayName) + '</span><p>' +
+          esc(description) + '</p>' + history + '</div>' +
+          '<span class="badge-pill">미해결 · ' + esc((item.occurrenceCount || occurrences.length || 1)) +
+          '회</span></div>';
       }).join('') + '</div></div>';
   }
 
@@ -169,7 +200,7 @@
           state.selectedJobCategoryId = match.jobCategoryId;
         }
       }
-    }).catch(function (e) { alert(e.message); });
+    }).catch(function (e) { notify('error', e.message); });
   }
 
   function docListHtml(type) {
@@ -181,16 +212,16 @@
         if (!selectable) {
           var status = DF.statusLabel(null, d.latestVersionStatus);
           return '<div class="material-doc-row" style="opacity:.55; cursor:default;"><div class="material-checkbox"></div>' +
-            '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-            '<p style="font-size:11px; margin:2px 0 0; color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
+            '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
+            '<p class="material-doc-meta" style="color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
         }
         var checked = !!state.selectedDocIds[d.documentId];
         return '<div class="material-doc-row' + (checked ? ' is-checked' : '') + '" data-toggle-doc="' + d.documentId + '"><div class="material-checkbox"></div>' +
-          '<div><p style="font-size:12.5px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-          '<p style="font-size:11px; color:#8A93A3; margin:2px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + ' · 확정됨</p></div></div>';
+          '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
+          '<p class="material-doc-meta">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + ' · 확정됨</p></div></div>';
       }).join('');
     } else {
-      html += '<p style="font-size:11.5px; color:#8A93A3; margin:0 0 10px;">등록된 자료가 없어요</p>';
+      html += '<p class="material-empty">등록된 자료가 없어요</p>';
     }
     html += '<button class="material-register-btn" data-open-register="' + type + '">+ 자료 등록하기</button>';
     return html;
@@ -220,34 +251,34 @@
         return '<option value="' + c.jobCategoryId + '"' + (String(c.jobCategoryId) === String(state.selectedJobCategoryId) ? ' selected' : '') + '>' + (CAREER_LEVEL_LABEL[c.careerLevel] || c.careerLevel) + '</option>';
       }).join('');
 
-    return '<div class="card card--pad-lg">' +
+    return '<div class="card card--pad-lg material-select-card">' +
       backBtn('backToMode', '모드 다시 선택') +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">면접에 사용할 자료를 선택하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
+      '<p class="material-select-intro">확정된 자료만 선택할 수 있어요. 없으면 새로 등록해주세요</p>' +
       '<div class="material-columns">' +
-        '<div><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">회사 공고 / 회사 정보</p>' +
+        '<div><p class="material-column-title">회사 공고 / 회사 정보</p>' +
           COMPANY_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
         '<div>' +
-          '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:12px; padding:14px; margin-bottom:14px;">' +
-            '<p style="font-size:11px; color:#8A93A3; margin:0 0 8px;">희망 직무</p>' +
-            '<div class="flex-row gap-8" style="flex-wrap:wrap;">' +
+          '<div class="material-job-card">' +
+            '<p class="material-job-label">희망 직무</p>' +
+            '<div class="flex-row gap-8 material-job-selects">' +
               '<select id="material-main-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;">' + mainOpts + '</select>' +
               '<select id="material-sub-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (state.selectedMainCategory ? '' : ' disabled') + '>' + subOpts + '</select>' +
               '<select id="material-level-select" class="select-input" style="width:auto; padding:7px 8px; font-size:12px;"' + (levelMatches.length ? '' : ' disabled') + '>' + levelOpts + '</select>' +
-            '</div></div>' +
-          '<p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 12px;">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
+            '</div><p class="material-job-note">선택한 직무·경력을 면접 기준으로 사용합니다. 공고의 요구 경력과 다르면 분석 결과에서 차이를 안내해드려요.</p></div>' +
+          '<p class="material-column-title">이력서 / 자기소개서 / 포트폴리오 / 경험정리</p>' +
           CANDIDATE_TYPES.map(function (type) { return '<div class="material-category"><p style="font-size:12.5px; font-weight:700; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' + docListHtml(type) + '</div>'; }).join('') +
         '</div>' +
       '</div>' +
-      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-select-next">다음: 자료 확인하기</button></div>' +
+      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-select-next">선택 내용 확인하고 분석 준비</button></div>' +
     '</div>';
   }
 
   function goMaterialReview() {
-    if (!state.selectedJobCategoryId) { alert('희망 직무를 선택해주세요.'); return; }
+    if (!state.selectedJobCategoryId) { notify('warning', '희망 직무를 선택해주세요.'); return; }
     var selectedIds = Object.keys(state.selectedDocIds);
-    if (!selectedIds.length) { alert('자료를 1개 이상 선택해주세요.'); return; }
+    if (!selectedIds.length) { notify('warning', '자료를 1개 이상 선택해주세요.'); return; }
 
     Promise.all(selectedIds.map(function (id) {
       if (state.selectedExtractionIds[id]) return Promise.resolve();
@@ -256,13 +287,12 @@
         if (confirmed) state.selectedExtractionIds[id] = confirmed.extractionId;
       });
     })).then(function () {
-      state.step = 'materialReview';
-      render();
-    }).catch(function (e) { alert(e.message); });
+      openMaterialReviewModal();
+    }).catch(function (e) { notify('error', e.message); });
   }
 
   // ---- step: material review (선택 내용 읽기 전용 확인 + 확정) ----
-  function renderMaterialReview() {
+  function materialReviewContent() {
     var byType = {};
     Object.keys(state.selectedDocIds).forEach(function (id) {
       var doc = state.allDocs.filter(function (d) { return String(d.documentId) === String(id); })[0];
@@ -274,29 +304,62 @@
     var jc = state.jobCategories.filter(function (c) { return String(c.jobCategoryId) === String(state.selectedJobCategoryId); })[0];
     var jcLabel = jc ? (jc.mainCategory + ' > ' + jc.subCategory + ' · ' + (CAREER_LEVEL_LABEL[jc.careerLevel] || jc.careerLevel)) : '';
 
-    return '<div class="card card--pad-lg">' +
-      backBtn('backToMaterialSelect', '자료 다시 선택') +
-      '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">선택한 자료와 기준을 확인하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 18px;">확정을 누르면 이 자료들로 분석을 시작해요. 확정 후에는 자료 구성을 바꿀 수 없어요</p>' +
-      '<div style="background:#F3F8FD; border:1px solid #DCE7F3; border-radius:10px; padding:14px; margin-bottom:18px;">' +
-        '<p style="font-size:11px; color:#8A93A3; margin:0 0 4px;">희망 직무</p>' +
-        '<p style="font-size:13.5px; font-weight:700; margin:0;">' + esc(jcLabel) + '</p>' +
+    return '<div class="material-review-content">' +
+      '<p class="material-review-lead">선택한 자료와 기준을 확인하세요</p>' +
+      '<p class="material-review-description">확정하면 아래 자료와 직무 기준으로 분석을 시작합니다. 확정 후에는 구성을 바꿀 수 없어요.</p>' +
+      '<div class="material-review-job">' +
+        '<p class="material-review-job-label">희망 직무</p>' +
+        '<p class="material-review-job-value">' + esc(jcLabel) + '</p>' +
       '</div>' +
       Object.keys(byType).map(function (type) {
-        return '<div style="margin-bottom:16px;"><p style="font-size:12.5px; font-weight:700; color:#5B6370; margin:0 0 8px;">' + DF.CATEGORY_LABEL[type] + '</p>' +
+        return '<div class="material-review-group"><p class="material-review-group-title">' + DF.CATEGORY_LABEL[type] + '</p>' +
           byType[type].map(function (d) {
-            return '<div class="review-card" style="padding:12px 16px; margin-bottom:8px;"><p style="font-size:13px; font-weight:600; margin:0;">' + esc(d.displayName) + '</p>' +
-              '<p style="font-size:11.5px; color:#8A93A3; margin:4px 0 0;">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + '</p></div>';
+            return '<div class="review-card material-review-item"><p class="material-review-item-name">' + esc(d.displayName) + '</p>' +
+              '<p class="material-review-item-version">' + DF.versionLabel(d.latestMajorVersion, d.latestMinorVersion) + '</p></div>';
           }).join('') +
         '</div>';
       }).join('') +
-      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-review-confirm">확정하고 분석 시작</button></div>' +
     '</div>';
+  }
+
+  function renderMaterialReview() {
+    return '<div class="card card--pad-lg">' +
+      backBtn('backToMaterialSelect', '자료 다시 선택') +
+      materialReviewContent() +
+      '<div class="flex-row" style="justify-content:flex-end; margin-top:22px;"><button class="btn btn--primary" id="material-review-confirm">이 구성으로 분석 시작</button></div>' +
+    '</div>';
+  }
+
+  function closeMaterialReviewModal() {
+    var modal = document.getElementById('material-review-modal');
+    if (modal) modal.remove();
+    document.body.classList.remove('has-selection-modal');
+  }
+
+  function openMaterialReviewModal() {
+    closeMaterialReviewModal();
+    document.body.classList.add('has-selection-modal');
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="question-selection-modal material-review-modal" id="material-review-modal" role="dialog" aria-modal="true" aria-labelledby="material-review-title">' +
+        '<div class="question-selection-backdrop" data-close-material-review></div>' +
+        '<section class="question-selection-dialog material-review-dialog">' +
+          '<header><div><span class="question-selection-mode">회사 맞춤</span><h2 id="material-review-title">분석 전 마지막 확인</h2>' +
+          '<p>선택한 자료와 면접 기준이 맞는지 확인해주세요.</p></div>' +
+          '<button type="button" class="question-selection-close" data-close-material-review aria-label="닫기">×</button></header>' +
+          '<div class="material-review-scroll">' + materialReviewContent() + '</div>' +
+          '<footer><button type="button" class="btn-sm" data-close-material-review>자료 다시 선택</button>' +
+          '<button type="button" class="btn btn--primary" id="material-review-confirm">이 구성으로 분석 시작</button></footer>' +
+        '</section>' +
+      '</div>');
+    document.querySelectorAll('[data-close-material-review]').forEach(function (el) {
+      el.addEventListener('click', closeMaterialReviewModal);
+    });
+    bindMaterialReviewEvents();
   }
 
   function submitAnalysisCase() {
     var confirmBtn = document.getElementById('material-review-confirm');
-    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '처리 중...'; }
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '분석 준비 중...'; }
 
     var extractionIds = Object.keys(state.selectedDocIds).map(function (id) { return state.selectedExtractionIds[id]; });
 
@@ -313,22 +376,30 @@
         return DF.api('/analysis-cases/' + state.analysisCaseId + '/confirm', { method: 'POST' });
       })
       .then(function () {
-        state.step = 'submitted';
-        render();
+        var tracked;
+        try {
+          tracked = JSON.parse(localStorage.getItem('jobpuzzle_analysis_cases') || '[]');
+        } catch (ignore) {
+          tracked = [];
+        }
+        tracked = tracked.filter(function (item) {
+          return String(item.analysisCaseId) !== String(state.analysisCaseId);
+        });
+        tracked.unshift({
+          analysisCaseId: state.analysisCaseId,
+          status: 'INPUT_CONFIRMED',
+          mainCategory: state.selectedMainCategory,
+          subCategory: state.selectedSubCategory,
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem('jobpuzzle_analysis_cases', JSON.stringify(tracked.slice(0, 10)));
+        sessionStorage.setItem('jobpuzzle_analysis_notice', '분석 요청이 접수되었습니다.');
+        window.location.href = '/api/analysis/' + encodeURIComponent(state.analysisCaseId);
       })
       .catch(function (e) {
-        alert(e.message);
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '확정하고 분석 시작'; }
+        notify('error', e.message);
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '이 구성으로 분석 시작'; }
       });
-  }
-
-  // ---- step: submitted ----
-  function renderSubmitted() {
-    return '<div class="card card--pad-lg" style="text-align:center; padding:60px 20px;">' +
-      '<p style="font-size:16px; font-weight:700; margin:0 0 8px;">분석 요청이 접수됐어요</p>' +
-      '<p style="font-size:13px; color:#8A93A3; margin:0 0 24px; line-height:1.7;">자료가 확정되었습니다. 분석 화면에서 직접 실행하고 결과를 확인할 수 있어요.</p>' +
-      '<a href="/api/analysis/' + state.analysisCaseId + '" class="btn btn--primary" style="text-decoration:none;">분석 화면으로 이동</a>' +
-    '</div>';
   }
 
   // ---- material register modal (등록 -> 추출 확인/수정 -> 확정, document-flow.js 재사용) ----
@@ -384,16 +455,16 @@
 
     document.getElementById('material-register-submit').addEventListener('click', function () {
       var name = document.getElementById('material-register-name').value.trim();
-      if (!name) { alert('자료명을 입력해주세요.'); return; }
+      if (!name) { notify('warning', '자료명을 입력해주세요.'); return; }
 
       var opts = { category: state.registerTargetType, name: name, method: state.materialRegisterMethod };
       if (state.materialRegisterMethod === 'file') {
         var files = document.getElementById('material-register-file').files;
-        if (!files.length) { alert('파일을 선택해주세요.'); return; }
+        if (!files.length) { notify('warning', '파일을 선택해주세요.'); return; }
         opts.files = files;
       } else {
         var content = document.getElementById('material-register-content').value.trim();
-        if (!content) { alert('내용을 입력해주세요.'); return; }
+        if (!content) { notify('warning', '내용을 입력해주세요.'); return; }
         opts.content = content;
       }
 
@@ -414,7 +485,7 @@
         if (opts.method === 'file') {
           DF.pollExtraction(doc.documentId, function () { panel.reload(); });
         }
-      }).catch(function (e) { alert(e.message); });
+      }).catch(function (e) { notify('error', e.message); });
     });
   }
 
@@ -583,11 +654,11 @@
           if (window.InterviewLive) window.InterviewLive.startBasic();
         }
         else if (state.mode === 'weakness') {
-          DF.api('/interview-weakness-tags').then(function (tags) {
+          DF.api('/interview-weakness-tags/details').then(function (tags) {
             state.weaknessTags = tags || [];
             state.step = 'weaknessPick';
             render();
-          }).catch(function (e) { alert(e.message); });
+          }).catch(function (e) { notify('error', e.message); });
         }
         else if (state.mode === 'custom') { enterMaterialSelect(); }
       });

@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,6 +29,15 @@ public class AnalysisCaseController {
 
     private final AnalysisCaseService analysisCaseService;
     private final AnalysisVectorIndexService vectorIndexService;
+
+    @GetMapping("/api/analysis-cases/completed")
+    public ResponseEntity<ApiResponse<List<AnalysisCaseResponse>>> getCompletedCases(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                analysisCaseService.getCompletedCases(user.getUserId())
+        ));
+    }
 
     // 분석 작업 생성 (jobCategoryId 없으면 회원 기본 관심 직무 사용)
     // POST /api/analysis-cases { jobCategoryId? }

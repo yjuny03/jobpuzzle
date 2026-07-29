@@ -2,6 +2,8 @@
   'use strict';
 
   var sessionId = new URLSearchParams(window.location.search).get('sessionId');
+  var sessionInfo = null;
+  var remainingQuestions = [];
   var sessionQuestions = [];
   var sessionScoreByQuestion = {};
   var CATEGORY_LABELS = {
@@ -15,8 +17,18 @@
     deliveryClarity: '답변 전달력'
   };
 
-  function api(path) {
-    return fetch(path, { credentials: 'same-origin' }).then(function (response) {
+  function api(path, options) {
+    options = options || {};
+    var fetchOptions = {
+      method: options.method || 'GET',
+      credentials: 'same-origin',
+      headers: {}
+    };
+    if (options.json !== undefined) {
+      fetchOptions.headers['Content-Type'] = 'application/json; charset=UTF-8';
+      fetchOptions.body = JSON.stringify(options.json);
+    }
+    return fetch(path, fetchOptions).then(function (response) {
       return response.json().then(function (body) {
         if (!response.ok || !body.success) {
           throw new Error(body.message || '결과를 불러오지 못했습니다.');
@@ -289,7 +301,99 @@
         score.mode === 'WEAKNESS_REVIEW' ? '약점 보완 결과' : '발견된 보완 포인트';
       weaknessList.innerHTML =
         '<p class="weakness-info-copy">70점 미만 평가에서 확인된 약점은 약점 보완 모드에서 연습할 수 있습니다.</p>';
+      if (weaknessButton) {
+        weaknessButton.hidden = false;
+        weaknessButton.href = '/interview.html?mode=weakness';
+      }
     }
+    renderInterimActions();
+  }
+
+  function focusLabels(items) {
+    return (items || []).map(function (item) {
+      return CATEGORY_LABELS[item] || item;
+    }).join(' · ');
+  }
+
+  function closeRemainingModal() {
+    var modal = document.getElementById('remaining-question-modal');
+    if (modal) modal.remove();
+    document.body.classList.remove('has-result-modal');
+  }
+
+  function openRemainingModal() {
+    closeRemainingModal();
+    var modal = document.createElement('div');
+    modal.id = 'remaining-question-modal';
+    modal.className = 'remaining-question-modal';
+    modal.innerHTML =
+      '<div class="remaining-question-backdrop" data-close-remaining></div>' +
+      '<section class="remaining-question-dialog" role="dialog" aria-modal="true">' +
+      '<header><div><span>이어 연습하기</span><h2>남은 질문을 추가해 보세요</h2>' +
+      '<p>추가한 질문의 평가도 지금까지의 점수와 함께 집계됩니다.</p></div>' +
+      '<button type="button" data-close-remaining aria-label="닫기">×</button></header>' +
+      '<div class="remaining-question-list">' + remainingQuestions.map(function (question) {
+        return '<label><input type="checkbox" value="' + question.questionId + '" checked>' +
+          '<div><strong>' + esc(question.questionText) + '</strong>' +
+          '<p><b>이 질문의 의도</b>' + esc(question.intent || '답변의 핵심 근거를 확인합니다.') + '</p>' +
+          '<small><b>집중 평가 기준</b>' + esc(focusLabels(question.evaluationFocus)) + '</small>' +
+          '</div></label>';
+      }).join('') + '</div>' +
+      '<footer><span>하나 이상 선택해 주세요.</span>' +
+      '<button id="add-remaining-questions" class="btn btn--primary">선택한 질문 이어서 연습</button></footer>' +
+      '</section>';
+    document.body.appendChild(modal);
+    document.body.classList.add('has-result-modal');
+    modal.querySelectorAll('[data-close-remaining]').forEach(function (button) {
+      button.addEventListener('click', closeRemainingModal);
+    });
+    document.getElementById('add-remaining-questions').addEventListener('click', function () {
+      var ids = Array.prototype.slice.call(
+        modal.querySelectorAll('input[type="checkbox"]:checked')
+      ).map(function (input) { return Number(input.value); });
+      if (!ids.length) {
+        alert('이어갈 질문을 하나 이상 선택해 주세요.');
+        return;
+      }
+      api('/api/interview-sessions/' + sessionId + '/questions', {
+        method: 'POST',
+        json: { questionIds: ids }
+      }).then(function () {
+        window.location.href = '/interview.html?resumeSessionId=' + encodeURIComponent(sessionId);
+      }).catch(function (error) { alert(error.message); });
+    });
+  }
+
+  function finalizeSession() {
+    if (!window.confirm(
+      '이 면접을 최종 확정할까요?\n\n확정하면 선택하지 않은 질문은 더 이상 추가할 수 없고, 리포트 생성 대상으로 전달됩니다.'
+    )) return;
+    api('/api/interview-sessions/' + sessionId + '/complete', { method: 'POST' })
+      .then(function () {
+        window.location.replace('/interview-result.html?sessionId=' + encodeURIComponent(sessionId));
+      })
+      .catch(function (error) { alert(error.message); });
+  }
+
+  function renderInterimActions() {
+    var area = document.getElementById('interim-actions');
+    if (!area || !sessionInfo || sessionInfo.status === 'COMPLETED') {
+      if (area) area.hidden = true;
+      return;
+    }
+    area.hidden = false;
+    area.innerHTML =
+      '<div><span>중간 결과</span><h2>지금까지의 답변을 확인하고 다음 단계를 선택하세요</h2>' +
+      '<p>아직 리포트가 확정되지 않았습니다. 남은 질문을 추가하면 같은 면접 점수에 이어서 반영됩니다.</p></div>' +
+      '<div class="interim-actions__buttons">' +
+      (remainingQuestions.length
+        ? '<button id="open-remaining-questions" class="btn btn--outline">남은 질문 ' +
+          remainingQuestions.length + '개 추가</button>'
+        : '<span class="interim-actions__done">준비된 질문을 모두 선택했습니다</span>') +
+      '<button id="finalize-session" class="btn btn--primary">이대로 리포트 확정</button></div>';
+    var addButton = document.getElementById('open-remaining-questions');
+    if (addButton) addButton.addEventListener('click', openRemainingModal);
+    document.getElementById('finalize-session').addEventListener('click', finalizeSession);
   }
 
   function formatDate(value) {
@@ -331,10 +435,18 @@
       return;
     }
     Promise.all([
+      api('/api/interview-sessions/' + sessionId),
       api('/api/interview-sessions/' + sessionId + '/score'),
-      api('/api/interview-sessions/' + sessionId + '/questions')
+      api('/api/interview-sessions/' + sessionId + '/questions'),
+      api('/api/interview-sessions/' + sessionId + '/questions/remaining')
     ]).then(function (values) {
-      renderSession(values[0], values[1]);
+      sessionInfo = values[0];
+      remainingQuestions = values[3] || [];
+      renderSession(values[1], values[2]);
+      if (sessionInfo.status !== 'COMPLETED') {
+        var listTabButton = document.querySelector('.tabbar__btn[data-tab="list"]');
+        if (listTabButton) listTabButton.click();
+      }
     }).catch(function (error) {
       document.getElementById('overall-score-label').textContent = error.message;
     });

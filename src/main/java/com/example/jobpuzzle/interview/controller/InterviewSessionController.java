@@ -118,12 +118,46 @@ public class InterviewSessionController {
         ));
     }
 
+    @GetMapping("/api/interview-sessions/{sessionId}/questions/remaining")
+    public ResponseEntity<ApiResponse<List<RemainingQuestionResponse>>> getRemainingQuestions(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable Long sessionId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getRemainingQuestions(user.getUserId(), sessionId)
+        ));
+    }
+
+    @PostMapping("/api/interview-sessions/{sessionId}/questions")
+    public ResponseEntity<ApiResponse<List<SessionQuestionResponse>>> addQuestions(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable Long sessionId,
+            @Valid @RequestBody SessionQuestionAddRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.addQuestions(
+                        user.getUserId(),
+                        sessionId,
+                        request.getQuestionIds()
+                )
+        ));
+    }
+
     @GetMapping("/api/interview-weakness-tags")
     public ResponseEntity<ApiResponse<List<String>>> getUnresolvedWeaknessTags(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 interviewSessionService.getUnresolvedWeaknessTags(user.getUserId())
+        ));
+    }
+
+    @GetMapping("/api/interview-weakness-tags/details")
+    public ResponseEntity<ApiResponse<List<WeaknessTagResponse>>> getUnresolvedWeaknessTagDetails(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getUnresolvedWeaknessTagDetails(user.getUserId())
         ));
     }
 
@@ -142,6 +176,15 @@ public class InterviewSessionController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 interviewSessionService.getActiveSessions(user.getUserId())
+        ));
+    }
+
+    @GetMapping("/api/interview-sessions/review-list")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> getReviewReadySessions(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.getReviewReadySessions(user.getUserId())
         ));
     }
 

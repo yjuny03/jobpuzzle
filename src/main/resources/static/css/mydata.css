@@ -1,4 +1,4 @@
-/* mydata.css — shared by my-data.html and job-analysis.html */
+/* mydata.css — document-management page styles */
 
 .page-jump-group {
   display: inline-flex;
@@ -265,3 +265,399 @@
 }
 .link-status--linked { background: #E6F4EC; color: #1E8E5A; }
 .link-status--unlinked { background: #FDF7EE; color: #8A5A22; }
+
+/* Dashboard-derived visual treatment for the resource management page. */
+.jp-mydata-page .page-subtitle {
+  max-width: 760px;
+  margin-bottom: 30px;
+}
+
+.jp-mydata-page .table-wrap {
+  overflow-x: auto;
+}
+
+.jp-mydata-page .table-head,
+.jp-mydata-page .table-row {
+  min-width: 900px;
+}
+
+.jp-mydata-page .table-head {
+  border-bottom: 2px solid var(--jp-line);
+  background: var(--jp-blue-soft);
+  color: var(--jp-ink);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.jp-mydata-page .table-row {
+  border-top: 2px solid var(--jp-line-soft);
+  background: rgba(251, 248, 239, 0.84);
+  color: var(--jp-ink);
+}
+
+.jp-mydata-page .table-row:first-child {
+  border-top: 0;
+}
+
+.jp-mydata-page .table-row:hover {
+  background: var(--jp-paper-blue);
+}
+
+.jp-mydata-page .table-row > span:first-child {
+  color: var(--jp-ink);
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+}
+
+.jp-mydata-page .table-row > span:nth-child(4) {
+  color: var(--jp-text-secondary) !important;
+  font-weight: 600;
+}
+
+.jp-mydata-page .table-row > span:nth-child(5) {
+  color: var(--jp-text-tertiary) !important;
+  font-weight: 600;
+}
+
+.jp-mydata-page .badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  align-self: center;
+  justify-self: start;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 2px solid var(--jp-blue);
+  border-radius: 8px;
+  background: #C7DDEB;
+  color: var(--jp-blue-deep);
+  font-weight: 700;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, 0.2);
+}
+
+.jp-mydata-page .badge::before {
+  content: "";
+  width: 10px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  background:
+    linear-gradient(currentColor, currentColor) 2px 4px / 6px 1px no-repeat,
+    linear-gradient(currentColor, currentColor) 2px 7px / 6px 1px no-repeat,
+    rgba(255, 255, 255, 0.34);
+  box-sizing: border-box;
+}
+
+.jp-mydata-page .table-row:hover .badge {
+  border-color: var(--jp-blue-deep);
+  background: #B8D3E4;
+}
+
+.jp-mydata-page .table-row > span:nth-child(3) {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  align-self: center;
+  justify-self: start;
+  padding: 6px 10px;
+  border: 2px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 58%, var(--jp-paper));
+  border-radius: 8px;
+  background: var(--jp-paper);
+  background: color-mix(in srgb, currentColor 12%, var(--jp-paper));
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, 0.14);
+  box-shadow: 2px 3px 0 color-mix(in srgb, currentColor 24%, transparent);
+  line-height: 1.2;
+}
+
+.jp-mydata-page .btn-sm {
+  border: 2px solid var(--jp-line-soft);
+  border-radius: 8px;
+  background: var(--jp-paper);
+  color: var(--jp-text-secondary);
+  font-weight: 700;
+}
+
+.jp-mydata-page .btn-sm:hover,
+.jp-mydata-page .btn-sm--primary-tint {
+  border-color: var(--jp-blue);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+}
+
+.jp-mydata-page .btn-sm--danger {
+  border-color: #C99A93;
+  background: #F0E2DE;
+  color: var(--jp-danger);
+}
+
+.jp-mydata-page .btn-sm--danger:hover {
+  border-color: #8E332D;
+  background: #B5433D;
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, 0.25);
+}
+
+.jp-mydata-page [data-view],
+.jp-mydata-page [data-del],
+.jp-mydata-page [data-panel-action="enter-edit"] {
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, 0.16);
+}
+
+.jp-mydata-page [data-view]:hover {
+  border-color: var(--jp-blue-deep);
+  background: #C7DDEB;
+  color: var(--jp-blue-deep);
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, 0.24);
+}
+
+.jp-mydata-page [data-panel-action="enter-edit"]:hover {
+  border-color: var(--jp-line);
+  background: var(--jp-blue-deep);
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(23, 40, 58, 0.24);
+}
+
+.jp-mydata-page [data-panel-action="edit-cancel"],
+.jp-mydata-page #register-cancel,
+.jp-mydata-page #scale-cancel {
+  border-color: #C99A93 !important;
+  background: #F0E2DE;
+  color: var(--jp-danger);
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, 0.14);
+}
+
+.jp-mydata-page [data-panel-action="edit-cancel"]:hover,
+.jp-mydata-page #register-cancel:hover,
+.jp-mydata-page #scale-cancel:hover {
+  border-color: #8E332D !important;
+  background: #B5433D;
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, 0.25);
+}
+
+.jp-mydata-page .table-empty {
+  color: var(--jp-text-secondary);
+  font-weight: 600;
+}
+
+.jp-mydata-page .page-jump-group {
+  border-left: 2px solid var(--jp-line-soft);
+}
+
+.jp-mydata-page .extract-layout {
+  gap: 18px;
+}
+
+.jp-mydata-page .extract-nav-item {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper-soft);
+  color: var(--jp-ink);
+}
+
+.jp-mydata-page .extract-nav-item:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+}
+
+.jp-mydata-page .extract-nav-item.is-active {
+  border-color: var(--jp-line);
+  background: var(--jp-blue-soft);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-mydata-page .extract-nav-item__name {
+  color: var(--jp-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.jp-mydata-page .extract-nav-item__meta {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 5px 9px;
+  border: 2px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 58%, var(--jp-paper));
+  border-radius: 7px;
+  background: var(--jp-paper);
+  background: color-mix(in srgb, currentColor 14%, var(--jp-paper));
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, 0.14);
+  box-shadow: 2px 3px 0 color-mix(in srgb, currentColor 26%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.jp-mydata-page .badge-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 6px 11px;
+  border: 2px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 64%, var(--jp-paper));
+  border-radius: 8px;
+  background: var(--jp-paper) !important;
+  background: color-mix(in srgb, currentColor 18%, var(--jp-paper)) !important;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, 0.16);
+  box-shadow: 2px 3px 0 color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.jp-mydata-page #extract-detail > .flex-row:first-child > div:first-child > p:nth-child(2) {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 2px solid var(--jp-blue);
+  border-radius: 8px;
+  background: #C7DDEB;
+  color: var(--jp-blue-deep) !important;
+  font-weight: 700;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, 0.2);
+}
+
+.jp-mydata-page #extract-detail > .flex-row:first-child > div:first-child > p:nth-child(2)::before {
+  content: "";
+  width: 10px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  background:
+    linear-gradient(currentColor, currentColor) 2px 4px / 6px 1px no-repeat,
+    linear-gradient(currentColor, currentColor) 2px 7px / 6px 1px no-repeat,
+    rgba(255, 255, 255, 0.34);
+  box-sizing: border-box;
+}
+
+.jp-mydata-page .extract-project-card,
+.jp-mydata-page .extract-entry-card {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper-soft);
+  color: var(--jp-ink);
+}
+
+.jp-mydata-page .extract-project-card__badge,
+.jp-mydata-page .extract-entry-card__badge {
+  border: 1px solid var(--jp-line-soft);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+}
+
+.jp-mydata-page .page-viewer {
+  border: 2px solid var(--jp-line);
+  background: #FFFFFF;
+  color: #17283A;
+  font-size: 14px;
+}
+
+.jp-mydata-page .extract-body__actions {
+  border-top: 2px solid var(--jp-line-soft);
+}
+
+.jp-mydata-page .version-note,
+.jp-mydata-page .file-name-preview,
+.jp-mydata-page .scale-option__desc {
+  color: var(--jp-text-secondary);
+  font-weight: 500;
+}
+
+.jp-mydata-page .reg-cat-btn,
+.jp-mydata-page .scale-option {
+  border: 2px solid var(--jp-line-soft);
+  background: var(--jp-paper-soft);
+  color: var(--jp-ink);
+}
+
+.jp-mydata-page .reg-cat-btn:hover,
+.jp-mydata-page .scale-option:hover {
+  border-color: var(--jp-blue);
+  background: var(--jp-paper-blue);
+}
+
+.jp-mydata-page .reg-cat-btn.is-active,
+.jp-mydata-page .scale-option.is-active {
+  border-color: var(--jp-line);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+}
+
+.jp-mydata-page .scale-radio {
+  border-color: var(--jp-line-soft);
+}
+
+.jp-mydata-page .scale-option.is-active .scale-radio {
+  border-color: var(--jp-blue-deep);
+  background: var(--jp-blue);
+}
+
+.jp-mydata-page .file-chip {
+  border: 1px solid var(--jp-line-soft);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+  font-weight: 600;
+}
+
+.jp-mydata-page .modal-x {
+  color: var(--jp-ink);
+}
+
+.jp-mydata-page #scale-modal .modal-box > p:nth-child(2),
+.jp-mydata-page #delete-modal .modal-box > p:nth-child(3) {
+  color: var(--jp-text-secondary) !important;
+  font-weight: 500;
+}
+
+.jp-mydata-page .old-version-banner,
+.jp-mydata-page .link-status--unlinked {
+  border: 2px solid #D1B58F;
+  background: #F3EBDD;
+  color: #76512C;
+}
+
+.jp-mydata-page .link-status--linked {
+  border: 2px solid #94B9AD;
+  background: #E3EEE9;
+  color: #2F6857;
+}
+
+@media (max-width: 800px) {
+  .jp-mydata-page .extract-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-mydata-page #extract-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .jp-mydata-page .extract-nav-item {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .jp-mydata-page .app-container {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .jp-mydata-page .reg-cat-grid,
+  .jp-mydata-page #extract-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-mydata-page .tabbar {
+    width: 100%;
+  }
+
+  .jp-mydata-page .tabbar__btn {
+    flex: 1;
+  }
+}
