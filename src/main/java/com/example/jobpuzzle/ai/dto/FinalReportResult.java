@@ -36,6 +36,7 @@ public class FinalReportResult {
     private String overallAssessment;
 
     private CategoryScores categoryScores;
+    private CategoryScoreReasons categoryScoreReasons;
     private BasisSummary basisSummary;
     private List<WeaknessTagSummary> weaknessTagSummary;
     private List<NextPracticeRecommendation> nextPracticeRecommendation;
@@ -57,6 +58,22 @@ public class FinalReportResult {
         // 적용 가이드가 없거나 WEAKNESS_REVIEW의 targetDimension이 아니면 null
         private Integer guideAlignment;
         private Integer deliveryClarity;
+    }
+
+    // categoryScores에 값이 있는 관점에 대해서만 채우는 근거 서술
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CategoryScoreReasons {
+        private String intentMatch;
+        private String specificity;
+        private String ownRole;
+        private String problemSolving;
+        private String resultExpression;
+        private String requirementConnection;
+        private String guideAlignment;
+        private String deliveryClarity;
     }
 
     @Data
@@ -86,6 +103,8 @@ public class FinalReportResult {
     public static class WeaknessTagSummary {
         private String tag;
         private int count;
+        // 이 태그가 어떤 답변의 score·summary 근거로 나왔는지에 대한 설명
+        private String reason;
     }
 
     @Data

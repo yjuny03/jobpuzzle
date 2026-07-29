@@ -51,21 +51,15 @@
   }
 
   var QUESTION_TYPE_LABELS = {
-    GENERAL: '일반', COMPANY_FIT: '회사 맞춤', EXPERIENCE: '경험', PROBLEM_SOLVING: '문제 해결', SKILL: '기술'
+    GENERAL: '일반', COMPANY_FIT: '회사 맞춤', EXPERIENCE: '경험', PROBLEM_SOLVING: '문제 해결', SKILL: '기술',
+    SELF_INTRO: '자기소개', MOTIVATION: '지원 동기', STRENGTH_WEAKNESS: '강점·약점',
+    FAILURE_CONFLICT: '실패·갈등 경험', JOB_GENERAL: '직무 일반', WEAKNESS_FOLLOWUP: '약점 보완 후속'
   };
   var IMPROVEMENT_TARGET_LABELS = {
     resume: '이력서', coverLetter: '자기소개서', portfolio: '포트폴리오', experienceNote: '경험정리'
   };
 
-  // 최종 리포트의 약점 태그를 클릭하면 그 태그가 달린 첫 질문으로 이동한다.
-  // renderSession()이 아직 안 끝났으면(sessionQuestions 비어있음) 조용히 무시한다.
-  function jumpToQuestionWithTag(tag) {
-    var index = sessionQuestions.findIndex(function (question) {
-      var item = sessionScoreByQuestion[question.sessionQuestionId];
-      return item && item.weaknessTags && item.weaknessTags.indexOf(tag) !== -1;
-    });
-    if (index === -1) return;
-
+  function jumpToQuestionIndex(index) {
     var listTabButton = document.querySelector('.tabbar__btn[data-tab="list"]');
     if (listTabButton) listTabButton.click();
 
@@ -74,6 +68,245 @@
       listButton.click();
       listButton.scrollIntoView({ block: 'nearest' });
     }
+  }
+
+  // 이 약점 태그가 달린 질문들의 인덱스를 전부 찾는다. sessionQuestions가 아직 안 채워졌으면 빈 배열.
+  function questionIndicesForTag(tag) {
+    var indices = [];
+    sessionQuestions.forEach(function (question, index) {
+      var item = sessionScoreByQuestion[question.sessionQuestionId];
+      if (item && item.weaknessTags && item.weaknessTags.indexOf(tag) !== -1) {
+        indices.push(index);
+      }
+    });
+    return indices;
+  }
+
+  // 최종 리포트와 질문별 결과(/score) 로딩 순서가 보장되지 않으므로, 둘 중 하나가 끝날 때마다 다시 채운다.
+  function renderWeaknessQuestionLinks() {
+    document.querySelectorAll('.weakness-tag-row__questions[data-tag]').forEach(function (container) {
+      var indices = questionIndicesForTag(container.dataset.tag);
+      container.innerHTML = indices.map(function (index) {
+        return '<button type="button" class="weakness-question-chip" data-question-index="' + index + '">' +
+          (index + 1) + '</button>';
+      }).join('');
+    });
+    document.querySelectorAll('.weakness-question-chip[data-question-index]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        jumpToQuestionIndex(Number(button.dataset.questionIndex));
+      });
+    });
+  }
+
+  // JSON-07 overallAssessment는 "[잘한 점]/[부족한 점] (세션 종합 점수: N점)/[총평]" 형식의 단일 문자열이다.
+  // 마커를 못 찾으면(v1.5 이전 리포트 등) 통짜 텍스트 블록 하나로 대체 표시한다.
+  var ASSESSMENT_SECTIONS = ['[잘한 점]', '[부족한 점]', '[총평]'];
+
+  function formatParagraph(text) {
+    return esc(text).replace(/\n+/g, '<br>');
+  }
+
+  function formatAssessmentBody(text) {
+    var lines = text.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+    var isBulletList = lines.length > 0 && lines.every(function (line) { return line.indexOf('-') === 0; });
+    if (!isBulletList) return '<p>' + formatParagraph(text) + '</p>';
+    return '<ul class="final-assessment-bullets">' + lines.map(function (line) {
+      return '<li>' + esc(line.replace(/^-\s*/, '')) + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function splitAssessmentSections(text) {
+    var positions = ASSESSMENT_SECTIONS.map(function (marker) { return text.indexOf(marker); });
+    if (positions.some(function (position) { return position === -1; })) return null;
+    var sections = {};
+    for (var i = 0; i < ASSESSMENT_SECTIONS.length; i++) {
+      var start = positions[i] + ASSESSMENT_SECTIONS[i].length;
+      var end = i + 1 < ASSESSMENT_SECTIONS.length ? positions[i + 1] : text.length;
+      sections[ASSESSMENT_SECTIONS[i]] = text.slice(start, end).trim();
+    }
+    return sections;
+  }
+
+  // "부족한 점" 섹션 첫 줄에 v1.8 이전 리포트는 "(세션 종합 점수: N점)"이 남아있을 수 있다.
+  // 종합 점수는 이제 그래프로 따로 보여주므로 본문에서는 그냥 잘라내고 버린다.
+  function stripLeadingParenthetical(text) {
+    return text.replace(/^\([^)]*\)\s*/, '');
+  }
+
+  function renderOverallAssessment(rawText) {
+    if (!rawText) return '';
+    var sections = splitAssessmentSections(rawText);
+    if (!sections) {
+      return '<div class="final-assessment"><div class="final-assessment-block">' +
+        formatAssessmentBody(rawText) + '</div></div>';
+    }
+    var blocks = [
+      { title: '잘한 점', body: sections['[잘한 점]'] },
+      { title: '부족한 점', body: stripLeadingParenthetical(sections['[부족한 점]']) },
+      { title: '총평', body: sections['[총평]'] }
+    ];
+    return '<div class="final-assessment">' + blocks.map(function (block) {
+      return '<div class="final-assessment-block">' +
+        '<div class="final-assessment-block__head"><strong>' + esc(block.title) + '</strong></div>' +
+        formatAssessmentBody(block.body) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  // 관점별 점수를 상단 요약 영역에 시각화한다. 3개 이상이면 레이더, 1~2개면 큰 도넛, 0개면 빈 상태 문구.
+  function dimensionEntries(categoryScores) {
+    return Object.keys(CATEGORY_LABELS)
+      .filter(function (key) { return categoryScores && categoryScores[key] != null; })
+      .map(function (key) { return { key: key, value: categoryScores[key] }; });
+  }
+
+  // AI 호출 없이 지금 있는 점수만으로 계산하는 한 줄 요약
+  function dimensionSummaryLine(entries) {
+    if (!entries.length) return '';
+    if (entries.length === 1) {
+      var only = entries[0];
+      return '이번 세션은 ' + esc(CATEGORY_LABELS[only.key] || only.key) + ' 관점만 평가됐어요 (' + only.value + '점).';
+    }
+    var sorted = entries.slice().sort(function (a, b) { return b.value - a.value; });
+    var best = sorted[0];
+    var worst = sorted[sorted.length - 1];
+    if (best.value === worst.value) {
+      return '관점별 점수가 ' + best.value + '점으로 고르게 나왔어요.';
+    }
+    return '가장 강한 관점은 ' + esc(CATEGORY_LABELS[best.key] || best.key) + '(' + best.value + '점), 가장 약한 관점은 ' +
+      esc(CATEGORY_LABELS[worst.key] || worst.key) + '(' + worst.value + '점)이에요.';
+  }
+
+  function radarChart(entries) {
+    var size = 620;
+    var center = size / 2;
+    var maxRadius = center - 140;
+    var count = entries.length;
+    // 관점이 적을수록 글자가 잘릴 걱정이 없으니 더 크게, 많을수록 겹치지 않게 작게.
+    var labelFontSize = count <= 4 ? 18 : count <= 6 ? 14 : 11;
+    var scoreFontSize = count <= 4 ? 16 : count <= 6 ? 12 : 10;
+    var points = entries.map(function (item, index) {
+      var angle = (Math.PI * 2 * index / count) - Math.PI / 2;
+      return {
+        angle: angle,
+        cos: Math.cos(angle),
+        sin: Math.sin(angle),
+        item: item
+      };
+    });
+    var axisPoint = function (p, ratio) {
+      return { x: center + maxRadius * ratio * p.cos, y: center + maxRadius * ratio * p.sin };
+    };
+    var toStr = function (pt) { return pt.x.toFixed(1) + ',' + pt.y.toFixed(1); };
+
+    var rings = [0.33, 0.66, 1].map(function (ratio) {
+      return '<polygon points="' + points.map(function (p) { return toStr(axisPoint(p, ratio)); }).join(' ') +
+        '" class="radar-ring" />';
+    }).join('');
+
+    var axes = points.map(function (p) {
+      var end = axisPoint(p, 1);
+      return '<line x1="' + center + '" y1="' + center + '" x2="' + end.x.toFixed(1) +
+        '" y2="' + end.y.toFixed(1) + '" class="radar-axis" />';
+    }).join('');
+
+    var scorePolygon = points.map(function (p) {
+      return toStr(axisPoint(p, p.item.value / 100));
+    }).join(' ');
+
+    var dots = points.map(function (p) {
+      var pt = axisPoint(p, p.item.value / 100);
+      return '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="4.5" class="radar-dot" />';
+    }).join('');
+
+    var labels = points.map(function (p) {
+      var labelPt = axisPoint(p, 1.1);
+      var anchor = p.cos > 0.3 ? 'start' : p.cos < -0.3 ? 'end' : 'middle';
+      return '<text x="' + labelPt.x.toFixed(1) + '" y="' + labelPt.y.toFixed(1) +
+        '" text-anchor="' + anchor + '" class="radar-label" style="font-size:' + labelFontSize + 'px">' +
+        esc(CATEGORY_LABELS[p.item.key] || p.item.key) +
+        '</text><text x="' + labelPt.x.toFixed(1) + '" y="' + (labelPt.y + labelFontSize + 4).toFixed(1) +
+        '" text-anchor="' + anchor + '" class="radar-label-score" style="font-size:' + scoreFontSize + 'px">' +
+        p.item.value + '점</text>';
+    }).join('');
+
+    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart" role="img" aria-label="관점별 점수 레이더 차트">' +
+      rings + axes + '<polygon points="' + scorePolygon + '" class="radar-score-area" />' + dots + labels + '</svg>';
+  }
+
+  function dimensionDonuts(entries) {
+    return '<div class="dimension-donut-list">' + entries.map(function (item) {
+      return '<div class="dimension-donut">' +
+        scoreRingMarkup(item.value, { size: 130, stroke: 10, uid: 'dim-' + item.key, variant: 'sm' }) +
+        '<p>' + esc(CATEGORY_LABELS[item.key] || item.key) + '</p></div>';
+    }).join('') + '</div>';
+  }
+
+  // 종합 점수 및 관점별 점수를 강조하는 그래프 — 얇은 링 + 그라데이션 + 은은한 그림자로 표현한다.
+  function scoreRingMarkup(value, options) {
+    options = options || {};
+    var size = options.size || 240;
+    var stroke = options.stroke || 16;
+    var uid = options.uid || 'main';
+    var gradientId = 'score-ring-gradient-' + uid;
+    var shadowId = 'score-ring-shadow-' + uid;
+    var ringClass = 'score-ring' + (options.variant ? ' score-ring--' + options.variant : '');
+    var center = size / 2;
+    var radius = center - stroke / 2 - 4;
+    var circumference = 2 * Math.PI * radius;
+    var ratio = value == null ? 0 : Math.max(0, Math.min(100, value)) / 100;
+    var dashoffset = circumference * (1 - ratio);
+    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="' + ringClass + '" role="img" aria-label="' +
+      (value == null ? '평가 전' : value + '점') + '">' +
+      '<defs>' +
+      '<linearGradient id="' + gradientId + '" x1="0%" y1="0%" x2="100%" y2="100%">' +
+      '<stop offset="0%" stop-color="#7EB8E8" /><stop offset="100%" stop-color="#185FA5" />' +
+      '</linearGradient>' +
+      '<filter id="' + shadowId + '" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#185FA5" flood-opacity="0.28" />' +
+      '</filter>' +
+      '</defs>' +
+      '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" class="score-ring-track" stroke-width="' + stroke + '" fill="none" />' +
+      '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" class="score-ring-progress" stroke-width="' + stroke +
+      '" fill="none" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + dashoffset.toFixed(1) +
+      '" transform="rotate(-90 ' + center + ' ' + center + ')" stroke="url(#' + gradientId + ')" filter="url(#' + shadowId + ')" />' +
+      '<text x="' + center + '" y="' + (center + size * 0.02).toFixed(1) + '" text-anchor="middle" class="score-ring-value">' +
+      (value == null ? '-' : value) + '</text>' +
+      '<text x="' + center + '" y="' + (center + size * 0.14).toFixed(1) + '" text-anchor="middle" class="score-ring-label">/ 100점</text>' +
+      '</svg>';
+  }
+
+  function dimensionReasonList(entries, reasons) {
+    return '<div class="dimension-reason-list">' + entries.map(function (item) {
+      var reason = reasons && reasons[item.key];
+      return '<div class="dimension-reason"><div class="dimension-reason__head">' +
+        '<strong>' + esc(CATEGORY_LABELS[item.key] || item.key) + '</strong><em>' + item.value + '점</em></div>' +
+        '<p>' + esc(reason || '아직 근거 설명이 없어요.') + '</p></div>';
+    }).join('') + '</div>';
+  }
+
+  function renderDimensionVisual(overallScore, categoryScores, categoryScoreReasons) {
+    var container = document.getElementById('dimension-visual');
+    if (!container) return;
+    var entries = dimensionEntries(categoryScores);
+    var overallBlock = '<div class="dimension-visual__overall">' +
+      '<span class="dimension-visual__type">면접 종합 점수</span>' +
+      '<div class="dimension-visual__graphic-wrap">' + scoreRingMarkup(overallScore) + '</div></div>';
+
+    if (!entries.length) {
+      container.innerHTML = '<div class="dimension-visual__graphics">' + overallBlock + '</div>' +
+        '<p class="result-empty-copy">평가에 성공한 관점이 없습니다.</p>';
+      return;
+    }
+    var typeLabel = entries.length >= 3 ? '레이더 차트' : '관점별 점수';
+    var chart = entries.length >= 3 ? radarChart(entries) : dimensionDonuts(entries);
+    var chartBlock = '<div class="dimension-visual__chart">' +
+      '<span class="dimension-visual__type">' + esc(typeLabel) + '</span>' +
+      '<div class="dimension-visual__graphic-wrap">' + chart + '</div></div>';
+    container.innerHTML =
+      '<div class="dimension-visual__graphics">' + overallBlock + chartBlock + '</div>' +
+      '<div class="dimension-visual__desc">' +
+      '<p class="dimension-visual__summary">' + dimensionSummaryLine(entries) + '</p>' +
+      dimensionReasonList(entries, categoryScoreReasons) + '</div>';
   }
 
   function renderFinalReport(report) {
@@ -87,15 +320,20 @@
       '<p class="result-empty-copy">' + esc(report.totalQuestionCount) + '개 질문, 답변 ' +
       esc(report.submittedQuestionCount) + '개를 모두 종합해 정리한 결과예요.</p>';
 
-    if (report.overallAssessment) {
-      html += '<div class="final-assessment">' + esc(report.overallAssessment) + '</div>';
-    }
+    html += '<div id="dimension-visual" class="dimension-visual"></div>';
 
-    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span><small>태그를 누르면 관련 질문으로 이동해요</small></div>';
+    html += renderOverallAssessment(report.overallAssessment);
+
+    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span><small>번호를 누르면 해당 질문으로 이동해요</small></div>';
     html += weaknessTags.length
-      ? '<div class="final-tag-list">' + weaknessTags.map(function (item) {
-          return '<button type="button" class="final-tag-chip" data-jump-tag="' + esc(item.tag) + '">' +
-            esc(item.tag) + ' <em>' + item.count + '회</em></button>';
+      ? '<div class="weakness-tag-list">' + weaknessTags.map(function (item) {
+          return '<div class="weakness-tag-row">' +
+            '<div class="weakness-tag-row__head"><strong>' + esc(item.tag) + '</strong><em>' + item.count + '회</em></div>' +
+            (item.reason ? '<p class="weakness-tag-row__reason">' + esc(item.reason) + '</p>' : '') +
+            '<div class="weakness-tag-row__questions-line">' +
+            '<span class="weakness-tag-row__questions-label">약점이 나온 질문</span>' +
+            '<div class="weakness-tag-row__questions" data-tag="' + esc(item.tag) + '"></div>' +
+            '</div></div>';
         }).join('') + '</div>'
       : '<p class="result-empty-copy">확인된 약점 태그가 없습니다.</p>';
 
@@ -132,25 +370,14 @@
     }
 
     panel.innerHTML = html;
-    panel.querySelectorAll('[data-jump-tag]').forEach(function (button) {
-      button.addEventListener('click', function () { jumpToQuestionWithTag(button.dataset.jumpTag); });
-    });
+    renderDimensionVisual(report.overallScore, report.categoryScores, report.categoryScoreReasons);
+    renderWeaknessQuestionLinks();
   }
 
   function scoreTone(score) {
     if (score >= 80) return 'score-good';
     if (score >= 70) return 'score-pass';
     return 'score-needs-work';
-  }
-
-  function renderDonut(value) {
-    var overall = value == null ? 0 : value;
-    var deg = Math.round(overall * 3.6);
-    document.getElementById('overall-donut').innerHTML =
-      '<div class="score-donut" style="--score-angle:' + deg + 'deg">' +
-      '<div><strong>' + (value == null ? '-' : overall) + '</strong><span>100점</span></div></div>';
-    document.getElementById('overall-score-label').textContent =
-      value == null ? '점수 집계 대상 없음' : overall + '점';
   }
 
   function dimensionItems(scores, counts) {
@@ -232,7 +459,6 @@
     document.getElementById('result-meta').textContent =
       '질문 ' + score.totalQuestionCount + '개 · 답변 ' + score.submittedQuestionCount +
       '개 · 평가 성공 ' + score.evaluatedQuestionCount + '개';
-    renderDonut(score.overallScore);
 
     var scoreByQuestion = {};
     (score.questionScores || []).forEach(function (item) {
@@ -264,48 +490,7 @@
         renderQuestionDetail(question, scoreByQuestion[question.sessionQuestionId], score);
       });
     });
-
-    var categories = Object.keys(score.categoryScores || {}).map(function (key) {
-      var questionCount = (score.questionScores || []).filter(function (questionScore) {
-        return questionScore.dimensionScores &&
-          questionScore.dimensionScores[key] != null;
-      }).length;
-      return { key: key, value: score.categoryScores[key], questionCount: questionCount };
-    }).sort(function (a, b) { return a.value - b.value; });
-    document.getElementById('score-method').innerHTML =
-      '<div><span>1</span><strong>답변마다 분석</strong><p>첫 답변과 심화 답변을 핵심 기준으로 평가</p></div>' +
-      '<i>→</i><div><span>2</span><strong>질문별 점수</strong><p>같은 기준의 답변 점수를 평균</p></div>' +
-      '<i>→</i><div><span>3</span><strong>세션 종합</strong><p>질문별 동일 관점과 최종점수를 평균</p></div>';
-    document.getElementById('eval-list').innerHTML = categories.length
-      ? categories.map(function (item) {
-        return '<article class="eval-item-card"><div><strong>' +
-          esc(CATEGORY_LABELS[item.key] || item.key) + '</strong>' +
-          '<span class="eval-scope">세션 종합 관점</span>' +
-          '<p>이 관점이 적용된 질문 ' + item.questionCount +
-          '개의 최종 관점점수를 평균했습니다.</p></div>' +
-          '<b class="' + scoreTone(item.value) + '">' + item.value + '점</b></article>';
-      }).join('')
-      : '<p class="result-empty-copy">평가에 성공한 관점이 없습니다.</p>';
-
-    var weaknessList = document.getElementById('weakness-list');
-    var weaknessButton = document.getElementById('weakness-practice-link');
-    var weaknessHeading = document.getElementById('weakness-heading');
-    if (score.mode === 'BASIC') {
-      if (weaknessHeading) weaknessHeading.textContent = '이번 연습 안내';
-      weaknessList.innerHTML =
-        '<p class="weakness-info-title">기본 모드는 약점 태그를 생성하지 않습니다.</p>' +
-        '<p class="weakness-info-copy">직무 공통 질문의 답변 점수만 확인할 수 있습니다.</p>';
-      if (weaknessButton) weaknessButton.hidden = true;
-    } else {
-      if (weaknessHeading) weaknessHeading.textContent =
-        score.mode === 'WEAKNESS_REVIEW' ? '약점 보완 결과' : '발견된 보완 포인트';
-      weaknessList.innerHTML =
-        '<p class="weakness-info-copy">70점 미만 평가에서 확인된 약점은 약점 보완 모드에서 연습할 수 있습니다.</p>';
-      if (weaknessButton) {
-        weaknessButton.hidden = false;
-        weaknessButton.href = '/interview.html?mode=weakness';
-      }
-    }
+    renderWeaknessQuestionLinks();
     renderInterimActions();
   }
 
@@ -403,15 +588,23 @@
     });
   }
 
+  // 완료된 면접(리포트)을 보고 있을 때는 헤더에서 "면접 준비" 대신 "리포트"를 활성 표시한다.
+  function highlightReportsNav() {
+    var interviewLink = document.querySelector('.site-header__nav a[href="/interview.html"]');
+    var reportsLink = document.querySelector('.site-header__nav a[href="/reports.html"]');
+    if (interviewLink) interviewLink.classList.remove('is-active');
+    if (reportsLink) reportsLink.classList.add('is-active');
+  }
+
   function renderHistory(items) {
     document.getElementById('result-title').textContent = '완료한 면접';
     document.getElementById('result-meta').textContent =
       items.length ? '완료한 면접을 선택해 질문별 점수와 진행 결과를 확인하세요.' :
         '아직 완료한 면접이 없습니다.';
     document.querySelector('.result-layout').classList.add('result-layout--history');
-    document.querySelector('.result-sidebar').hidden = true;
     document.querySelector('.result-tabs').hidden = true;
     document.getElementById('q-detail').hidden = true;
+    highlightReportsNav();
     var list = document.getElementById('q-list');
     list.className = 'history-list';
     list.innerHTML = items.length ? items.map(function (item) {
@@ -446,9 +639,11 @@
       if (sessionInfo.status !== 'COMPLETED') {
         var listTabButton = document.querySelector('.tabbar__btn[data-tab="list"]');
         if (listTabButton) listTabButton.click();
+      } else {
+        highlightReportsNav();
       }
     }).catch(function (error) {
-      document.getElementById('overall-score-label').textContent = error.message;
+      document.getElementById('result-meta').textContent = error.message;
     });
 
     // 최종 리포트는 별도 호출로 분리
