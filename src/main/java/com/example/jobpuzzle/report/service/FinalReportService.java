@@ -468,6 +468,7 @@ public class FinalReportService {
 
             InterviewSession session = findSession(lease.sessionId());
             SessionScoreSummary score = lease.scoreSummary();
+            validateResult(result, session, score);
 
             FinalReport report = FinalReport.builder()
                     .session(session)
@@ -502,6 +503,26 @@ public class FinalReportService {
 
             log.succeed();
         });
+    }
+
+    // LLM 응답 중 화면에 그대로 노출되거나 세션 모드와 어긋나면 문제가 되는 필드만 최소로 검증한다.
+    private void validateResult(FinalReportResult result, InterviewSession session, SessionScoreSummary score) {
+        if (score.getOverallScore() == null && result.getOverallScore() != null
+                && (result.getOverallScore() < 0 || result.getOverallScore() > 100)) {
+            throw new IllegalStateException("JSON-07 overallScore out of range: " + result.getOverallScore());
+        }
+
+        FinalReportResult.BasisSummary basisSummary = result.getBasisSummary();
+        if (session.getMode() != InterviewSessionMode.WEAKNESS_REVIEW && basisSummary != null
+                && (basisSummary.getTargetWeaknessTag() != null || basisSummary.getTargetDimension() != null)) {
+            throw new IllegalStateException(
+                    "JSON-07 targetWeaknessTag/targetDimension must be null outside WEAKNESS_REVIEW mode");
+        }
+
+        if (result.getWeaknessTagSummary() != null
+                && result.getWeaknessTagSummary().stream().anyMatch(tag -> tag.getCount() < 0)) {
+            throw new IllegalStateException("JSON-07 weaknessTagSummary count must not be negative");
+        }
     }
 
     private void saveImprovementSuggestions(
