@@ -6,44 +6,48 @@
 <title>설정 — JobPuzzle</title>
 <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
 <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/app-theme.css" th:href="@{/css/app-theme.css}">
 <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
 <link rel="stylesheet" href="/css/settings.css" th:href="@{/css/settings.css}">
 </head>
-<body>
+<body class="jp-app-theme jp-settings-page">
 
 <div th:replace="~{fragments/header :: appHeader('settings')}"></div>
 
 <div class="app-shell">
   <div class="app-container app-container--narrow">
 
-    <h1 class="page-title">설정</h1>
-    <p class="page-subtitle">계정과 희망 직무를 관리할 수 있어요</p>
+    <header class="settings-hero">
+      <p class="eyebrow-label">내 정보 관리</p>
+      <h1 class="page-title">설정</h1>
+      <p class="page-subtitle">계정 정보와 희망 직무를 한곳에서 관리할 수 있어요.</p>
+    </header>
 
     <!-- profile -->
-    <div class="card card--pad-lg" style="margin-bottom:20px;">
+    <section class="card card--pad-lg settings-card">
       <p class="settings-section-title">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         프로필 설정
       </p>
       <div class="auth-error" id="profile-error"></div>
-      <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="settings-field-list">
         <div id="settings-id-row"><label class="field-label">아이디</label><input id='settings-id' class="text-input" value="" disabled></div>
         <div><label class="field-label">이메일</label><input id='settings-email' class="text-input" value="" disabled></div>
         <div><label class="field-label">이름</label><input id='settings-name' class="text-input" value="" disabled></div>
       </div>
-      <div class="flex-row gap-10 mt-16">
-        <button id='edit-profile-btn' class="btn btn--ghost" style="border:1px solid #E3E7ED;">수정</button>
+      <div class="flex-row gap-10 mt-16 settings-actions">
+        <button id='edit-profile-btn' class="btn btn--ghost">수정</button>
         <button id='save-profile-btn' class="btn btn--primary" hidden>저장</button>
       </div>
-    </div>
+    </section>
 
     <!-- target role -->
-    <div class="card card--pad-lg" style="margin-bottom:20px;">
+    <section class="card card--pad-lg settings-card">
       <p class="settings-section-title">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2"><path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
         희망 직무 설정
       </p>
-      <p style="font-size:12.5px; color:#8A93A3; margin:0 0 16px;">메인 화면과 리포트 기본값에 활용됩니다.</p>
+      <p class="settings-section-description">메인 화면과 리포트 기본값에 활용됩니다.</p>
       <div class="auth-error" id="job-category-error"></div>
       <div class="job-form-grid">
         <div><label class="field-label">대분류</label>
@@ -61,14 +65,14 @@
             <option value="">중분류를 먼저 선택해주세요</option>
           </select>
         </div>
-        <button id="save-job-category-btn" class="btn btn--primary" style="white-space:nowrap;">저장하기</button>
+        <button id="save-job-category-btn" class="btn btn--primary settings-job-save">저장하기</button>
       </div>
-    </div>
+    </section>
 
     <!-- danger zone -->
     <div class="danger-card">
-      <p style="font-size:15px; font-weight:700; margin:0 0 8px; color:#B5433D;">회원 탈퇴</p>
-      <p style="font-size:13px; color:#8A6B67; line-height:1.6; margin:0 0 16px;">탈퇴 시 모든 자료와 훈련 기록이 삭제되며 복구할 수 없어요.</p>
+      <p class="danger-card__title">회원 탈퇴</p>
+      <p class="danger-card__copy">탈퇴 시 모든 자료와 훈련 기록이 삭제되며 복구할 수 없어요.</p>
       <button class="btn-danger-outline" id="withdraw-btn">회원 탈퇴하기</button>
     </div>
 
@@ -93,7 +97,7 @@
     <p style="font-size:13px; color:#8A93A3; line-height:1.6; margin:0 0 16px;">탈퇴하면 계정과 업로드한 자료, 분석 기록 등 관련 정보가 모두 삭제되며 복구할 수 없습니다.</p>
     <div class="auth-error" id="withdraw-error"></div>
     <div class="flex-row gap-10" style="justify-content:center; margin-top:12px;">
-      <button class="btn btn--ghost" id="withdraw-cancel-btn" style="border:1px solid #E3E7ED;">취소</button>
+      <button class="btn btn--ghost" id="withdraw-cancel-btn">취소</button>
       <button class="btn-danger-outline" id="withdraw-confirm-btn">탈퇴</button>
     </div>
   </div>

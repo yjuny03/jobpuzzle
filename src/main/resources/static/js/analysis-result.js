@@ -46,6 +46,14 @@
     }, { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0, INSUFFICIENT: 0 });
   }
 
+  // 충족도별 연결 강도를 반영해 전체 요구사항 연결 점수를 계산합니다.
+  function calculateConnectionScore(counts, total) {
+    if (!total) return 0;
+    // LOW와 MEDIUM을 완전 충족으로 세지 않아 약한 연결이 점수를 과도하게 높이지 않도록 합니다.
+    var weightedSum = counts.HIGH * 100 + counts.MEDIUM * 50 + counts.LOW * 25;
+    return Math.round(weightedSum / total);
+  }
+
   function categoryText(category) {
     if (!category) return '직무 정보 없음';
     return [category.mainCategory, category.subCategory].filter(Boolean).join(' · ') || '직무 정보 없음';
@@ -106,9 +114,8 @@
     topbar.appendChild(node('span', 'result-date', '분석 #' + result.analysisCaseId + ' · 저장된 결과'));
     root.appendChild(topbar);
 
-    var connected = counts.HIGH + counts.MEDIUM + counts.LOW;
     var total = (result.requirementMatches || []).length;
-    var percent = total ? Math.round(connected / total * 100) : 0;
+    var percent = calculateConnectionScore(counts, total);
     var hero = node('section', 'result-hero');
     var copy = node('div', 'result-hero__copy');
     copy.appendChild(node('p', 'result-eyebrow', 'YOUR JOB FIT REPORT'));
@@ -125,10 +132,7 @@
     puzzle.dataset.resultPuzzle = '';
     puzzle.setAttribute('aria-hidden', 'true');
     hero.appendChild(puzzle);
-    var readinessStatus = result.readiness && result.readiness.status;
-    var scoreTone = readinessStatus === 'SUFFICIENT'
-      ? 'good'
-      : readinessStatus === 'PARTIAL' ? 'medium' : 'low';
+    var scoreTone = percent >= 70 ? 'good' : percent >= 40 ? 'medium' : 'low';
     var scoreWrap = node('div', 'result-score-wrap');
     var score = node('div', 'result-score result-score--' + scoreTone);
     score.style.setProperty('--result-score', percent);
