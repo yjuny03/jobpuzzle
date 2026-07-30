@@ -6,43 +6,38 @@
 <title>리포트 — JobPuzzle</title>
 <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
 <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/app-theme.css" th:href="@{/css/app-theme.css}">
 <link rel="stylesheet" href="/css/reports.css" th:href="@{/css/reports.css}">
 </head>
-<body>
+<body class="jp-app-theme jp-reports-page">
 
 <div th:replace="~{fragments/header :: appHeader('reports')}"></div>
 
 <div class="app-shell">
   <div class="app-container">
 
-    <p class="eyebrow-label">리포트</p>
-    <h1 class="page-title">리포트 · 직무별 리포트 · 추천</h1>
-    <p class="page-subtitle">완료한 모의면접 결과와 직무별 리포트, 추천 공고를 확인하세요</p>
-
-    <div class="tabbar" style="margin-bottom:24px;">
-      <button class="tabbar__btn is-active" data-tab="report">면접 리포트</button>
-      <button class="tabbar__btn" data-tab="guide">직무별 리포트</button>
-      <button class="tabbar__btn" data-tab="recs">추천 목록</button>
-    </div>
-
-    <!-- 1. interview report -->
-    <div class="tab-panel" data-panel="report">
-      <div class="report-layout">
-        <div id="report-list" style="display:flex; flex-direction:column; gap:10px;"></div>
-
-        <div class="card card--pad-lg" id="report-detail"></div>
+    <section class="reports-hero">
+      <div>
+        <p class="eyebrow-label">나의 면접 기록</p>
+        <h1 class="page-title">면접 리포트</h1>
+        <p class="page-subtitle">완료한 면접의 점수와 보완 방향을 다시 확인해 보세요.</p>
       </div>
-    </div>
+      <canvas class="reports-hero__puzzle" data-job-puzzle-scene data-result-puzzle aria-hidden="true"></canvas>
+    </section>
 
-    <!-- 2. job guide -->
-    <div class="tab-panel" data-panel="guide" hidden>
-      <div class="card card--pad-lg" id="guide-detail"></div>
-    </div>
-
-    <!-- 3. recommendations -->
-    <div class="tab-panel" data-panel="recs" hidden>
-      <div style="display:flex; flex-direction:column; gap:12px;" id="recs-list"></div>
-    </div>
+    <section class="reports-section" aria-labelledby="reports-section-title">
+      <header class="reports-section__head">
+        <div>
+          <p class="reports-section__eyebrow">INTERVIEW HISTORY</p>
+          <h2 id="reports-section-title">완료한 면접</h2>
+        </div>
+        <span class="reports-section__count" id="report-count">0개</span>
+      </header>
+      <div class="report-layout">
+        <div class="report-list" id="report-list" aria-label="완료한 면접 목록"></div>
+        <div class="report-detail" id="report-detail" aria-live="polite"></div>
+      </div>
+    </section>
 
   </div>
 </div>
@@ -52,6 +47,7 @@
 <script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/puzzle-scene.js" th:src="@{/js/puzzle-scene.js}"></script>
 <script src="/js/reports.js" th:src="@{/js/reports.js}"></script>
 </body>
 </html>

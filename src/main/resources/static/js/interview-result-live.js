@@ -17,6 +17,14 @@
     deliveryClarity: '답변 전달력'
   };
 
+  // 면접 결과 화면의 안내와 오류를 공통 토스트 디자인으로 표시합니다.
+  function notify(type, message, duration) {
+    if (typeof window.showToast === 'function') {
+      return window.showToast(type, message, duration);
+    }
+    return null;
+  }
+
   function api(path, options) {
     options = options || {};
     var fetchOptions = {
@@ -176,11 +184,30 @@
       esc(CATEGORY_LABELS[worst.key] || worst.key) + '(' + worst.value + '점)이에요.';
   }
 
+  // 모든 점수 그래프가 같은 네 단계 색상 기준을 사용하도록 점수 구간을 반환합니다.
+  function graphScoreTone(value) {
+    if (value >= 70) return 'good';
+    if (value >= 50) return 'blue';
+    if (value >= 25) return 'yellow';
+    return 'danger';
+  }
+
+  // 원형 그래프와 레이더 차트가 공유하는 점수 구간 안내를 표시합니다.
+  function graphScoreLegend() {
+    return '<div class="score-tone-legend" aria-label="점수 색상 기준">' +
+      '<span class="is-good">70점 이상</span><span class="is-blue">50점 이상</span>' +
+      '<span class="is-yellow">25점 이상</span><span class="is-danger">25점 미만</span></div>';
+  }
+
   function radarChart(entries) {
     var size = 620;
     var center = size / 2;
     var maxRadius = center - 140;
     var count = entries.length;
+    var averageScore = Math.round(entries.reduce(function (sum, item) {
+      return sum + item.value;
+    }, 0) / count);
+    var chartTone = graphScoreTone(averageScore);
     // 관점이 적을수록 글자가 잘릴 걱정이 없으니 더 크게, 많을수록 겹치지 않게 작게.
     var labelFontSize = count <= 4 ? 18 : count <= 6 ? 14 : 11;
     var scoreFontSize = count <= 4 ? 16 : count <= 6 ? 12 : 10;
@@ -213,9 +240,18 @@
       return toStr(axisPoint(p, p.item.value / 100));
     }).join(' ');
 
+    // 각 축의 점수선은 해당 관점의 점수 구간 색상을 그대로 사용합니다.
+    var scoreLines = points.map(function (p) {
+      var pt = axisPoint(p, p.item.value / 100);
+      return '<line x1="' + center + '" y1="' + center + '" x2="' + pt.x.toFixed(1) +
+        '" y2="' + pt.y.toFixed(1) + '" class="radar-score-line score-tone--' +
+        graphScoreTone(p.item.value) + '" />';
+    }).join('');
+
     var dots = points.map(function (p) {
       var pt = axisPoint(p, p.item.value / 100);
-      return '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="4.5" class="radar-dot" />';
+      return '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) +
+        '" r="5.5" class="radar-dot score-tone--' + graphScoreTone(p.item.value) + '" />';
     }).join('');
 
     var labels = points.map(function (p) {
@@ -225,18 +261,25 @@
         '" text-anchor="' + anchor + '" class="radar-label" style="font-size:' + labelFontSize + 'px">' +
         esc(CATEGORY_LABELS[p.item.key] || p.item.key) +
         '</text><text x="' + labelPt.x.toFixed(1) + '" y="' + (labelPt.y + labelFontSize + 4).toFixed(1) +
-        '" text-anchor="' + anchor + '" class="radar-label-score" style="font-size:' + scoreFontSize + 'px">' +
+        '" text-anchor="' + anchor + '" class="radar-label-score score-tone--' +
+        graphScoreTone(p.item.value) + '" style="font-size:' + scoreFontSize + 'px">' +
         p.item.value + '점</text>';
     }).join('');
 
-    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart" role="img" aria-label="관점별 점수 레이더 차트">' +
-      rings + axes + '<polygon points="' + scorePolygon + '" class="radar-score-area" />' + dots + labels + '</svg>';
+    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="radar-chart score-tone--' + chartTone +
+      '" role="img" aria-label="관점별 점수 레이더 차트">' +
+      rings + axes + '<polygon points="' + scorePolygon + '" class="radar-score-area" />' +
+      scoreLines + dots + labels + '</svg>';
   }
 
   function dimensionDonuts(entries) {
-    return '<div class="dimension-donut-list">' + entries.map(function (item) {
+    var single = entries.length === 1;
+    return '<div class="dimension-donut-list ' + (single ? 'is-single' : 'is-pair') + '">' +
+      entries.map(function (item) {
       return '<div class="dimension-donut">' +
-        scoreRingMarkup(item.value, { size: 130, stroke: 10, uid: 'dim-' + item.key, variant: 'sm' }) +
+        scoreRingMarkup(item.value, single
+          ? { size: 240, stroke: 16, uid: 'dim-' + item.key }
+          : { size: 130, stroke: 10, uid: 'dim-' + item.key, variant: 'sm' }) +
         '<p>' + esc(CATEGORY_LABELS[item.key] || item.key) + '</p></div>';
     }).join('') + '</div>';
   }
@@ -255,16 +298,26 @@
     var circumference = 2 * Math.PI * radius;
     var ratio = value == null ? 0 : Math.max(0, Math.min(100, value)) / 100;
     var dashoffset = circumference * (1 - ratio);
-    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="' + ringClass + '" role="img" aria-label="' +
+    var tone = graphScoreTone(value == null ? 0 : value);
+    var colors = {
+      good: ['#83dc91', '#31945b', '#31945b'],
+      blue: ['#65b9ff', '#086bd6', '#086bd6'],
+      yellow: ['#f5dc72', '#c59618', '#c59618'],
+      danger: ['#ff8b82', '#c94450', '#c94450']
+    }[tone];
+    return '<svg viewBox="0 0 ' + size + ' ' + size + '" class="' + ringClass + ' score-tone--' + tone +
+      '" role="img" aria-label="' +
       (value == null ? '평가 전' : value + '점') + '">' +
       '<defs>' +
       '<linearGradient id="' + gradientId + '" x1="0%" y1="0%" x2="100%" y2="100%">' +
-      '<stop offset="0%" stop-color="#7EB8E8" /><stop offset="100%" stop-color="#185FA5" />' +
+      '<stop offset="0%" stop-color="' + colors[0] + '" /><stop offset="100%" stop-color="' + colors[1] + '" />' +
       '</linearGradient>' +
       '<filter id="' + shadowId + '" x="-30%" y="-30%" width="160%" height="160%">' +
-      '<feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#185FA5" flood-opacity="0.28" />' +
+      '<feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="' + colors[2] + '" flood-opacity="0.32" />' +
       '</filter>' +
       '</defs>' +
+      '<circle cx="' + center + '" cy="' + center + '" r="' + radius +
+      '" class="score-ring-outline" stroke-width="' + (stroke + 8) + '" fill="none" />' +
       '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" class="score-ring-track" stroke-width="' + stroke + '" fill="none" />' +
       '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" class="score-ring-progress" stroke-width="' + stroke +
       '" fill="none" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + dashoffset.toFixed(1) +
@@ -279,18 +332,23 @@
     return '<div class="dimension-reason-list">' + entries.map(function (item) {
       var reason = reasons && reasons[item.key];
       return '<div class="dimension-reason"><div class="dimension-reason__head">' +
-        '<strong>' + esc(CATEGORY_LABELS[item.key] || item.key) + '</strong><em>' + item.value + '점</em></div>' +
+        '<strong>' + esc(CATEGORY_LABELS[item.key] || item.key) + '</strong>' +
+        '<em class="score-tone-badge score-tone--' + graphScoreTone(item.value) + '">' +
+        item.value + '점</em></div>' +
         '<p>' + esc(reason || '아직 근거 설명이 없어요.') + '</p></div>';
     }).join('') + '</div>';
   }
 
-  function renderDimensionVisual(overallScore, categoryScores, categoryScoreReasons) {
+  function renderDimensionVisual(overallScore, categoryScores, categoryScoreReasons, overallAssessment) {
     var container = document.getElementById('dimension-visual');
     if (!container) return;
     var entries = dimensionEntries(categoryScores);
+    var assessment = renderOverallAssessment(overallAssessment) ||
+      '<p class="result-empty-copy">종합 평가 내용이 없습니다.</p>';
     var overallBlock = '<div class="dimension-visual__overall">' +
       '<span class="dimension-visual__type">면접 종합 점수</span>' +
-      '<div class="dimension-visual__graphic-wrap">' + scoreRingMarkup(overallScore) + '</div></div>';
+      '<div class="dimension-visual__graphic-wrap">' + scoreRingMarkup(overallScore) + '</div>' +
+      '<div class="dimension-visual__overall-detail">' + assessment + '</div></div>';
 
     if (!entries.length) {
       container.innerHTML = '<div class="dimension-visual__graphics">' + overallBlock + '</div>' +
@@ -301,16 +359,19 @@
     var chart = entries.length >= 3 ? radarChart(entries) : dimensionDonuts(entries);
     var chartBlock = '<div class="dimension-visual__chart">' +
       '<span class="dimension-visual__type">' + esc(typeLabel) + '</span>' +
-      '<div class="dimension-visual__graphic-wrap">' + chart + '</div></div>';
-    container.innerHTML =
-      '<div class="dimension-visual__graphics">' + overallBlock + chartBlock + '</div>' +
-      '<div class="dimension-visual__desc">' +
+      '<div class="dimension-visual__graphic-wrap">' + chart + '</div>' +
+      '<div class="dimension-visual__chart-detail">' +
       '<p class="dimension-visual__summary">' + dimensionSummaryLine(entries) + '</p>' +
-      dimensionReasonList(entries, categoryScoreReasons) + '</div>';
+      graphScoreLegend() +
+      '<div class="dimension-visual__desc">' +
+      dimensionReasonList(entries, categoryScoreReasons) + '</div></div></div>';
+    container.innerHTML =
+      '<div class="dimension-visual__graphics">' + overallBlock + chartBlock + '</div>';
   }
 
   function renderFinalReport(report) {
     var panel = document.getElementById('final-report-panel');
+    panel.setAttribute('aria-busy', 'false');
     var weaknessTags = report.weaknessTagSummary || [];
     var recommendations = report.nextPracticeRecommendation || [];
     var learningDirection = report.learningDirection || [];
@@ -321,8 +382,6 @@
       esc(report.submittedQuestionCount) + '개를 모두 종합해 정리한 결과예요.</p>';
 
     html += '<div id="dimension-visual" class="dimension-visual"></div>';
-
-    html += renderOverallAssessment(report.overallAssessment);
 
     html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span><small>번호를 누르면 해당 질문으로 이동해요</small></div>';
     html += weaknessTags.length
@@ -352,7 +411,9 @@
     if (suggestionKeys.length) {
       html += '<div class="result-section-title" style="margin-top:22px;"><span>서류 보완 제안</span></div>';
       html += '<div class="final-suggestion-list">' + suggestionKeys.map(function (key) {
-        return '<div class="final-suggestion-group"><strong>' + esc(IMPROVEMENT_TARGET_LABELS[key]) + '</strong>' +
+        return '<div class="final-suggestion-group"><div class="final-suggestion-group__head">' +
+          '<span class="final-suggestion-icon" aria-hidden="true">▤</span>' +
+          '<strong>' + esc(IMPROVEMENT_TARGET_LABELS[key]) + '</strong></div>' +
           '<ul>' + suggestion[key].map(function (text) { return '<li>' + esc(text) + '</li>'; }).join('') + '</ul></div>';
       }).join('') + '</div>';
     }
@@ -371,14 +432,57 @@
     }
 
     panel.innerHTML = html;
-    renderDimensionVisual(report.overallScore, report.categoryScores, report.categoryScoreReasons);
+    renderDimensionVisual(
+      report.overallScore,
+      report.categoryScores,
+      report.categoryScoreReasons,
+      report.overallAssessment
+    );
     renderWeaknessQuestionLinks();
   }
 
+  // 최종 리포트 AI 응답을 기다리는 동안 기존 분석 퍼즐과 대기 진행 바를 표시합니다.
+  function renderFinalReportLoading() {
+    var panel = document.getElementById('final-report-panel');
+    var stages = [
+      { progress: 18, copy: '저장된 면접 답변을 모으고 있어요.' },
+      { progress: 42, copy: '답변별 평가 근거를 정리하고 있어요.' },
+      { progress: 68, copy: '강점과 보완 방향을 종합하고 있어요.' },
+      { progress: 88, copy: '최종 리포트를 마무리하고 있어요.' }
+    ];
+    var stageIndex = 0;
+
+    panel.setAttribute('aria-busy', 'true');
+    panel.innerHTML =
+      '<div class="final-report-loading" role="status" aria-live="polite">' +
+      '<div class="final-report-loading__puzzle">' +
+      '<canvas data-job-puzzle-scene data-analysis-puzzle data-analysis-stage="1" aria-hidden="true"></canvas>' +
+      '</div><div class="final-report-loading__content">' +
+      '<span class="final-report-loading__badge">AI 리포트 생성 중</span>' +
+      '<h2>면접 답변을 종합하고 있어요</h2>' +
+      '<p id="final-report-loading-copy">' + stages[0].copy + '</p>' +
+      '<div class="final-report-loading__progress" aria-hidden="true"><i style="width:' +
+      stages[0].progress + '%"></i></div>' +
+      '<small>응답이 도착하면 최종 리포트가 자동으로 표시됩니다.</small>' +
+      '</div></div>';
+
+    var canvas = panel.querySelector('[data-analysis-puzzle]');
+    var fill = panel.querySelector('.final-report-loading__progress i');
+    var copy = document.getElementById('final-report-loading-copy');
+
+    // 서버가 세부 진행률을 제공하지 않으므로 완료 전에는 100%로 표시하지 않습니다.
+    return window.setInterval(function () {
+      stageIndex = Math.min(stageIndex + 1, stages.length - 1);
+      canvas.dataset.analysisStage = String(stageIndex + 1);
+      fill.style.width = stages[stageIndex].progress + '%';
+      copy.textContent = stages[stageIndex].copy;
+    }, 1800);
+  }
+
+  // 질문별 결과의 모든 점수 배지가 최종 리포트 그래프와 같은 구간을 사용하도록 합니다.
   function scoreTone(score) {
-    if (score >= 80) return 'score-good';
-    if (score >= 70) return 'score-pass';
-    return 'score-needs-work';
+    return 'question-score-badge ' +
+      (score == null ? 'is-unrated' : 'score-tone--' + graphScoreTone(score));
   }
 
   function dimensionItems(scores, counts) {
@@ -427,6 +531,9 @@
 
   function renderQuestionDetail(question, questionScore, score) {
     var detail = document.getElementById('q-detail');
+    var finalScore = questionScore && questionScore.finalScore != null
+      ? questionScore.finalScore
+      : null;
     var dimensionScores = questionScore ? questionScore.dimensionScores : {};
     var dimensionCounts = questionScore ? questionScore.dimensionEvaluationCounts : {};
     var dimensionCount = Object.keys(dimensionScores || {}).length;
@@ -434,20 +541,23 @@
       return Math.max(max, dimensionCounts[key] || 0);
     }, 0);
     detail.innerHTML =
-      '<div class="question-detail-head"><span>질문 ' + question.displayOrder + '</span>' +
-      '<strong class="' + scoreTone(questionScore && questionScore.finalScore || 0) + '">' +
-      (questionScore && questionScore.finalScore != null ? questionScore.finalScore + '점' : '미평가') +
+      '<div class="question-detail-head"><span class="question-number-badge">질문 ' +
+      question.displayOrder + '</span>' +
+      '<strong class="' + scoreTone(finalScore) + '">' +
+      (finalScore != null ? finalScore + '점' : '미평가') +
       '</strong></div>' +
       '<h2>' + esc(question.questionText) + '</h2>' +
       '<p class="question-intent">' + esc(question.intent || '질문 의도가 기록되지 않았습니다.') + '</p>' +
       conversationTimeline(question) +
+      '<div class="question-evaluation-row">' +
       '<div class="question-score-formula"><div><span>① 답변 분석</span><strong>' +
       answerEvaluationCount + '회</strong></div><i>→</i><div><span>② 핵심 평가 기준</span><strong>' +
-      dimensionCount + '개</strong></div><i>→</i><div><span>③ 질문 종합 점수</span><strong>' +
-      (questionScore && questionScore.finalScore != null ? questionScore.finalScore + '점' : '미평가') +
+      dimensionCount + '개</strong></div><i>→</i><div><span>③ 질문 종합 점수</span><strong class="' +
+      scoreTone(finalScore) + '">' +
+      (finalScore != null ? finalScore + '점' : '미평가') +
       '</strong></div></div>' +
       '<div class="dimension-list">' +
-      dimensionItems(dimensionScores, dimensionCounts) + '</div>' +
+      dimensionItems(dimensionScores, dimensionCounts) + '</div></div>' +
       '<div class="progress-summary"><div><strong>' + score.submittedQuestionCount +
       '</strong><span>답변한 질문</span></div><div><strong>' + score.evaluatedQuestionCount +
       '</strong><span>평가 성공</span></div><div><strong>' + score.skippedQuestionCount +
@@ -473,7 +583,8 @@
       return '<button type="button" class="q-list-item' + (index === 0 ? ' is-active' : '') +
         '" data-question-index="' + index + '"><span class="q-list-item__num">' +
         (index + 1) + '</span><span class="q-list-item__summary">' +
-        esc(question.questionText) + '</span><strong>' +
+        esc(question.questionText) + '</span><strong class="' +
+        scoreTone(item && item.finalScore != null ? item.finalScore : null) + '">' +
         (item && item.finalScore != null ? item.finalScore + '점' : '미평가') + '</strong></button>';
     }).join('');
     if (questions.length) {
@@ -538,7 +649,7 @@
         modal.querySelectorAll('input[type="checkbox"]:checked')
       ).map(function (input) { return Number(input.value); });
       if (!ids.length) {
-        alert('이어갈 질문을 하나 이상 선택해 주세요.');
+        notify('warning', '이어갈 질문을 하나 이상 선택해 주세요.');
         return;
       }
       api(window.JobPuzzleRoutes.path('/interview-sessions/' + sessionId + '/questions'), {
@@ -546,7 +657,7 @@
         json: { questionIds: ids }
       }).then(function () {
         window.location.href = window.JobPuzzleRoutes.path('/interview?resumeSessionId=' + encodeURIComponent(sessionId));
-      }).catch(function (error) { alert(error.message); });
+      }).catch(function (error) { notify('error', error.message); });
     });
   }
 
@@ -558,7 +669,7 @@
       .then(function () {
         window.location.replace(window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(sessionId)));
       })
-      .catch(function (error) { alert(error.message); });
+      .catch(function (error) { notify('error', error.message); });
   }
 
   function renderInterimActions() {
@@ -648,10 +759,17 @@
       document.getElementById('result-meta').textContent = error.message;
     });
 
-    // 최종 리포트는 별도 호출로 분리
-    api(window.JobPuzzleRoutes.path('/final-report/sessions/' + sessionId)).then(renderFinalReport).catch(function (error) {
-      document.getElementById('final-report-panel').innerHTML =
-        '<p class="result-empty-copy">' + esc(error.message) + '</p>';
+    // 최종 리포트 AI 호출은 다른 조회와 분리하고 응답 전까지 전용 대기 화면을 유지합니다.
+    var finalReportLoadingTimer = renderFinalReportLoading();
+    api(window.JobPuzzleRoutes.path('/final-report/sessions/' + sessionId)).then(function (report) {
+      window.clearInterval(finalReportLoadingTimer);
+      renderFinalReport(report);
+    }).catch(function (error) {
+      window.clearInterval(finalReportLoadingTimer);
+      var panel = document.getElementById('final-report-panel');
+      panel.setAttribute('aria-busy', 'false');
+      panel.innerHTML = '<p class="result-empty-copy">' + esc(error.message) + '</p>';
+      notify('error', error.message);
     });
   });
 })();
