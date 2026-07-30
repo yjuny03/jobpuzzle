@@ -1,0 +1,57 @@
+/* Admin screens — scoped under .jp-admin-page. Reuses jp-app-theme tokens;
+   patterns copied from mydata.css (badge-pill, btn-sm) to keep the same look. */
+
+.jp-admin-page .tabbar__btn {
+  text-decoration: none;
+}
+
+.jp-admin-page .table-head > span,
+.jp-admin-page .table-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.jp-admin-page .badge-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 6px 11px;
+  border: 2px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 64%, var(--jp-paper));
+  border-radius: 8px;
+  background: var(--jp-paper) !important;
+  background: color-mix(in srgb, currentColor 18%, var(--jp-paper)) !important;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, 0.16);
+  box-shadow: 2px 3px 0 color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.jp-admin-page .btn-sm {
+  border: 2px solid var(--jp-line-soft);
+  border-radius: 8px;
+  background: var(--jp-paper);
+  color: var(--jp-text-secondary);
+  font-weight: 700;
+}
+
+.jp-admin-page .btn-sm:hover,
+.jp-admin-page .btn-sm--primary-tint {
+  border-color: var(--jp-blue);
+  background: var(--jp-blue-soft);
+  color: var(--jp-blue-deep);
+}
+
+.jp-admin-page .btn-sm--danger {
+  border-color: #C99A93;
+  background: #F0E2DE;
+  color: var(--jp-danger);
+}
+
+.jp-admin-page .btn-sm--danger:hover {
+  border-color: #8E332D;
+  background: #B5433D;
+  color: #FFFFFF;
+  box-shadow: 2px 3px 0 rgba(92, 28, 24, 0.25);
+}
