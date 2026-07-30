@@ -1,5 +1,7 @@
 package com.example.jobpuzzle.guide.service;
 
+import com.example.jobpuzzle.global.error.CustomException;
+import com.example.jobpuzzle.global.error.ErrorCode;
 import com.example.jobpuzzle.guide.dto.GuideListResponse;
 import com.example.jobpuzzle.guide.vector.GuideVectorDocument;
 import com.example.jobpuzzle.guide.vector.GuideVectorStorePort;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,8 +31,7 @@ class GuideIndexingServiceTest {
     void storesProviderContractOnlyAfterVectorIndexSucceeds() {
         User admin = mock(User.class);
         when(admin.getRole()).thenReturn(UserRole.ADMIN);
-        GuideVectorDocument document =
-                new GuideVectorDocument(10L, 1L, "BACKEND", "v1.0", 0, "기준", "내용");
+        GuideVectorDocument document = new GuideVectorDocument(10L, 1L, "내용");
         when(stateService.begin(1L))
                 .thenReturn(new GuideIndexingLease(1L, List.of(document)));
         when(vectorStore.index(1L, List.of(document)))
@@ -45,5 +47,23 @@ class GuideIndexingServiceTest {
 
         assertThat(service.index(admin, 1L)).isSameAs(response);
         verify(stateService, never()).fail(anyLong(), anyString());
+        verify(vectorStore, times(1)).provider();
+        verify(vectorStore, times(1)).model();
+        verify(vectorStore, times(1)).dimension();
+    }
+
+    @Test
+    void recordsFailureWhenVectorProviderMetadataCannotBeRead() {
+        User admin = mock(User.class);
+        when(admin.getRole()).thenReturn(UserRole.ADMIN);
+        GuideVectorDocument document = new GuideVectorDocument(10L, 1L, "내용");
+        when(stateService.begin(1L))
+                .thenReturn(new GuideIndexingLease(1L, List.of(document)));
+        CustomException failure = new CustomException(ErrorCode.GUIDE_INDEXING_FAILED);
+        when(vectorStore.provider()).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.index(admin, 1L)).isSameAs(failure);
+        verify(stateService).fail(1L, ErrorCode.GUIDE_INDEXING_FAILED.getMessage());
+        verify(vectorStore, never()).index(anyLong(), anyList());
     }
 }

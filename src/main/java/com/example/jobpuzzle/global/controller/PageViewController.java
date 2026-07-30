@@ -13,6 +13,10 @@ public class PageViewController {
     @GetMapping("/dashboard")
     public String dashboard() { return "dashboard"; }
 
+    // 로그인 사용자가 자신의 AI 보완 과제만 관리하는 전용 화면을 반환한다.
+    @GetMapping("/action-plans")
+    public String actionPlans() { return "action-plans"; }
+
     @GetMapping("/my-data")
     public String myData() { return "my-data"; }
 

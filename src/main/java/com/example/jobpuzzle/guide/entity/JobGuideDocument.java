@@ -87,21 +87,6 @@ public class JobGuideDocument extends BaseEntity {
     private List<String> avoidQuestions;
 
     @Enumerated(EnumType.STRING)
-    // 기존 운영 데이터에 컬럼을 추가할 때 DDL 자동 갱신이 실패하지 않도록 legacy 행은 null을 허용한다.
-    // 애플리케이션을 통해 새로 생성되는 가이드는 생성자에서 항상 NOT_STARTED를 저장한다.
-    @Column(name = "preprocessing_status", length = 30)
-    private GuidePreprocessingStatus preprocessingStatus;
-
-    @Column(name = "preprocessing_model", length = 100)
-    private String preprocessingModel;
-
-    @Column(name = "preprocessed_at")
-    private LocalDateTime preprocessedAt;
-
-    @Column(name = "preprocessing_error", length = 500)
-    private String preprocessingError;
-
-    @Enumerated(EnumType.STRING)
     @Column(name = "indexing_status", length = 30)
     private GuideIndexingStatus indexingStatus;
 
@@ -156,7 +141,6 @@ public class JobGuideDocument extends BaseEntity {
         this.evidenceRules = evidenceRules;
         this.questionDirection = questionDirection;
         this.avoidQuestions = avoidQuestions;
-        this.preprocessingStatus = GuidePreprocessingStatus.NOT_STARTED;
         this.indexingStatus = GuideIndexingStatus.NOT_INDEXED;
         validateScope();
     }
@@ -167,59 +151,14 @@ public class JobGuideDocument extends BaseEntity {
         this.filePath = filePath;
     }
 
-    /** 관리자 전처리와 검수가 끝나기 전까지 변경 가능한 초안인지 반환한다. */
+    /** 활성화 전까지 변경 가능한 초안인지 반환한다. */
     public boolean isDraft() {
         return this.status == JobGuideDocumentStatus.DRAFT;
     }
 
-    /** 외부 호출 직전에 전처리 중 상태로 바꾸고 이전 실패 정보는 지운다. */
-    public void startPreprocessing() {
-        this.preprocessingStatus = GuidePreprocessingStatus.PROCESSING;
-        this.preprocessingError = null;
-    }
-
-    public boolean isPreprocessingInProgress() {
-        return this.preprocessingStatus == GuidePreprocessingStatus.PROCESSING;
-    }
-
-    public boolean isReadyForReview() {
-        return this.preprocessingStatus == GuidePreprocessingStatus.READY_FOR_REVIEW;
-    }
-
-    /** 관리자가 청크를 직접 검수·교체한 경우에도 활성화 가능한 검수 준비 상태로 표시한다. */
-    public void markManuallyReadyForReview() {
-        this.preprocessingStatus = GuidePreprocessingStatus.READY_FOR_REVIEW;
-        this.preprocessingModel = null;
-        this.preprocessedAt = LocalDateTime.now();
-        this.preprocessingError = null;
+    /** 청크가 바뀌면 이전 벡터 참조 계약을 폐기하고 재색인을 요구한다. */
+    public void resetIndexingForChunkChange() {
         resetIndexing();
-    }
-
-    /** OpenAI 구조화 결과를 DRAFT에 반영해 관리자 검수 가능한 상태로 만든다. */
-    public void completePreprocessing(
-            String model,
-            String applicableScope,
-            List<String> evaluationFocus,
-            List<String> evidenceRules,
-            List<String> questionDirection,
-            List<String> avoidQuestions
-    ) {
-        this.applicableScope = applicableScope;
-        this.evaluationFocus = List.copyOf(evaluationFocus);
-        this.evidenceRules = List.copyOf(evidenceRules);
-        this.questionDirection = List.copyOf(questionDirection);
-        this.avoidQuestions = List.copyOf(avoidQuestions);
-        this.preprocessingStatus = GuidePreprocessingStatus.READY_FOR_REVIEW;
-        this.preprocessingModel = model;
-        this.preprocessedAt = LocalDateTime.now();
-        this.preprocessingError = null;
-        resetIndexing();
-    }
-
-    /** 원문이나 Provider 응답은 남기지 않고 관리자에게 필요한 안전한 실패 사유만 저장한다. */
-    public void failPreprocessing(String safeMessage) {
-        this.preprocessingStatus = GuidePreprocessingStatus.FAILED;
-        this.preprocessingError = safeMessage;
     }
 
     /** 외부 벡터 저장 호출 전 중복 인덱싱을 막는다. */

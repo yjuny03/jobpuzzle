@@ -12,7 +12,7 @@ class Json02V11PromptContractTest {
 
     @Test
     void preservesDistinctFactsWithoutArrayCapsAndUsesMarkerOnlyReferences() throws IOException {
-        String prompt = Files.readString(Path.of("src/main/resources/prompts/json-02-v1.1.txt"));
+        String prompt = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.1.txt"));
 
         assertThat(prompt)
                 .contains("배열의 개수 고정 상한을 적용하지 않는다.")

@@ -12,6 +12,7 @@ public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "COMMON_002", "요청 값이 올바르지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "서버 내부 오류가 발생했습니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "COMMON_004", "접근 권한이 없습니다."),
+    AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "COMMON_005", "로그인이 필요합니다."),
 
     //AI
     AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_001", "AI 응답이 유효하지 않습니다."),
@@ -24,6 +25,7 @@ public enum ErrorCode {
     EMBEDDING_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "ANALYSIS_013", "임베딩 제공자 요청 한도를 초과했습니다."),
     VECTOR_STORE_ERROR(HttpStatus.BAD_GATEWAY, "ANALYSIS_014", "vector 저장소 호출에 실패했습니다."),
     VECTOR_COLLECTION_INCOMPATIBLE(HttpStatus.CONFLICT, "ANALYSIS_015", "vector collection의 모델 또는 차원 계약이 일치하지 않습니다."),
+    ACTION_PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_016", "액션플랜을 찾을 수 없습니다."),
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
     ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
     ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),
@@ -80,17 +82,12 @@ public enum ErrorCode {
     GUIDE_NOT_LATEST_VERSION(HttpStatus.CONFLICT, "GUIDE_008", "최신 가이드 버전에서만 새 버전을 만들거나 활성화할 수 있습니다."),
     GUIDE_CHUNKS_REQUIRED(HttpStatus.CONFLICT, "GUIDE_009", "가이드를 활성화하려면 검수된 청크가 하나 이상 필요합니다."),
     GUIDE_CHUNK_ORDER_INVALID(HttpStatus.BAD_REQUEST, "GUIDE_010", "가이드 청크 순서는 0부터 빠짐없이 이어져야 합니다."),
-    GUIDE_PREPROCESSING_DISABLED(HttpStatus.SERVICE_UNAVAILABLE, "GUIDE_011", "가이드 AI 전처리 기능이 비활성화되어 있습니다."),
-    GUIDE_PREPROCESSING_CONFIG_INVALID(HttpStatus.SERVICE_UNAVAILABLE, "GUIDE_012", "가이드 AI 전처리 설정이 올바르지 않습니다."),
-    GUIDE_PREPROCESSING_FAILED(HttpStatus.BAD_GATEWAY, "GUIDE_013", "가이드 AI 전처리에 실패했습니다."),
-    GUIDE_PREPROCESSING_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "GUIDE_014", "가이드 AI 전처리 결과 형식이 올바르지 않습니다."),
-    GUIDE_PREPROCESSING_IN_PROGRESS(HttpStatus.CONFLICT, "GUIDE_015", "이미 가이드 전처리가 진행 중입니다."),
-    GUIDE_NOT_REVIEW_READY(HttpStatus.CONFLICT, "GUIDE_016", "관리자 검수 준비가 끝난 가이드만 활성화할 수 있습니다."),
     GUIDE_INDEXING_IN_PROGRESS(HttpStatus.CONFLICT, "GUIDE_017", "이미 가이드 인덱싱이 진행 중입니다."),
     GUIDE_INDEXING_FAILED(HttpStatus.BAD_GATEWAY, "GUIDE_018", "가이드 벡터 인덱싱에 실패했습니다."),
     GUIDE_INDEX_NOT_READY(HttpStatus.CONFLICT, "GUIDE_019", "벡터 인덱싱이 완료된 가이드만 활성화할 수 있습니다."),
     GUIDE_VECTOR_RESULT_INVALID(HttpStatus.CONFLICT, "GUIDE_020", "가이드 벡터 검색 결과가 현재 버전의 청크와 일치하지 않습니다."),
     GUIDE_CODE_VERSION_DUPLICATE(HttpStatus.CONFLICT, "GUIDE_021", "이미 등록된 가이드 코드·버전 조합입니다."),
+    GUIDE_SOURCE_REQUIRED(HttpStatus.CONFLICT, "GUIDE_022", "청크로 분할할 가이드 원문이 없습니다."),
 
 
     // interview - 면접 세션·질문 선택·답변 진행

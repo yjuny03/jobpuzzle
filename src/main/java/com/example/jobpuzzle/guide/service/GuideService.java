@@ -6,11 +6,10 @@ import com.example.jobpuzzle.guide.dto.*;
 import com.example.jobpuzzle.guide.entity.*;
 import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
-import com.example.jobpuzzle.jobcategory.entity.JobCategory;
-import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.user.entity.User;
 import com.example.jobpuzzle.user.entity.UserRole;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +19,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * 관리자가 분석 가이드를 등록하고 버전 계보를 관리하는 서비스.
+ * 관리자가 저장된 가이드 청크를 검수하고 색인 완료 버전을 활성화하는 서비스.
  *
  * <p>신규 분석은 적용 범위별 ACTIVE 한 건만 사용한다. 새 버전을 활성화할 때
  * 이전 ACTIVE를 INACTIVE로 바꾸되, 이미 생성된 분석 결과의 가이드 스냅샷은
@@ -29,56 +28,11 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class GuideService {
 
     private final JobGuideDocumentRepository guideRepository;
     private final JobGuideChunkRepository chunkRepository;
-    private final JobCategoryRepository jobCategoryRepository;
-
-    /** 새 가이드 계보의 첫 DRAFT 버전을 등록한다. */
-    public GuideListResponse registerGuideDocument(User admin, GuideRegisterRequest request) {
-        requireAdmin(admin);
-        if (guideRepository.existsByGuideCode(request.getGuideCode())) {
-            throw new CustomException(ErrorCode.GUIDE_CODE_DUPLICATED);
-        }
-        if (guideRepository.existsByGuideCodeAndVersion(request.getGuideCode(), request.getVersion())) {
-            throw new CustomException(ErrorCode.GUIDE_VERSION_DUPLICATED);
-        }
-
-        JobGuideDocument guide = buildGuide(
-                admin, null, request.getGuideCode(), request.getScopeType(),
-                resolveCategory(request.getScopeType(), request.getJobCategoryId()),
-                request.getScopeMainCategory(), request.getTitle(), request.getSourceType(),
-                request.getFilePath(), request.getVersion(), request.getApplicableScope(),
-                request.getEvaluationFocus(), request.getEvidenceRules(),
-                request.getQuestionDirection(), request.getAvoidQuestions()
-        );
-        return toResponse(guideRepository.save(guide));
-    }
-
-    /**
-     * 계보의 최신(후속 버전이 없는) 가이드를 기준으로 다음 DRAFT 버전을 만든다.
-     * 적용 범위와 가이드 코드는 이전 버전에서 강제로 상속한다.
-     */
-    public GuideListResponse createNextVersion(
-            User admin, Long previousGuideId, GuideVersionCreateRequest request
-    ) {
-        requireAdmin(admin);
-        JobGuideDocument previous = findLockedGuide(previousGuideId);
-        requireLatest(previous);
-        if (guideRepository.existsByGuideCodeAndVersion(previous.getGuideCode(), request.getVersion())) {
-            throw new CustomException(ErrorCode.GUIDE_VERSION_DUPLICATED);
-        }
-
-        JobGuideDocument next = buildGuide(
-                admin, previous, previous.getGuideCode(), previous.getScopeType(),
-                previous.getJobCategory(), previous.getScopeMainCategory(),
-                request.getTitle(), request.getSourceType(), request.getFilePath(),
-                request.getVersion(), request.getApplicableScope(), request.getEvaluationFocus(),
-                request.getEvidenceRules(), request.getQuestionDirection(), request.getAvoidQuestions()
-        );
-        return toResponse(guideRepository.save(next));
-    }
 
     /**
      * DRAFT의 검수된 청크를 전체 교체한다.
@@ -100,6 +54,8 @@ public class GuideService {
         }
 
         chunkRepository.deleteByGuide_GuideId(guideId);
+        // 같은 guide_id·chunk_index를 다시 넣기 전에 DELETE를 확정해 유니크 키 충돌을 막는다.
+        chunkRepository.flush();
         List<JobGuideChunk> entities = chunks.stream()
                 .map(chunk -> JobGuideChunk.builder()
                         .guide(guide)
@@ -111,8 +67,24 @@ public class GuideService {
                         .build())
                 .toList();
         chunkRepository.saveAll(entities);
-        guide.markManuallyReadyForReview();
+        guide.resetIndexingForChunkChange();
+        log.info("관리자 검수 청크 저장 guideId={} chunkCount={} indexingStatus=NOT_INDEXED",
+                guideId, entities.size());
         return GuideListResponse.from(guide, entities.size());
+    }
+
+    /** 청크 순서를 보존해 관리자 검수 화면에 반환한다. */
+    @Transactional(readOnly = true)
+    public List<GuideChunkResponse> getChunks(Long guideId) {
+        if (!guideRepository.existsById(guideId)) {
+            throw new CustomException(ErrorCode.GUIDE_NOT_FOUND);
+        }
+        List<GuideChunkResponse> chunks =
+                chunkRepository.findByGuide_GuideIdOrderByChunkIndexAsc(guideId).stream()
+                        .map(GuideChunkResponse::from)
+                        .toList();
+        log.debug("가이드 검수 청크 조회 guideId={} chunkCount={}", guideId, chunks.size());
+        return chunks;
     }
 
     /**
@@ -127,64 +99,21 @@ public class GuideService {
         if (chunkRepository.countByGuide_GuideId(guideId) == 0) {
             throw new CustomException(ErrorCode.GUIDE_CHUNKS_REQUIRED);
         }
-        if (!target.isReadyForReview()) {
-            throw new CustomException(ErrorCode.GUIDE_NOT_REVIEW_READY);
-        }
         if (!target.isIndexed()) {
             throw new CustomException(ErrorCode.GUIDE_INDEX_NOT_READY);
         }
 
-        findActiveGuidesInSameScope(target).stream()
+        List<JobGuideDocument> previousActiveGuides = findActiveGuidesInSameScope(target).stream()
                 .filter(active -> !active.getGuideId().equals(target.getGuideId()))
-                .forEach(JobGuideDocument::deactivate);
+                .toList();
+        previousActiveGuides.forEach(JobGuideDocument::deactivate);
         target.activate();
+        // 기존 ACTIVE 비활성화와 최신 DRAFT 활성화를 한 트랜잭션에 묶어 무가이드 구간을 만들지 않는다.
+        log.info("최신 가이드 활성화 guideId={} guideCode={} version={} replacedActiveCount={}",
+                guideId, target.getGuideCode(), target.getVersion(), previousActiveGuides.size());
         return toResponse(target);
     }
 
-    /** 관리 화면에서 특정 버전과 청크 수를 조회한다. */
-    @Transactional(readOnly = true)
-    public GuideListResponse getGuide(Long guideId) {
-        JobGuideDocument guide = guideRepository.findById(guideId)
-                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
-        return toResponse(guide);
-    }
-
-    private JobGuideDocument buildGuide(
-            User admin, JobGuideDocument previous, String guideCode, GuideScopeType scopeType,
-            JobCategory category, String scopeMainCategory, String title,
-            JobGuideDocumentSourceType sourceType, String filePath, String version,
-            String applicableScope, List<String> evaluationFocus, List<String> evidenceRules,
-            List<String> questionDirection, List<String> avoidQuestions
-    ) {
-        return JobGuideDocument.builder()
-                .guideCode(guideCode.trim())
-                .previousGuide(previous)
-                .scopeType(scopeType)
-                .jobCategory(category)
-                .scopeMainCategory(normalize(scopeMainCategory))
-                .title(title.trim())
-                .sourceType(sourceType)
-                .filePath(normalize(filePath))
-                .version(version.trim())
-                .createdBy(admin)
-                .applicableScope(applicableScope.trim())
-                .evaluationFocus(copyOrEmpty(evaluationFocus))
-                .evidenceRules(copyOrEmpty(evidenceRules))
-                .questionDirection(copyOrEmpty(questionDirection))
-                .avoidQuestions(copyOrEmpty(avoidQuestions))
-                .build();
-    }
-
-    private JobCategory resolveCategory(GuideScopeType scopeType, Long categoryId) {
-        if (scopeType != GuideScopeType.CATEGORY) {
-            return null;
-        }
-        if (categoryId == null) {
-            throw new CustomException(ErrorCode.GUIDE_SCOPE_INVALID);
-        }
-        return jobCategoryRepository.findById(categoryId)
-                .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND));
-    }
 
     private List<JobGuideDocument> findActiveGuidesInSameScope(JobGuideDocument guide) {
         return switch (guide.getScopeType()) {
@@ -228,11 +157,4 @@ public class GuideService {
                 guide, Math.toIntExact(chunkRepository.countByGuide_GuideId(guide.getGuideId())));
     }
 
-    private List<String> copyOrEmpty(List<String> values) {
-        return values == null ? List.of() : List.copyOf(values);
-    }
-
-    private String normalize(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
 }

@@ -11,7 +11,7 @@ class Json05V11PromptContractTest {
 
     @Test
     void separatesEvidenceBearingAndNonEvidenceRequirementMatches() throws Exception {
-        String prompt = Files.readString(Path.of("src/main/resources/prompts/json-05-v1.1.txt"));
+        String prompt = Files.readString(Path.of("src/main/resources/prompts/before-json-05/json-05-v1.1.txt"));
 
         assertThat(prompt)
                 .contains("evidencedRequirementMatches", "nonEvidencedRequirementMatches")
@@ -22,7 +22,7 @@ class Json05V11PromptContractTest {
 
     @Test
     void v12UsesDeduplicatedCandidateEvidenceReferencesWithoutRelaxingSourceRules() throws Exception {
-        String prompt = Files.readString(Path.of("src/main/resources/prompts/json-05-v1.2.txt"));
+        String prompt = Files.readString(Path.of("src/main/resources/prompts/before-json-05/json-05-v1.2.txt"));
 
         assertThat(prompt).contains("requirements와 candidateEvidence로 정규화", "candidateEvidenceIds",
                 "candidateEvidence[].evidenceId", "같은 sourceRef를 중복 반환하지 않는다");

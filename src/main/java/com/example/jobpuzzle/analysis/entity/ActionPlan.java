@@ -65,6 +65,7 @@ public class ActionPlan extends BaseEntity {
     @JoinColumn(name = "ai_call_log_id", nullable = false)
     private AiCallLog aiCallLog;
 
+    // 검증을 통과한 AI 과제를 사용자 관리 상태와 분리해 최초 PENDING 상태로 생성한다.
     public static ActionPlan from(AnalysisInputSnapshot snapshot, MatchAnalysisResult matchAnalysisResult,
                                   AiCallLog aiCallLog, CustomizedAnalysisGenerationResult.Task value) {
         ActionPlan plan = new ActionPlan();
@@ -78,5 +79,24 @@ public class ActionPlan extends BaseEntity {
         plan.suggestion = value.getSuggestion();
         plan.status = ActionPlanStatus.PENDING;
         return plan;
+    }
+
+    // 사용자가 지정한 마감일만 변경하며 완료 상태에는 영향을 주지 않는다.
+    public void updateDeadline(LocalDate deadline) {
+        this.deadline = deadline;
+    }
+
+    // 완료 요청을 멱등하게 처리해 반복 요청에도 최초 완료 시각을 보존한다.
+    public void complete(LocalDateTime completedAt) {
+        this.status = ActionPlanStatus.DONE;
+        if (this.completedAt == null) {
+            this.completedAt = completedAt;
+        }
+    }
+
+    // 완료를 취소하고 완료 시각을 함께 제거해 상태와 시각의 일관성을 유지한다.
+    public void reopen() {
+        this.status = ActionPlanStatus.PENDING;
+        this.completedAt = null;
     }
 }

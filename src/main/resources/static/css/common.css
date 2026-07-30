@@ -178,6 +178,11 @@ button {
     pointer-events: none;
 }
 
+/* 사용자 메뉴가 열린 동안 헤더 전체를 페이지 버튼과 모달보다 위에 고정해 클릭 통과를 막는다. */
+.site-header[data-dynamic-header].has-open-user-menu {
+    z-index: 13000;
+}
+
 /* 밝은 섹션 위의 글래스 헤더 */
 .site-header[data-dynamic-header].header--light,
 .site-header[data-dynamic-header].header--light.is-header-compact {
@@ -399,6 +404,8 @@ button {
     box-shadow: 0 16px 36px -12px rgba(20, 50, 90, 0.22);
     padding: 6px;
     z-index: 10020;
+    pointer-events: auto;
+    isolation: isolate;
 }
 .user-menu[hidden] {
     display: none !important;

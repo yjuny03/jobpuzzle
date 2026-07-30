@@ -18,6 +18,19 @@
   color: var(--color-text-faint);
 }
 
+/* 긴 추출 검토 창도 고정 헤더 아래에서 시작하고 남은 화면 안에서만 스크롤한다. */
+.jp-mydata-page .modal-overlay {
+  align-items: flex-start;
+  z-index: 8000;
+  overflow-y: auto;
+  padding: 100px 20px 20px;
+}
+
+.jp-mydata-page .modal-box--lg,
+.jp-mydata-page .modal-box--xl {
+  max-height: calc(100dvh - 120px);
+}
+
 .reg-cat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
