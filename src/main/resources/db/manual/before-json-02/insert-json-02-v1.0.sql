@@ -4,7 +4,7 @@ SELECT COUNT(*) AS target_version_count FROM prompt_template WHERE prompt_code =
 
 START TRANSACTION;
 
--- 목적: src/main/resources/prompts/json-02-v1.0.txt 정본과 동일한 JSON-02 배포 본문을 저장한다.
+-- 목적: src/main/resources/prompts/before-json-02/json-02-v1.0.txt 보관 정본과 동일한 JSON-02 배포 본문을 저장한다.
 INSERT INTO prompt_template (prompt_code, name, version, target_json, template_text, forbidden_rules, is_active, created_at) VALUES (
     'PT-CAND-001',
     '지원자 자료 분석 프롬프트',

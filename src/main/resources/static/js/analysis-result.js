@@ -375,15 +375,33 @@
     return card;
   }
 
-  function renderPlans() {
-    var card = section('액션플랜', '분석 결과를 실제 보완 활동으로 이어가는 기능을 준비하고 있어요.');
-    var placeholder = node('div', 'result-plan-placeholder');
-    placeholder.appendChild(node('span', 'result-plan-placeholder__mark', '✓'));
-    var copy = node('div');
-    copy.appendChild(node('strong', null, '액션플랜 기능 준비 중'));
-    copy.appendChild(node('p', null, '보완 과제의 진행 상태와 완료 일정을 관리할 수 있도록 추가될 예정입니다.'));
-    placeholder.appendChild(copy);
-    card.appendChild(placeholder);
+  function renderPlans(result) {
+    var plans = result.actionPlans || [];
+    var card = section('보완 과제', '분석 결과를 바탕으로 추천된 과제입니다. 일정과 완료 상태는 액션플랜에서 관리할 수 있습니다.', plans.length);
+    if (!plans.length) {
+      card.appendChild(node('p', 'result-empty', '이 분석에서 생성된 액션플랜이 없습니다.'));
+      return card;
+    }
+    var list = node('div', 'result-action-plan-list');
+    // 상단 개수와 실제 목록이 어긋나지 않도록 이 분석에서 생성된 과제를 모두 표시한다.
+    plans.forEach(function (plan, index) {
+      var item = node('article', 'result-action-plan');
+      item.appendChild(node('span', 'result-action-plan__number', String(index + 1)));
+      var copy = node('div', 'result-action-plan__copy');
+      copy.appendChild(node('strong', null, plan.suggestion || '보완 과제'));
+      if (plan.matchLevel) {
+        copy.appendChild(node('span',
+          'result-action-plan__level result-action-plan__level--' + String(plan.matchLevel).toLowerCase(),
+          plan.matchLevel));
+      }
+      copy.appendChild(node('p', null, plan.missingPoint || '보완이 필요한 내용을 확인해 주세요.'));
+      item.appendChild(copy);
+      list.appendChild(item);
+    });
+    card.appendChild(list);
+    var allLink = node('a', 'result-action-plan__all', '액션플랜에서 일정 관리하기 →');
+    allLink.href = window.JobPuzzleRoutes.path('/action-plans') + '?analysisCaseId=' + encodeURIComponent(result.analysisCaseId);
+    card.appendChild(allLink);
     return card;
   }
 

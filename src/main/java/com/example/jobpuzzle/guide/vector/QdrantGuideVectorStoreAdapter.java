@@ -35,17 +35,18 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         this.client = client;
     }
 
+    /** 같은 guideId의 기존 point를 교체하고 현재 청크만 Qdrant에 저장한다. */
     @Override
     public Map<Long, String> index(Long guideId, List<GuideVectorDocument> documents) {
         ensureCollection();
-        // 같은 가이드의 재전처리로 생성된 과거 point가 검색되지 않도록 범위 전체를 먼저 교체한다.
-        callPost("/collections/" + collectionName() + "/points/delete",
+        // 같은 가이드를 다시 색인할 때 과거 point가 검색되지 않도록 해당 guideId 범위를 교체한다.
+        callPost("/collections/" + collectionName() + "/points/delete?wait=true",
                 Map.of("filter", guideFilter(guideId)));
         List<Map<String, Object>> points = documents.stream()
                 .map(document -> Map.of(
                         "id", document.chunkId(),
                         "vector", embeddingProvider.embed(document.content()).vector(),
-                        "payload", payload(document)))
+                        "payload", Map.of("guideId", document.guideId())))
                 .toList();
         if (!points.isEmpty()) {
             callPut("/collections/" + collectionName() + "/points?wait=true",
@@ -56,6 +57,7 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
                 document -> collectionName() + ":" + document.chunkId()));
     }
 
+    /** 분석 검색문을 임베딩하고 선택된 활성 가이드 범위 안에서만 유사 청크를 찾는다. */
     @Override
     public List<GuideVectorHit> search(Long guideId, String queryText, int topK) {
         Map<?, ?> response = callPost(
@@ -83,6 +85,7 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
     @Override public String model() { return embeddingProvider.getModelName(); }
     @Override public int dimension() { return embeddingProvider.getDimension(); }
 
+    /** 설정된 컬렉션을 준비하고 검색 필터로 사용하는 guideId 인덱스만 보장한다. */
     private void ensureCollection() {
         try {
             Map<?, ?> response =
@@ -101,13 +104,9 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         }
         callPut("/collections/" + collectionName() + "/index",
                 Map.of("field_name", "guideId", "field_schema", "integer"));
-        for (String field : List.of("guideCode", "guideVersion", "embeddingProvider", "embeddingModel")) {
-            callPut("/collections/" + collectionName() + "/index",
-                    Map.of("field_name", field, "field_schema", "keyword"));
-        }
     }
 
-    /** 같은 이름의 collection이 다른 embedding 차원으로 생성된 경우 조용히 재사용하지 않는다. */
+    /** 모델 차원이나 거리 방식이 다른 컬렉션을 재사용해 검색 결과가 깨지는 것을 막는다. */
     private void validateCollection(Map<?, ?> response) {
         Object result = response == null ? null : response.get("result");
         Object config = result instanceof Map<?, ?> value ? value.get("config") : null;
@@ -121,22 +120,13 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         }
     }
 
-    private Map<String, Object> payload(GuideVectorDocument document) {
-        return Map.of(
-                "guideId", document.guideId(),
-                "guideCode", document.guideCode(),
-                "guideVersion", document.guideVersion(),
-                "chunkIndex", document.chunkIndex(),
-                "embeddingProvider", provider(),
-                "embeddingModel", model(),
-                "embeddingDimension", dimension());
-    }
-
+    /** 다른 버전이나 범위의 point가 검색 결과에 섞이지 않도록 guideId로 격리한다. */
     private Map<String, Object> guideFilter(Long guideId) {
         return Map.of("must", List.of(
                 Map.of("key", "guideId", "match", Map.of("value", guideId))));
     }
 
+    /** Qdrant POST 실패를 애플리케이션의 벡터 저장소 오류로 통일한다. */
     private Map<?, ?> callPost(String uri, Object body) {
         try {
             Map<?, ?> response = client.post().uri(uri).body(body).retrieve().body(Map.class);
@@ -146,6 +136,7 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         }
     }
 
+    /** Qdrant PUT 실패를 애플리케이션의 벡터 저장소 오류로 통일한다. */
     private Map<?, ?> callPut(String uri, Object body) {
         try {
             Map<?, ?> response = client.put().uri(uri).body(body).retrieve().body(Map.class);
@@ -155,12 +146,15 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         }
     }
 
+    /** 설정값과 임베딩 계약으로 기존부터 사용해 온 가이드 컬렉션 이름을 계산한다. */
     private String collectionName() {
+        // 기존 ACTIVE 가이드의 embedding_ref와 실제 Qdrant 위치를 유지하기 위해 이름 계약은 변경하지 않는다.
         String identity = provider() + "|" + model() + "|" + dimension();
         return safe(properties.getCollection(), 80) + "-" + safe(provider(), 24)
                 + "-" + safe(model(), 48) + "-d" + dimension() + "-" + shortHash(identity);
     }
 
+    /** Provider와 모델명을 Qdrant 컬렉션 이름에 사용할 수 있는 문자열로 정규화한다. */
     private String safe(String value, int maxLength) {
         String normalized = value == null ? "" : value.toLowerCase()
                 .replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
@@ -168,6 +162,7 @@ public class QdrantGuideVectorStoreAdapter implements GuideVectorStorePort {
         return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength);
     }
 
+    /** 서로 다른 임베딩 계약의 컬렉션명이 충돌하지 않도록 짧은 식별 해시를 만든다. */
     private String shortHash(String value) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")

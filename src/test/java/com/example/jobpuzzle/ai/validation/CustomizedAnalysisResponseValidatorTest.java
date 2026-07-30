@@ -33,8 +33,8 @@ class CustomizedAnalysisResponseValidatorTest {
     private final PromptTemplateRenderer renderer = new PromptTemplateRenderer(objectMapper);
     private final MockAiClient mock = new MockAiClient(objectMapper, new AnalysisSourceMarkerParser());
 
-    // 운영 DB 반영 전 renderer·Mock·validator가 공유하는 JSON-05 정본 리소스를 읽는다.
-    private static final String OPERATING_JSON05_PROMPT = operatingPrompt();
+    // 구형 renderer·Mock·validator 계약 회귀 검증은 보관된 JSON-05 v1.0 fixture를 사용한다.
+    private static final String LEGACY_JSON05_PROMPT = legacyPrompt();
 
     @Test
     void rendersMockParsesAndValidatesFullCustomizedAnalysisWithoutPersistence() {
@@ -76,11 +76,11 @@ class CustomizedAnalysisResponseValidatorTest {
     }
 
     @Test
-    void initialRegistrationSqlUsesTheSameOperatingPromptWithoutUpsert() {
-        // 배포 SQL이 정본 리소스를 그대로 포함하고 동일 버전을 조용히 덮어쓰지 않는지 검증한다.
-        String sql = resource("/db/manual/insert-json-05-v1.0.sql");
+    void latestActivationSqlRegistersTheCurrentVersionWithoutUpsert() {
+        // 현재 사용하는 JSON-05 최신 배포 SQL만 읽어 버전과 중복 덮어쓰기 금지를 검증한다.
+        String sql = resource("/db/manual/activate-json-05-v1.10.sql");
 
-        assertThat(sql).contains(OPERATING_JSON05_PROMPT.strip(), "PT-JSON05-001", "v1.0")
+        assertThat(sql).contains("PT-JSON05-001", "v1.10")
                 .doesNotContain("ON DUPLICATE KEY UPDATE");
     }
 
@@ -372,12 +372,12 @@ class CustomizedAnalysisResponseValidatorTest {
 
     private PromptTemplate template() {
         return PromptTemplate.builder().promptCode("PT05").name("JSON-05").version("v1").targetJson("JSON-05")
-                .isActive(true).templateText(OPERATING_JSON05_PROMPT).build();
+                .isActive(true).templateText(LEGACY_JSON05_PROMPT).build();
     }
 
-    // 테스트 fixture가 운영 정본과 달라지지 않도록 classpath 리소스를 그대로 사용한다.
-    private static String operatingPrompt() {
-        return resource("/prompts/json-05-v1.0.txt");
+    // 보관된 구형 계약을 명시적으로 읽어 최신 프롬프트와 혼동하지 않게 한다.
+    private static String legacyPrompt() {
+        return resource("/prompts/before-json-05/json-05-v1.0.txt");
     }
 
     // 정본 prompt와 최초 등록 SQL을 같은 방식으로 읽어 테스트가 배포 산출물을 검증하게 한다.

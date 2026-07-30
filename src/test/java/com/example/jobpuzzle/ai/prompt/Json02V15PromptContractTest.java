@@ -11,7 +11,7 @@ class Json02V15PromptContractTest {
 
     @Test
     void preservesEvidenceAndPartitionContractsWhileReservingTechnicalIdsForTheServer() throws Exception {
-        String prompt = Files.readString(Path.of("src/main/resources/prompts/json-02-v1.5.txt"));
+        String prompt = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.5.txt"));
 
         assertThat(prompt)
                 .contains("[PARTITION_BOUNDARY_RULES]", "반드시 JSON null", "evidenceText 필드는 반환하지 않는다.")

@@ -4,10 +4,6 @@ package com.example.jobpuzzle.guide.vector;
 public record GuideVectorDocument(
         Long chunkId,
         Long guideId,
-        String guideCode,
-        String guideVersion,
-        int chunkIndex,
-        String title,
         String content
 ) {
 }

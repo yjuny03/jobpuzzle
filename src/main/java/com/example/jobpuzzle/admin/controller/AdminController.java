@@ -144,18 +144,12 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    // 가이드 활성화 - 같은 범위에 이미 활성화된 가이드가 있으면 force=true를 줘야 진행됨
-    @PatchMapping("/guides/{guideId}/activate")
-    public ResponseEntity<ApiResponse<AdminGuideResponse>> activateGuide(
-            @PathVariable Long guideId,
-            @RequestParam(defaultValue = "false") boolean force
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.activateGuide(guideId, force)));
-    }
-
-    // 가이드 비활성화
+    // 활성 가이드를 분석 대상에서 제외한다.
     @PatchMapping("/guides/{guideId}/deactivate")
-    public ResponseEntity<ApiResponse<AdminGuideResponse>> deactivateGuide(@PathVariable Long guideId) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.deactivateGuide(guideId)));
+    public ResponseEntity<ApiResponse<AdminGuideResponse>> deactivateGuide(
+            @PathVariable Long guideId,
+            @AuthenticationPrincipal(expression = "user") User admin
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.deactivateGuide(guideId, admin)));
     }
 }
