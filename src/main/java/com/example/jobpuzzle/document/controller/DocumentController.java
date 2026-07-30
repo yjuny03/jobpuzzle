@@ -3,6 +3,7 @@ package com.example.jobpuzzle.document.controller;
 import com.example.jobpuzzle.document.dto.DirectDocumentRegisterRequest;
 import com.example.jobpuzzle.document.dto.DocumentDetailResponse;
 import com.example.jobpuzzle.document.dto.DocumentListResponse;
+import com.example.jobpuzzle.document.dto.DocumentNameUpdateRequest;
 import com.example.jobpuzzle.document.dto.DocumentResponse;
 import com.example.jobpuzzle.document.dto.DocumentUploadRequest;
 import com.example.jobpuzzle.document.dto.ExtractionEditRequest;
@@ -116,6 +117,18 @@ public class DocumentController {
         List<ExtractionVersionResponse> response =
                 documentExtractionService.getDocumentVersions(user.getUserId(), documentId);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // 자료명 변경 (버전 이력·확정 상태와 무관하게 즉시 반영)
+    // PATCH /jobpuzzle/documents/{documentId}/name { displayName }
+    @PatchMapping("/documents/{documentId}/name")
+    public ResponseEntity<ApiResponse<Void>> updateDisplayName(
+            @PathVariable Long documentId,
+            @Valid @RequestBody DocumentNameUpdateRequest request,
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        documentService.updateDisplayName(user.getUserId(), documentId, request.getDisplayName());
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // 원본 파일 보관 여부 변경

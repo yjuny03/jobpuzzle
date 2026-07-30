@@ -421,23 +421,10 @@
     document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.materialMethod === 'file'); });
     document.querySelector('[data-material-method-panel="file"]').hidden = false;
     document.querySelector('[data-material-method-panel="text"]').hidden = true;
-    updateMaterialMethodVisibility();
     document.getElementById('material-register-form').hidden = false;
     document.getElementById('material-register-panel').hidden = true;
     document.getElementById('material-register-panel').innerHTML = '';
     document.getElementById('material-register-modal').hidden = false;
-  }
-
-  function updateMaterialMethodVisibility() {
-    var textTabBtn = document.querySelector('#material-register-modal [data-material-method="text"]');
-    var allowed = DF.DIRECT_INPUT_ALLOWED.indexOf(state.registerTargetType) !== -1;
-    textTabBtn.hidden = !allowed;
-    if (!allowed && state.materialRegisterMethod === 'text') {
-      state.materialRegisterMethod = 'file';
-      document.querySelectorAll('#material-register-modal [data-material-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.materialMethod === 'file'); });
-      document.querySelector('[data-material-method-panel="file"]').hidden = false;
-      document.querySelector('[data-material-method-panel="text"]').hidden = true;
-    }
   }
 
   function closeMaterialRegisterModal() {

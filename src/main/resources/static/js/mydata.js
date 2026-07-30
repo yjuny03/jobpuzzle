@@ -6,7 +6,6 @@
   var api = DF.api;
   var CATEGORY_LABEL = DF.CATEGORY_LABEL;
   var CATEGORIES = Object.keys(CATEGORY_LABEL).map(function (id) { return { id: id, label: CATEGORY_LABEL[id] }; });
-  var DIRECT_INPUT_ALLOWED = DF.DIRECT_INPUT_ALLOWED;
   var versionLabel = DF.versionLabel;
   var statusLabel = DF.statusLabel;
 
@@ -193,7 +192,6 @@
     document.querySelectorAll('#register-modal [data-method]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.method === 'file'); });
     document.querySelector('[data-method-panel="file"]').hidden = false;
     document.querySelector('[data-method-panel="text"]').hidden = true;
-    updateRegisterMethodVisibility();
     document.getElementById('register-modal').hidden = false;
   }
 
@@ -205,22 +203,8 @@
       b.addEventListener('click', function () {
         state.registerCategory = b.dataset.regCat;
         renderRegisterCategoryGrid();
-        updateRegisterMethodVisibility();
       });
     });
-  }
-
-  // 직접 입력을 지원하지 않는 자료 유형이면 "직접 입력" 탭 자체를 숨긴다
-  function updateRegisterMethodVisibility() {
-    var textTabBtn = document.querySelector('#register-modal [data-method="text"]');
-    var allowed = !!state.registerCategory && DIRECT_INPUT_ALLOWED.indexOf(state.registerCategory) !== -1;
-    textTabBtn.hidden = !allowed;
-    if (!allowed && state.registerMethod === 'text') {
-      state.registerMethod = 'file';
-      document.querySelectorAll('#register-modal [data-method]').forEach(function (x) { x.classList.toggle('is-active', x.dataset.method === 'file'); });
-      document.querySelector('[data-method-panel="file"]').hidden = false;
-      document.querySelector('[data-method-panel="text"]').hidden = true;
-    }
   }
 
   // 선택할 때마다 누적되는 파일 목록을 칩 형태로 그려주고, 칩의 × 버튼으로 개별 삭제

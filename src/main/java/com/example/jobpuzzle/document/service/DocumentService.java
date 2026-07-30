@@ -37,9 +37,6 @@ public class DocumentService {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "jpg", "jpeg", "png");
     private static final int MAX_IMAGE_COUNT = 20;
-    private static final Set<UserDocumentType> DIRECT_INPUT_ALLOWED_TYPES = Set.of(
-            UserDocumentType.JOB_POSTING, UserDocumentType.COMPANY_INFO, UserDocumentType.EXPERIENCE_NOTE
-    );
 
     private final UserDocumentRepository userDocumentRepository;
     private final DocumentExtractionRepository documentExtractionRepository;
@@ -74,10 +71,6 @@ public class DocumentService {
     // 직접 입력은 추출 파이프라인을 거치지 않고 그 자리에서 미확정 DRAFT까지 생성 (버전은 첫 확정 시점에 부여)
     @Transactional
     public ExtractionVersionResponse registerTextDocument(Long userId, DirectDocumentRegisterRequest request) {
-        if (!DIRECT_INPUT_ALLOWED_TYPES.contains(request.getDocumentType())) {
-            throw new CustomException(ErrorCode.INVALID_DIRECT_INPUT_TYPE);
-        }
-
         UserDocument document = UserDocument.builder()
                 .user(userRepository.getReferenceById(userId))
                 .documentType(request.getDocumentType())
@@ -138,6 +131,13 @@ public class DocumentService {
     public void deleteDocument(Long userId, Long documentId) {
         UserDocument document = findOwnedDocument(userId, documentId);
         document.softDelete();
+    }
+
+    // 자료명 변경은 버전 이력·확정 상태와 무관하게 즉시 반영
+    @Transactional
+    public void updateDisplayName(Long userId, Long documentId, String displayName) {
+        UserDocument document = findOwnedDocument(userId, documentId);
+        document.rename(displayName);
     }
 
     @Transactional
