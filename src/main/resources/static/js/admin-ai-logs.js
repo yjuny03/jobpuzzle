@@ -24,11 +24,12 @@
     return '<span class="badge-pill" style="background:' + bg + '; color:' + color + ';">' + esc(label) + '</span>';
   }
 
-  var state = { page: 0, status: '', pageData: null };
+  var state = { page: 0, status: '', stage: '', pageData: null };
 
   function load() {
     var qs = 'page=' + state.page + '&size=10';
     if (state.status) qs += '&status=' + state.status;
+    if (state.stage) qs += '&stage=' + state.stage;
     return api('/admin/ai-call-logs?' + qs).then(function (page) {
       state.pageData = page;
       renderRows();
@@ -42,7 +43,7 @@
       var errorText = r.errorType && r.errorType !== 'NONE'
         ? esc(r.errorType) + (r.errorMessage ? ' · ' + esc(r.errorMessage) : '')
         : '-';
-      return '<div class="table-row" style="grid-template-columns:0.9fr 1.2fr 1fr 1fr 1.6fr 0.9fr 1.1fr;">' +
+      return '<div class="table-row" style="grid-template-columns:0.9fr 1.2fr 1fr 1fr 1.6fr 0.9fr 1.1fr; cursor:pointer;" data-log="' + r.aiCallLogId + '">' +
         '<span>' + pill(status.label, status.bg, status.color) + '</span>' +
         '<span style="font-size:12.5px; color:#5B6370;">' + esc(r.executionStage) + '</span>' +
         '<span style="font-size:12.5px; color:#5B6370;">' + esc(r.provider) + ' / ' + esc(r.model) + '</span>' +
@@ -53,6 +54,12 @@
       '</div>';
     }).join('');
     document.getElementById('ai-log-rows').innerHTML = rows || '<div class="table-empty">조회된 로그가 없어요</div>';
+
+    document.querySelectorAll('[data-log]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        window.location.href = window.JobPuzzleRoutes.path('/admin/ai-logs/' + row.dataset.log);
+      });
+    });
   }
 
   function renderPagination() {
@@ -91,6 +98,11 @@
     if (!document.getElementById('ai-log-rows')) return;
     document.getElementById('ai-log-status-filter').addEventListener('change', function (e) {
       state.status = e.target.value;
+      state.page = 0;
+      load();
+    });
+    document.getElementById('ai-log-stage-filter').addEventListener('change', function (e) {
+      state.stage = e.target.value;
       state.page = 0;
       load();
     });

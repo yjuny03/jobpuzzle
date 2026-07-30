@@ -17,6 +17,7 @@ public enum ErrorCode {
     //AI
     AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_001", "AI 응답이 유효하지 않습니다."),
     AI_PROMPT_TEMPLATE_NOT_FOUND(HttpStatus.CONFLICT, "AI_002", "실행 단계에 사용할 활성 프롬프트 템플릿이 없습니다."),
+    AI_CALL_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "AI_003", "AI 호출 로그를 찾을 수 없습니다."),
 
     //analysis
     JSON05_RESULT_INTEGRITY_CONFLICT(HttpStatus.CONFLICT, "ANALYSIS_010", "JSON-05 result integrity conflict"),
