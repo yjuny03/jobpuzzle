@@ -5,6 +5,10 @@
 (function () {
     'use strict';
 
+    // header.js도 auth-guest/auth-user 전환을 다룰 수 있지만, 랜딩 페이지는 이 파일이
+    // preview-bar 더미 상태까지 함께 관리하므로 중복 fetch를 막기 위해 먼저 표시해둔다.
+    window.__jobPuzzleLandingHandlesAuthHeader = true;
+
     //  01. 화면 상태 설정값: 비로그인(guest), 로그인·자료없음(noData), 로그인·자료있음(ready)
     var STATE_CONFIG = {
         guest: {

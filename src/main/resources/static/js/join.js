@@ -183,15 +183,14 @@
       stopEmailCodeCountdown();
       var remaining = CODE_VALID_SECONDS;
       emailCodeCountdownEl.textContent = formatMMSS(remaining);
-      emailCodeHint.classList.remove('field-hint--error');
+      emailCodeHint.classList.remove('field-hint--error', 'field-hint--ok');
       verifyEmailCodeBtn.disabled = false;
 
       emailCodeTimerId = setInterval(function () {
         remaining -= 1;
         if (remaining <= 0) {
           stopEmailCodeCountdown();
-          emailCodeHint.textContent = '인증 시간이 만료되었습니다. 인증코드를 다시 발송해주세요.';
-          emailCodeHint.classList.add('field-hint--error');
+          setHint(emailCodeHint, '인증 시간이 만료되었습니다. 인증코드를 다시 발송해주세요.', false);
           verifyEmailCodeBtn.disabled = true;
           return;
         }
@@ -276,19 +275,17 @@
           if (result.ok && result.body.success) {
             emailVerified = true;
             stopEmailCodeCountdown();
-            emailCodeHint.textContent = '이메일 인증이 완료되었습니다.';
-            emailCodeHint.classList.remove('field-hint--error');
+            setHint(emailCodeHint, '이메일 인증이 완료되었습니다.', true);
             emailCodeInput.disabled = true;
           } else {
             emailVerified = false;
-            emailCodeHint.textContent = result.body.message || '인증 코드가 올바르지 않습니다.';
-            emailCodeHint.classList.add('field-hint--error');
+            setHint(emailCodeHint, result.body.message || '인증 코드가 올바르지 않습니다.', false);
             verifyEmailCodeBtn.disabled = false;
           }
         })
         .catch(function () {
-          emailCodeHint.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-          emailCodeHint.classList.add('field-hint--error');
+          emailVerified = false;
+          setHint(emailCodeHint, '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', false);
           verifyEmailCodeBtn.disabled = false;
         });
     });
