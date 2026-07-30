@@ -385,6 +385,7 @@
     api: api,
     CATEGORY_LABEL: CATEGORY_LABEL,
     DIRECT_INPUT_ALLOWED: DIRECT_INPUT_ALLOWED,
+    CHAR_LIMIT: CHAR_LIMIT,
     versionLabel: versionLabel,
     statusLabel: statusLabel,
     splitPages: splitPages,
