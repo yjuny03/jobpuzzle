@@ -72,9 +72,32 @@
 }
 
 .jp-app-theme .user-chip {
-  border: 2px solid var(--jp-line-soft);
+  border: 3px solid #54758b;
   background: var(--jp-paper-soft);
   color: var(--jp-ink);
+  box-shadow:
+    2px 3px 0 rgba(38, 59, 75, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .7);
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.jp-app-theme .user-chip:hover,
+.jp-app-theme .user-chip:focus-visible {
+  border-color: var(--jp-blue-deep);
+  background: var(--jp-paper-blue);
+}
+
+.jp-app-theme .user-chip[aria-expanded="true"] {
+  border-color: #244f6b;
+  background: var(--jp-blue-soft);
+  box-shadow:
+    3px 4px 0 rgba(36, 79, 107, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .62);
+  transform: translateY(-1px);
+}
+
+.jp-app-theme .user-chip__name {
+  font-weight: 800;
 }
 
 .jp-app-theme .user-chip__avatar {
@@ -86,6 +109,16 @@
   border: 2px solid var(--jp-line);
   background: var(--jp-paper);
   box-shadow: var(--jp-shadow);
+}
+
+.jp-app-theme .user-menu__item {
+  color: var(--jp-ink);
+  font-weight: 850;
+}
+
+.jp-app-theme .user-menu__item--danger {
+  color: #a53238;
+  font-weight: 900;
 }
 
 .jp-app-theme .site-scroll-progress {

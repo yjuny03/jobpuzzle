@@ -90,20 +90,20 @@ class AnalysisPipelineHttpIntegrationTest {
         Fixture fixture = fixture(true);
         confirm(fixture);
 
-        mockMvc.perform(post("/api/analysis/cases/{caseId}/run", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(post("/analysis/cases/{caseId}/run", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"));
 
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/status", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(get("/analysis/cases/{caseId}/status", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.analysisCaseStatus").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.questionSetAvailable").value(true));
 
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/result", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(get("/analysis/cases/{caseId}/result", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -111,7 +111,7 @@ class AnalysisPipelineHttpIntegrationTest {
                 .andExpect(jsonPath("$.data.questionSet.questions").isNotEmpty());
 
         // 세션 모듈은 Repository가 아닌 이 handoff API만으로 PASS 질문 세트를 받아야 한다.
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/question-set", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(get("/analysis/cases/{caseId}/question-set", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -128,14 +128,14 @@ class AnalysisPipelineHttpIntegrationTest {
         Fixture fixture = fixture(false);
         confirm(fixture);
 
-        mockMvc.perform(post("/api/analysis/cases/{caseId}/run", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(post("/analysis/cases/{caseId}/run", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value(ErrorCode.GUIDE_ACTIVE_NOT_FOUND.getCode()))
                 .andExpect(jsonPath("$.message").value(ErrorCode.GUIDE_ACTIVE_NOT_FOUND.getMessage()));
 
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/status", fixture.analysisCase().getAnalysisCaseId())
+        mockMvc.perform(get("/analysis/cases/{caseId}/status", fixture.analysisCase().getAnalysisCaseId())
                         .with(authenticated(fixture.user())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.analysisCaseStatus").value("FAILED"));

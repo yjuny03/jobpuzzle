@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
 </head>
 
-<body>
+<body class="jp-auth-theme">
 
   <div th:replace="~{fragments/header :: landingHeader}"></div>
 
@@ -49,7 +49,8 @@
     </div>
   </main>
 
-  <script src="/js/header.js" th:src="@{/js/header.js}"></script>
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
+<script src="/js/header.js" th:src="@{/js/header.js}"></script>
   <script src="/js/job-category-setup.js" th:src="@{/js/job-category-setup.js}"></script>
 </body>
 

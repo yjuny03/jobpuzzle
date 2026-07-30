@@ -92,7 +92,7 @@
       });
     }
 
-    fetch('/api/job-category')
+    fetch(window.JobPuzzleRoutes.path('/job-category'))
       .then(function (res) { return res.json(); })
       .then(function (body) {
         jobCategories = body.data || [];
@@ -183,15 +183,14 @@
       stopEmailCodeCountdown();
       var remaining = CODE_VALID_SECONDS;
       emailCodeCountdownEl.textContent = formatMMSS(remaining);
-      emailCodeHint.classList.remove('field-hint--error');
+      emailCodeHint.classList.remove('field-hint--error', 'field-hint--ok');
       verifyEmailCodeBtn.disabled = false;
 
       emailCodeTimerId = setInterval(function () {
         remaining -= 1;
         if (remaining <= 0) {
           stopEmailCodeCountdown();
-          emailCodeHint.textContent = '인증 시간이 만료되었습니다. 인증코드를 다시 발송해주세요.';
-          emailCodeHint.classList.add('field-hint--error');
+          setHint(emailCodeHint, '인증 시간이 만료되었습니다. 인증코드를 다시 발송해주세요.', false);
           verifyEmailCodeBtn.disabled = true;
           return;
         }
@@ -226,7 +225,7 @@
       sendEmailCodeBtn.disabled = true;
       var sendBtnOriginalText = sendEmailCodeBtn.textContent;
       sendEmailCodeBtn.textContent = '전송 중...';
-      fetch('/api/user/join/send-code', {
+      fetch(window.JobPuzzleRoutes.path('/user/join/send-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -263,7 +262,7 @@
       }
 
       verifyEmailCodeBtn.disabled = true;
-      fetch('/api/user/join/verify', {
+      fetch(window.JobPuzzleRoutes.path('/user/join/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -276,19 +275,17 @@
           if (result.ok && result.body.success) {
             emailVerified = true;
             stopEmailCodeCountdown();
-            emailCodeHint.textContent = '이메일 인증이 완료되었습니다.';
-            emailCodeHint.classList.remove('field-hint--error');
+            setHint(emailCodeHint, '이메일 인증이 완료되었습니다.', true);
             emailCodeInput.disabled = true;
           } else {
             emailVerified = false;
-            emailCodeHint.textContent = result.body.message || '인증 코드가 올바르지 않습니다.';
-            emailCodeHint.classList.add('field-hint--error');
+            setHint(emailCodeHint, result.body.message || '인증 코드가 올바르지 않습니다.', false);
             verifyEmailCodeBtn.disabled = false;
           }
         })
         .catch(function () {
-          emailCodeHint.textContent = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-          emailCodeHint.classList.add('field-hint--error');
+          emailVerified = false;
+          setHint(emailCodeHint, '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', false);
           verifyEmailCodeBtn.disabled = false;
         });
     });
@@ -396,7 +393,7 @@
         setHint(loginIdHint, '아이디는 4~50자로 입력해주세요.', false);
         return;
       }
-      fetch('/api/user/check-id?loginId=' + encodeURIComponent(loginId))
+      fetch(window.JobPuzzleRoutes.path('/user/check-id?loginId=' + encodeURIComponent(loginId)))
         .then(function (res) { return res.json(); })
         .then(function (body) {
           var duplicate = body.data;
@@ -439,7 +436,7 @@
         code: Number(emailCodeInput.value.trim())
       };
 
-      fetch('/api/user/join', {
+      fetch(window.JobPuzzleRoutes.path('/user/join'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -451,7 +448,7 @@
         .then(function (result) {
           if (result.ok && result.body.success) {
             // 가입 성공 - 로그인 페이지로 이동
-            window.location.href = '/login';
+            window.location.href = window.JobPuzzleRoutes.path('/login');
           } else {
             showError(errorEl, result.body.message || '회원가입에 실패했습니다.');
           }

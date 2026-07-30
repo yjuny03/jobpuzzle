@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/analysis")
+@RequestMapping("/analysis")
 public class AnalysisController {
     private final AnalysisService analysisService;
     private final AnalysisCaseService analysisCaseService;

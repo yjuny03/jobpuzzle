@@ -10,7 +10,7 @@
     cardCanvases = Array.prototype.slice.call(
       document.querySelectorAll(
       '.stat-puzzle-canvas[data-puzzle-piece], .evaluation-puzzle-canvas[data-puzzle-piece]'
-      + ', .mode-puzzle-canvas[data-puzzle-piece]'
+      + ', .mode-puzzle-canvas[data-puzzle-piece], .analysis-puzzle-canvas[data-puzzle-complete]'
       )
     );
   }
@@ -139,11 +139,92 @@
     ctx.restore();
   }
 
+  function drawAssembly(canvas, now) {
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    var ratio = resizeCanvas(canvas);
+    var width = canvas.width;
+    var height = canvas.height;
+    var completed = Math.max(0, Math.min(4, Number(canvas.dataset.puzzleComplete) || 0));
+    var centerX = width * 0.5;
+    var centerY = height * 0.51;
+    var size = Math.min(width, height) * 0.16;
+    var spreadX = size * 1.02;
+    var spreadY = size * 0.8;
+    var reduce = reduceMotion ? 0 : 1;
+    var pulse = (Math.sin(now * 0.0022) + 1) * 0.5 * reduce;
+    var colors = [
+      ['#5B91B3', '#326B90'],
+      ['#65AAA9', '#3C8787'],
+      ['#718EB5', '#4C6894'],
+      ['#77AAA3', '#46847E']
+    ];
+    var targets = [
+      [-spreadX, -spreadY],
+      [spreadX, -spreadY],
+      [-spreadX, spreadY],
+      [spreadX, spreadY]
+    ];
+    var origins = [
+      [-width * 0.34, -height * 0.26],
+      [width * 0.34, -height * 0.28],
+      [-width * 0.36, height * 0.28],
+      [width * 0.35, height * 0.3]
+    ];
+
+    ctx.clearRect(0, 0, width, height);
+    if (completed > 0) {
+      var glowRadius = size * (2.5 + completed * 0.2 + pulse * 0.25);
+      var glow = ctx.createRadialGradient(centerX, centerY, size * 0.35, centerX, centerY, glowRadius);
+      glow.addColorStop(0, 'rgba(112, 210, 196, ' + (0.24 + completed * 0.045) + ')');
+      glow.addColorStop(0.55, 'rgba(89, 158, 205, ' + (0.12 + pulse * 0.05) + ')');
+      glow.addColorStop(1, 'rgba(89, 158, 205, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    for (var index = 0; index < 4; index += 1) {
+      var isComplete = index < completed;
+      var isCurrent = index === completed && completed < 4;
+      var gather = isComplete ? 1 : isCurrent ? (0.28 + pulse * 0.58) : 0;
+      var x = centerX + origins[index][0] * (1 - gather) + targets[index][0] * gather;
+      var y = centerY + origins[index][1] * (1 - gather) + targets[index][1] * gather;
+      var floatY = isComplete ? 0 : Math.sin(now * 0.0013 + index * 1.4) * 5 * ratio * reduce;
+      var rotation = isComplete ? 0 : Math.sin(now * 0.0009 + index) * 0.13 * reduce;
+
+      ctx.save();
+      ctx.globalAlpha = isComplete ? 1 : isCurrent ? 0.92 : 0.38;
+      ctx.translate(x, y + floatY);
+      ctx.rotate(rotation);
+      ctx.shadowColor = isComplete
+        ? 'rgba(72, 183, 167, ' + (0.46 + pulse * 0.18) + ')'
+        : 'rgba(38, 59, 75, 0.2)';
+      ctx.shadowBlur = (isComplete ? 18 + pulse * 8 : 8) * ratio;
+      ctx.shadowOffsetY = isComplete ? 0 : 4 * ratio;
+      puzzlePath(ctx, size, index);
+      var gradient = ctx.createLinearGradient(-size, -size, size, size);
+      gradient.addColorStop(0, colors[index][0]);
+      gradient.addColorStop(1, colors[index][1]);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.lineWidth = 2 * ratio;
+      ctx.strokeStyle = '#263B4B';
+      ctx.stroke();
+      puzzlePath(ctx, size * 0.88, index);
+      ctx.lineWidth = 1 * ratio;
+      ctx.strokeStyle = 'rgba(255,255,255,.32)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function render(now) {
     if (disposed) return;
     if (!document.hidden) {
       cardCanvases.forEach(function (canvas) {
-        drawPiece(canvas, now);
+        if (canvas.hasAttribute('data-puzzle-complete')) drawAssembly(canvas, now);
+        else drawPiece(canvas, now);
       });
     }
     window.requestAnimationFrame(render);

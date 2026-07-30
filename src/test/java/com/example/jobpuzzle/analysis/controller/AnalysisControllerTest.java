@@ -53,7 +53,7 @@ class AnalysisControllerTest {
         when(response.getStatus()).thenReturn(AnalysisCaseStatus.ANALYZING);
         when(analysisCaseService.getCase(USER_ID, CASE_ID)).thenReturn(response);
 
-        mockMvc.perform(post("/api/analysis/cases/{caseId}/run", CASE_ID)
+        mockMvc.perform(post("/analysis/cases/{caseId}/run", CASE_ID)
                 .with(authenticatedUser())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
@@ -90,7 +90,7 @@ class AnalysisControllerTest {
         when(statusQueryService.getStatus(USER_ID, CASE_ID)).thenReturn(AnalysisStatusResponse.builder()
                 .analysisCaseId(CASE_ID).analysisCaseStatus("FAILED").build());
 
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/status", CASE_ID).with(authenticatedUser()))
+        mockMvc.perform(get("/analysis/cases/{caseId}/status", CASE_ID).with(authenticatedUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.analysisCaseStatus").value("FAILED"));
@@ -104,7 +104,7 @@ class AnalysisControllerTest {
         when(resultQueryService.getResult(USER_ID, CASE_ID)).thenReturn(AnalysisResultResponse.builder()
                 .analysisCaseId(CASE_ID).status("COMPLETED").build());
 
-        mockMvc.perform(get("/api/analysis/cases/{caseId}/result", CASE_ID).with(authenticatedUser()))
+        mockMvc.perform(get("/analysis/cases/{caseId}/result", CASE_ID).with(authenticatedUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"));
@@ -116,7 +116,7 @@ class AnalysisControllerTest {
         // /run 예외가 HTTP status와 code/message로 손실 없이 변환되는지 검증한다.
         doThrow(new CustomException(errorCode)).when(analysisService).runCustomizedAnalysis(USER_ID, CASE_ID);
 
-        mockMvc.perform(post("/api/analysis/cases/{caseId}/run", CASE_ID)
+        mockMvc.perform(post("/analysis/cases/{caseId}/run", CASE_ID)
                         .with(authenticatedUser()).with(csrf()))
                 .andExpect(status().is(errorCode.getStatus().value()))
                 .andExpect(jsonPath("$.success").value(false))

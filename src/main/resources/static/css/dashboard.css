@@ -371,9 +371,32 @@
 }
 
 .jp-dashboard-theme .user-chip {
-  border: 2px solid var(--dash-line-soft);
+  border: 3px solid #54758b;
   background: var(--dash-paper-soft);
   color: var(--dash-ink);
+  box-shadow:
+    2px 3px 0 rgba(38, 59, 75, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .7);
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.jp-dashboard-theme .user-chip:hover,
+.jp-dashboard-theme .user-chip:focus-visible {
+  border-color: var(--dash-blue-deep);
+  background: var(--dash-paper-blue);
+}
+
+.jp-dashboard-theme .user-chip[aria-expanded="true"] {
+  border-color: #244f6b;
+  background: var(--dash-blue-soft);
+  box-shadow:
+    3px 4px 0 rgba(36, 79, 107, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .62);
+  transform: translateY(-1px);
+}
+
+.jp-dashboard-theme .user-chip__name {
+  font-weight: 800;
 }
 
 .jp-dashboard-theme .user-chip__avatar {
@@ -385,6 +408,16 @@
   border: 2px solid var(--dash-line);
   background: var(--dash-paper);
   box-shadow: var(--dash-shadow);
+}
+
+.jp-dashboard-theme .user-menu__item {
+  color: var(--dash-ink);
+  font-weight: 850;
+}
+
+.jp-dashboard-theme .user-menu__item--danger {
+  color: #a53238;
+  font-weight: 900;
 }
 
 .jp-dashboard-theme .site-scroll-progress {

@@ -7,4 +7,8 @@ import java.util.List;
 
 public interface JobGuideChunkRepository extends JpaRepository<JobGuideChunk, Long> {
     List<JobGuideChunk> findByGuide_GuideIdOrderByChunkIndexAsc(Long guideId);
+
+    long countByGuide_GuideId(Long guideId);
+
+    void deleteByGuide_GuideId(Long guideId);
 }

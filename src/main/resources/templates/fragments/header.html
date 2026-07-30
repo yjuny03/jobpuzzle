@@ -4,23 +4,23 @@
     <!-- Landing-page header: guest/user areas are switched by landing.js dummy state. -->
     <header th:fragment="landingHeader" class="site-header header--dark" data-dynamic-header>
       <div class="site-scroll-progress" aria-hidden="true"><i></i></div>
-      <a href="/index.html" th:href="@{/index.html}" class="site-header__brand">
+      <a href="/jobpuzzle/" th:href="@{/}" class="site-header__brand">
         <img src="/images/logoB.png" th:src="@{/images/logoB.png}" alt="JobPuzzle" class="site-header__logo site-header__logo--light" />
         <img src="/images/logoD.png" th:src="@{/images/logoD.png}" alt="" class="site-header__logo site-header__logo--dark" aria-hidden="true" />
         <span class="site-header__name">JobPuzzle</span>
       </a>
 
       <nav class="site-header__nav">
-        <a href="/dashboard.html" th:href="@{/dashboard.html}">대시보드</a>
-        <a href="/my-data.html" th:href="@{/my-data.html}">자료 관리</a>
-        <a href="/interview.html" th:href="@{/interview.html}">면접 준비</a>
-        <a href="/reports.html" th:href="@{/reports.html}">리포트</a>
+        <a href="/jobpuzzle/dashboard" th:href="@{/dashboard}">대시보드</a>
+        <a href="/jobpuzzle/my-data" th:href="@{/my-data}">자료 관리</a>
+        <a href="/jobpuzzle/interview" th:href="@{/interview}">면접 준비</a>
+        <a href="/jobpuzzle/reports" th:href="@{/reports}">리포트</a>
       </nav>
 
       <div class="site-header__actions">
         <div class="auth-guest" id="auth-guest" hidden>
-          <a class="btn btn--ghost" href="/login" th:href="@{/login}">로그인</a>
-          <a class="btn btn--primary" href="/join" th:href="@{/join}">회원가입</a>
+          <a class="btn btn--ghost" href="/jobpuzzle/login" th:href="@{/login}">로그인</a>
+          <a class="btn btn--primary" href="/jobpuzzle/join" th:href="@{/join}">회원가입</a>
         </div>
         <div class="auth-user" id="auth-user" hidden>
           <button class="user-chip" id="user-chip" type="button" data-user-menu-trigger="user-menu" aria-controls="user-menu" aria-expanded="false">
@@ -39,15 +39,23 @@
           </button>
           <div class="user-menu" id="user-menu" hidden>
             <a
-              href="/settings.html"
-              th:href="@{/settings.html}"
+              href="/jobpuzzle/settings"
+              th:href="@{/settings}"
               class="user-menu__item"
               >설정</a
             >
+            <a
+              href="/jobpuzzle/admin/users"
+              th:href="@{/admin/users}"
+              id="admin-link"
+              class="user-menu__item"
+              hidden
+              >관리자</a
+            >
             <div class="user-menu__divider"></div>
             <a
-              href="/index.html"
-              th:href="@{/index.html}"
+              href="/jobpuzzle/"
+              th:href="@{/}"
               id="logout-link"
               class="user-menu__item user-menu__item--danger"
               >로그아웃</a
@@ -60,7 +68,7 @@
     <!-- Logged-in application header. Dummy user values stay hardcoded until backend owners bind them. -->
     <header th:fragment="appHeader(activePage)" class="site-header header--light" data-dynamic-header>
       <div class="site-scroll-progress" aria-hidden="true"><i></i></div>
-      <a href="/index.html" th:href="@{/index.html}" class="site-header__brand">
+      <a href="/jobpuzzle/" th:href="@{/}" class="site-header__brand">
         <img src="/images/logoB.png" th:src="@{/images/logoB.png}" alt="JobPuzzle" class="site-header__logo site-header__logo--light" />
         <img src="/images/logoD.png" th:src="@{/images/logoD.png}" alt="" class="site-header__logo site-header__logo--dark" aria-hidden="true" />
         <span class="site-header__name">JobPuzzle</span>
@@ -68,26 +76,26 @@
 
       <nav class="site-header__nav">
         <a
-          href="/dashboard.html"
-          th:href="@{/dashboard.html}"
+          href="/jobpuzzle/dashboard"
+          th:href="@{/dashboard}"
           th:classappend="${activePage == 'dashboard'} ? 'is-active' : ''"
           >대시보드</a
         >
         <a
-          href="/my-data.html"
-          th:href="@{/my-data.html}"
+          href="/jobpuzzle/my-data"
+          th:href="@{/my-data}"
           th:classappend="${activePage == 'mydata'} ? 'is-active' : ''"
           >자료 관리</a
         >
         <a
-          href="/interview.html"
-          th:href="@{/interview.html}"
+          href="/jobpuzzle/interview"
+          th:href="@{/interview}"
           th:classappend="${activePage == 'interview'} ? 'is-active' : ''"
           >면접 준비</a
         >
         <a
-          href="/reports.html"
-          th:href="@{/reports.html}"
+          href="/jobpuzzle/reports"
+          th:href="@{/reports}"
           th:classappend="${activePage == 'reports'} ? 'is-active' : ''"
           >리포트</a
         >
@@ -111,15 +119,23 @@
           </button>
           <div class="user-menu" id="app-user-menu" hidden>
             <a
-              href="/settings.html"
-              th:href="@{/settings.html}"
+              href="/jobpuzzle/settings"
+              th:href="@{/settings}"
               class="user-menu__item"
               >설정</a
             >
+            <a
+              href="/jobpuzzle/admin/users"
+              th:href="@{/admin/users}"
+              id="app-admin-link"
+              class="user-menu__item"
+              hidden
+              >관리자</a
+            >
             <div class="user-menu__divider"></div>
             <a
-              href="/index.html"
-              th:href="@{/index.html}"
+              href="/jobpuzzle/"
+              th:href="@{/}"
               id="app-logout-link"
               class="user-menu__item user-menu__item--danger"
               >로그아웃</a

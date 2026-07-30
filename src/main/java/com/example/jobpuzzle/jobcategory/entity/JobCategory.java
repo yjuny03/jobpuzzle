@@ -37,4 +37,10 @@ public class JobCategory extends BaseTimeEntity {
         this.subCategory = subCategory;
         this.careerLevel = careerLevel;
     }
+
+    public void update(String mainCategory, String subCategory, JobCategoryCareerLevel careerLevel) {
+        this.mainCategory = mainCategory;
+        this.subCategory = subCategory;
+        this.careerLevel = careerLevel;
+    }
 }

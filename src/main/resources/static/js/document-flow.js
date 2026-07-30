@@ -1,8 +1,8 @@
-// document-flow.js — 자료 등록·추출·페이지별 보기/수정/확정 공용 로직 (my-data.html, interview.html 공용)
+// document-flow.js — 자료 등록·추출·페이지별 보기/수정/확정 공용 로직 (자료 관리, 면접 준비 화면 공용)
 (function (global) {
   'use strict';
 
-  var API_BASE = '/api';
+  var API_BASE = window.JobPuzzleRoutes.base;
 
   var CATEGORY_LABEL = {
     JOB_POSTING: '채용공고', COMPANY_INFO: '회사정보', RESUME: '이력서',

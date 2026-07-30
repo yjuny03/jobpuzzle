@@ -15,77 +15,49 @@
 <div class="app-shell">
   <main class="app-container">
     <div class="result-top-actions">
-      <a href="/interview.html" th:href="@{/interview.html}" class="result-nav-link">
+      <a href="/jobpuzzle/interview" th:href="@{/interview}" class="result-nav-link">
         <span aria-hidden="true">←</span> 새 면접 시작
       </a>
-      <a href="/reports.html" th:href="@{/reports.html}" class="result-nav-link result-nav-link--report">
+      <a href="/jobpuzzle/reports" th:href="@{/reports}" class="result-nav-link result-nav-link--report">
         리포트 목록 <span aria-hidden="true">→</span>
       </a>
     </div>
 
     <div class="result-layout">
-      <section>
-        <header class="result-heading">
+      <header class="result-banner">
+        <div class="result-heading">
           <p class="eyebrow-label">면접 결과</p>
           <h1 id="result-title">면접 결과</h1>
           <p id="result-meta">결과를 불러오는 중입니다.</p>
-        </header>
-
-        <nav class="tabbar result-tabs" aria-label="면접 결과 보기">
-          <button class="tabbar__btn is-active" data-tab="final">최종 리포트</button>
-          <button class="tabbar__btn" data-tab="list">질문별 결과</button>
-          <button class="tabbar__btn" data-tab="score">평가 항목별 점수</button>
-        </nav>
-
-        <section id="interim-actions" class="interim-actions" hidden></section>
-
-        <div class="tab-panel" data-panel="final">
-          <section class="card final-report-panel" id="final-report-panel">
-            <p class="result-empty-copy">최종 리포트를 불러오는 중입니다.</p>
-          </section>
         </div>
+      </header>
 
-        <div class="tab-panel" data-panel="list" hidden>
-          <div class="q-layout">
-            <div class="q-list" id="q-list"></div>
-            <article class="card q-detail" id="q-detail"></article>
-          </div>
-        </div>
+      <nav class="tabbar result-tabs" aria-label="면접 결과 보기">
+        <button class="tabbar__btn is-active" data-tab="final">최종 리포트</button>
+        <button class="tabbar__btn" data-tab="list">질문별 결과</button>
+      </nav>
 
-        <div class="tab-panel" data-panel="score" hidden>
-          <section class="card score-panel">
-            <h2>평가 항목별 점수</h2>
-            <p>질문 생성 시 선택된 평가 관점만 집계합니다.</p>
-            <div id="score-method" class="score-method"></div>
-            <div class="eval-list" id="eval-list"></div>
-          </section>
-        </div>
+      <section id="interim-actions" class="interim-actions" hidden></section>
 
-      </section>
-
-      <aside class="result-sidebar">
-        <section class="card result-summary-card">
-          <div class="overall-card">
-            <span class="result-summary-eyebrow">이번 면접 요약</span>
-            <div id="overall-donut"></div>
-            <p>종합 준비도</p>
-            <strong id="overall-score-label"></strong>
-          </div>
-          <div class="result-summary-divider"></div>
-          <div class="weakness-sidebar">
-            <h2 id="weakness-heading">연습 포인트</h2>
-            <div id="weakness-list"></div>
-            <a id="weakness-practice-link" href="/interview.html" th:href="@{/interview.html}"
-               class="btn btn--primary">약점 보완 연습</a>
-          </div>
+      <div class="tab-panel" data-panel="final">
+        <section class="card final-report-panel" id="final-report-panel">
+          <p class="result-empty-copy">최종 리포트를 불러오는 중입니다.</p>
         </section>
-      </aside>
+      </div>
+
+      <div class="tab-panel" data-panel="list" hidden>
+        <div class="q-layout">
+          <div class="q-list" id="q-list"></div>
+          <article class="card q-detail" id="q-detail"></article>
+        </div>
+      </div>
     </div>
   </main>
 </div>
 
 <div th:replace="~{fragments/footer :: siteFooter}"></div>
 
+<script src="/js/routes.js" th:src="@{/js/routes.js}"></script>
 <script src="/js/common.js" th:src="@{/js/common.js}"></script>
 <script src="/js/header.js" th:src="@{/js/header.js}"></script>
 <script src="/js/interview-result.js" th:src="@{/js/interview-result.js}"></script>

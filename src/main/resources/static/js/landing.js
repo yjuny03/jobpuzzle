@@ -5,13 +5,17 @@
 (function () {
     'use strict';
 
+    // header.js도 auth-guest/auth-user 전환을 다룰 수 있지만, 랜딩 페이지는 이 파일이
+    // preview-bar 더미 상태까지 함께 관리하므로 중복 fetch를 막기 위해 먼저 표시해둔다.
+    window.__jobPuzzleLandingHandlesAuthHeader = true;
+
     //  01. 화면 상태 설정값: 비로그인(guest), 로그인·자료없음(noData), 로그인·자료있음(ready)
     var STATE_CONFIG = {
         guest: {
             isLoggedIn: false,
             ctaLabel: '로그인하기',
             ctaHint: '로그인이 필요해요 · 클릭하면 로그인 페이지로 이동해요',
-            ctaHref: '/login',
+            ctaHref: '/jobpuzzle/login',
             reportLocked: true,
             lockTitle: '로그인하고 리포트 확인하기',
             lockDesc: '로그인하면 직무별 요구역량 리포트를 볼 수 있어요',
@@ -21,7 +25,7 @@
             isLoggedIn: true,
             ctaLabel: '분석할 자료 등록하러 가기',
             ctaHint: '채용공고와 이력서를 등록하면 분석이 시작돼요',
-            ctaHref: '/my-data.html',
+            ctaHref: '/jobpuzzle/my-data',
             reportLocked: true,
             lockTitle: '자료를 등록하면 리포트가 열려요',
             lockDesc: '채용공고와 이력서를 등록하면 나만의 리포트를 확인할 수 있어요',
@@ -31,7 +35,7 @@
             isLoggedIn: true,
             ctaLabel: '면접 준비 이어가기',
             ctaHint: '최근 등록한 백엔드 신입 공고 기준으로 이어갈 수 있어요',
-            ctaHref: '/interview.html',
+            ctaHref: '/jobpuzzle/interview',
             reportLocked: false
         }
     };
@@ -52,6 +56,7 @@
         els.userAvatar = document.getElementById('user-avatar');
         els.userChip = document.getElementById('user-chip');
         els.userMenu = document.getElementById('user-menu');
+        els.adminLink = document.getElementById('admin-link');
         els.heroCtaLabel = document.getElementById('hero-cta-label');
         els.heroCta = document.getElementById('hero-cta');
         els.heroCtaHint = document.getElementById('hero-cta-hint');
@@ -71,7 +76,7 @@
     }
 
     //  04. 현재 미리보기 모드를 화면에 반영: 헤더 로그인 상태, HERO CTA, 리포트 잠금 상태를 함께 변경
-    function applyMode(mode, userName) {
+    function applyMode(mode, userName, role) {
         var config = STATE_CONFIG[mode] || STATE_CONFIG.guest;
         var name = userName || DUMMY_USER_NAME;
 
@@ -88,6 +93,7 @@
             if (els.authUser) els.authUser.hidden = false;
             if (els.userName) els.userName.textContent = name + '님';
             if (els.userAvatar) els.userAvatar.textContent = name.charAt(0);
+            if (els.adminLink) els.adminLink.hidden = role !== 'ADMIN';
         } else {
             if (els.authGuest) els.authGuest.hidden = false;
             if (els.authUser) els.authUser.hidden = true;
@@ -126,7 +132,7 @@
 
         if (els.lockBtn) {
             els.lockBtn.addEventListener('click', function () {
-                window.location.href = els.lockBtn.dataset.href || '/login';
+                window.location.href = els.lockBtn.dataset.href || window.JobPuzzleRoutes.path('/login');
             });
         }
 
@@ -137,12 +143,12 @@
     // The preview toolbar stays dummy-data driven, but the real landing page
     // always derives its header and CTA state from the server-side session.
     function applyRealAuthState() {
-        fetch('/api/user/me', { credentials: 'same-origin' })
+        fetch(window.JobPuzzleRoutes.path('/user/me'), { credentials: 'same-origin' })
             .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
             .then(function (result) {
                 if (result.ok && result.body.success) {
                     var user = result.body.data;
-                    applyMode('noData', user.name || user.loginId);
+                    applyMode('noData', user.name || user.loginId, user.role);
                     return;
                 }
                 applyMode('guest');

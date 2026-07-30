@@ -399,7 +399,7 @@
         });
         localStorage.setItem('jobpuzzle_analysis_cases', JSON.stringify(tracked.slice(0, 10)));
         sessionStorage.setItem('jobpuzzle_analysis_notice', '분석 요청이 접수되었습니다.');
-        window.location.href = '/api/analysis/' + encodeURIComponent(state.analysisCaseId);
+        window.location.href = window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(state.analysisCaseId));
       })
       .catch(function (e) {
         notify('error', e.message);
@@ -534,7 +534,7 @@
     } else {
       html += '<div style="text-align:center; padding:16px 0 4px;">' +
         '<p style="font-size:13px; color:#5B6370; margin:0 0 18px;">자료가 너무 부족해 질문을 만들 수 없어요. 과제를 먼저 완료하거나 기본 질문 모드로 진행해주세요.</p>' +
-        '<div class="flex-row gap-10" style="justify-content:center;"><button class="btn" style="background:#fff; border:1px solid #E3E7ED;" data-action="goBasicMode">기본 질문 모드로 전환</button><a href="/dashboard.html" class="btn btn--primary" style="text-decoration:none;">과제 목록 확인하기</a></div></div>';
+        '<div class="flex-row gap-10" style="justify-content:center;"><button class="btn" style="background:#fff; border:1px solid #E3E7ED;" data-action="goBasicMode">기본 질문 모드로 전환</button><a href="' + window.JobPuzzleRoutes.path('/dashboard') + '" class="btn btn--primary" style="text-decoration:none;">과제 목록 확인하기</a></div></div>';
     }
 
     html += '</div>';
@@ -687,7 +687,7 @@
     });
     bindAction('finishAll', function () {
       try { localStorage.setItem('jobpuzzle_latest_session', JSON.stringify({ title: '모의면접', date: new Date().toISOString().slice(0, 10).replace(/-/g, '.'), score: 78 })); } catch (e) {}
-      window.location.href = '/interview-result.html';
+      window.location.href = window.JobPuzzleRoutes.path('/interview-results');
     });
 
     document.querySelectorAll('[data-select-q]').forEach(function (el) {

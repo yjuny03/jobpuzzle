@@ -28,6 +28,7 @@ public class FinalReportResponse {
     private String overallAssessment;
 
     private CategoryScores categoryScores;
+    private CategoryScoreReasons categoryScoreReasons;
     private BasisSummary basisSummary;
     private List<WeaknessTagSummary> weaknessTagSummary;
     private List<NextPracticeRecommendation> nextPracticeRecommendation;
@@ -45,6 +46,20 @@ public class FinalReportResponse {
         private Integer requirementConnection;
         private Integer guideAlignment;
         private Integer deliveryClarity;
+    }
+
+    // 관점별 점수가 왜 그렇게 나왔는지에 대한 AI 서술. 값이 없는 관점은 null.
+    @Getter
+    @Builder
+    public static class CategoryScoreReasons {
+        private String intentMatch;
+        private String specificity;
+        private String ownRole;
+        private String problemSolving;
+        private String resultExpression;
+        private String requirementConnection;
+        private String guideAlignment;
+        private String deliveryClarity;
     }
 
     @Getter
@@ -80,6 +95,7 @@ public class FinalReportResponse {
     public static class WeaknessTagSummary {
         private String tag;
         private int count;
+        private String reason;
     }
 
     @Getter

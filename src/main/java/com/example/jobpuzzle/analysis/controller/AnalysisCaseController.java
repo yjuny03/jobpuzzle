@@ -30,7 +30,7 @@ public class AnalysisCaseController {
     private final AnalysisCaseService analysisCaseService;
     private final AnalysisVectorIndexService vectorIndexService;
 
-    @GetMapping("/api/analysis-cases/completed")
+    @GetMapping("/analysis-cases/completed")
     public ResponseEntity<ApiResponse<List<AnalysisCaseResponse>>> getCompletedCases(
             @AuthenticationPrincipal(expression = "user") User user
     ) {
@@ -40,8 +40,8 @@ public class AnalysisCaseController {
     }
 
     // 분석 작업 생성 (jobCategoryId 없으면 회원 기본 관심 직무 사용)
-    // POST /api/analysis-cases { jobCategoryId? }
-    @PostMapping("/api/analysis-cases")
+    // POST /jobpuzzle/analysis-cases { jobCategoryId? }
+    @PostMapping("/analysis-cases")
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> createCase(
             @RequestBody(required = false) AnalysisCaseCreateRequest request,
             @AuthenticationPrincipal(expression = "user") User user
@@ -54,8 +54,8 @@ public class AnalysisCaseController {
     }
 
     // 분석 작업 상세(연결된 자료 목록 포함) 조회
-    // GET /api/analysis-cases/{analysisCaseId}
-    @GetMapping("/api/analysis-cases/{analysisCaseId}")
+    // GET /jobpuzzle/analysis-cases/{analysisCaseId}
+    @GetMapping("/analysis-cases/{analysisCaseId}")
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> getCase(
             @PathVariable Long analysisCaseId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -66,8 +66,8 @@ public class AnalysisCaseController {
     }
 
     // 분석 기준 직무·경력 변경 (DRAFT 상태에서만 가능)
-    // PATCH /api/analysis-cases/{analysisCaseId}/job-category { jobCategoryId }
-    @PatchMapping("/api/analysis-cases/{analysisCaseId}/job-category")
+    // PATCH /jobpuzzle/analysis-cases/{analysisCaseId}/job-category { jobCategoryId }
+    @PatchMapping("/analysis-cases/{analysisCaseId}/job-category")
     public ResponseEntity<ApiResponse<AnalysisCaseResponse>> changeJobCategory(
             @PathVariable Long analysisCaseId,
             @RequestBody AnalysisCaseJobCategoryUpdateRequest request,
@@ -80,8 +80,8 @@ public class AnalysisCaseController {
     }
 
     // CONFIRMED 추출본을 분석 작업에 연결
-    // POST /api/analysis-cases/{analysisCaseId}/sources { extractionId }
-    @PostMapping("/api/analysis-cases/{analysisCaseId}/sources")
+    // POST /jobpuzzle/analysis-cases/{analysisCaseId}/sources { extractionId }
+    @PostMapping("/analysis-cases/{analysisCaseId}/sources")
     public ResponseEntity<ApiResponse<AnalysisCaseSourceResponse>> addSource(
             @PathVariable Long analysisCaseId,
             @RequestBody AnalysisCaseSourceAddRequest request,
@@ -94,8 +94,8 @@ public class AnalysisCaseController {
     }
 
     // 연결된 자료 제거
-    // DELETE /api/analysis-cases/{analysisCaseId}/sources/{analysisCaseSourceId}
-    @DeleteMapping("/api/analysis-cases/{analysisCaseId}/sources/{analysisCaseSourceId}")
+    // DELETE /jobpuzzle/analysis-cases/{analysisCaseId}/sources/{analysisCaseSourceId}
+    @DeleteMapping("/analysis-cases/{analysisCaseId}/sources/{analysisCaseSourceId}")
     public ResponseEntity<Void> removeSource(
             @PathVariable Long analysisCaseId,
             @PathVariable Long analysisCaseSourceId,
@@ -108,8 +108,8 @@ public class AnalysisCaseController {
     }
 
     // 선택 자료·기준을 최종 확정하고 분석 입력 스냅샷 생성
-    // POST /api/analysis-cases/{analysisCaseId}/confirm
-    @PostMapping("/api/analysis-cases/{analysisCaseId}/confirm")
+    // POST /jobpuzzle/analysis-cases/{analysisCaseId}/confirm
+    @PostMapping("/analysis-cases/{analysisCaseId}/confirm")
     public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> confirmInput(
             @PathVariable Long analysisCaseId,
             @AuthenticationPrincipal(expression = "user") User user
@@ -119,15 +119,15 @@ public class AnalysisCaseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    @PostMapping("/api/analysis-cases/{analysisCaseId}/index")
+    @PostMapping("/analysis-cases/{analysisCaseId}/index")
     public ResponseEntity<ApiResponse<Void>> index(@PathVariable Long analysisCaseId, @AuthenticationPrincipal(expression = "user") User user) {
         vectorIndexService.index(user.getUserId(), analysisCaseId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     // 확정된 분석 입력 스냅샷 읽기 전용 조회
-    // GET /api/analysis-cases/{analysisCaseId}/snapshot
-    @GetMapping("/api/analysis-cases/{analysisCaseId}/snapshot")
+    // GET /jobpuzzle/analysis-cases/{analysisCaseId}/snapshot
+    @GetMapping("/analysis-cases/{analysisCaseId}/snapshot")
     public ResponseEntity<ApiResponse<AnalysisInputSnapshotResponse>> getSnapshot(
             @PathVariable Long analysisCaseId,
             @AuthenticationPrincipal(expression = "user") User user

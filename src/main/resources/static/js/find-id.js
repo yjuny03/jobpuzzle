@@ -34,7 +34,7 @@
       sendBtn.disabled = true;
       var sendBtnOriginalText = sendBtn.textContent;
       sendBtn.textContent = '전송 중...';
-      fetch('/api/user/find-id/send-code', {
+      fetch(window.JobPuzzleRoutes.path('/user/find-id/send-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -72,7 +72,7 @@
       }
 
       verifyBtn.disabled = true;
-      fetch('/api/user/find-id/verify', {
+      fetch(window.JobPuzzleRoutes.path('/user/find-id/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

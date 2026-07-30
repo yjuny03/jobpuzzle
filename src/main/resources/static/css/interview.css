@@ -407,11 +407,14 @@
 }
 .active-analysis-stages li {
   position:relative;
-  display:flex;
-  align-items:center;
-  gap:6px;
+  display:grid;
+  grid-template-rows:20px auto;
+  align-items:start;
+  gap:8px;
+  padding-right:8px;
   color:#98a5b3;
   font-size:10px;
+  line-height:1.35;
 }
 .active-analysis-stages li:not(:last-child)::after {
   content:"";
@@ -434,6 +437,16 @@
   background:#e7edf3;
   font-style:normal;
   font-size:9px;
+}
+.active-analysis-stages li > span {
+  position:relative;
+  z-index:1;
+  display:block;
+  min-width:0;
+  color:inherit;
+  font-weight:700;
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
 .active-analysis-stages .is-done { color:#18805c; }
 .active-analysis-stages .is-done i { color:#fff; background:#22a278; }
@@ -1920,20 +1933,57 @@
 }
 
 .jp-interview-page .question-selection-dialog {
-  border: 2px solid var(--jp-line);
-  background: var(--jp-paper);
+  border: 3px solid #203e54;
+  background:
+    linear-gradient(145deg, rgba(218, 232, 240, .34), transparent 42%),
+    #faf7ef;
   color: var(--jp-ink);
-  box-shadow: 7px 9px 0 rgba(23, 40, 58, 0.22);
+  box-shadow:
+    8px 10px 0 rgba(23, 40, 58, .24),
+    0 28px 72px rgba(15, 39, 58, .32);
+}
+
+.jp-interview-page .question-selection-dialog > header {
+  border-bottom: 2px solid #8aa9bc;
+  background: linear-gradient(135deg, #faf5e9 0%, #e7f0f4 100%);
+}
+
+.jp-interview-page .question-selection-dialog h2 {
+  color: #122b3e;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.jp-interview-page .question-selection-mode {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border: 2px solid #3976a0;
+  border-radius: 8px;
+  background: #d8e9f2;
+  color: #17567e;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(31, 87, 124, .18);
 }
 
 .jp-interview-page .question-selection-dialog > footer {
-  border-top: 2px solid var(--jp-line-soft);
-  background: var(--jp-paper-soft);
+  gap: 24px;
+  padding: 24px 36px 28px;
+  border-top: 3px solid #789aae;
+  background: linear-gradient(145deg, #f5f2e9 0%, #e6eef1 100%);
 }
 
-.jp-interview-page .question-selection-dialog header p,
+.jp-interview-page .question-selection-dialog header p {
+  color: #344f63;
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .jp-interview-page .question-selection-dialog footer span {
-  color: var(--jp-text-secondary);
+  color: #b32931;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .jp-interview-page .question-selection-dialog > footer > span {
@@ -1941,16 +1991,148 @@
 }
 
 .jp-interview-page .question-selection-close {
-  border: 2px solid var(--jp-line-soft);
-  background: var(--jp-paper-soft);
-  color: var(--jp-ink);
-  box-shadow: var(--jp-shadow-small);
+  border: 2px solid #b63a3f;
+  background: #fff0ed;
+  color: #ae272d;
+  font-weight: 900;
+  box-shadow: 3px 4px 0 rgba(145, 38, 43, .2);
+  transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
 }
 
 .jp-interview-page .question-selection-close:hover {
-  border-color: var(--jp-danger);
-  background: #F0E2DE;
-  color: var(--jp-danger);
+  border-color: #8f2026;
+  background: #c83d43;
+  color: #fff;
+  box-shadow: 4px 5px 0 rgba(116, 24, 29, .24);
+  transform: translateY(-1px);
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-list {
+  gap: 12px;
+  margin: 18px 28px;
+  padding: 16px;
+  border: 3px solid #26465c;
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .2), transparent 46%),
+    #aebfca;
+  box-shadow:
+    4px 5px 0 rgba(28, 62, 84, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .72);
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-item {
+  min-height: 70px;
+  border: 2px solid #83a7bd;
+  border-radius: 13px;
+  background: #fbf8f0;
+  color: #1b3447;
+  box-shadow: 2px 3px 0 rgba(46, 86, 111, .14);
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-item:hover {
+  border-color: #347da8;
+  background: #e6f1f6;
+  box-shadow: 4px 5px 0 rgba(31, 96, 137, .18);
+  transform: translateY(-2px);
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-item:has(input:checked) {
+  border-color: #286f9b;
+  background: linear-gradient(145deg, #edf6f8 0%, #d6e9f1 100%);
+}
+
+.jp-interview-page .question-selection-dialog input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  margin: 1px 3px 0 0;
+  border: 2px solid #416f8c;
+  border-radius: 7px;
+  background: #fffdf7;
+  box-shadow:
+    2px 3px 0 rgba(36, 70, 92, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .8);
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+.jp-interview-page .question-selection-dialog input[type="checkbox"]:checked {
+  border-color: #1c628e;
+  background: linear-gradient(145deg, #4c9ac2 0%, #26729e 100%);
+  box-shadow:
+    2px 3px 0 rgba(23, 72, 102, .25),
+    inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.jp-interview-page .question-selection-dialog input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 7px;
+  width: 6px;
+  height: 10px;
+  border-right: 3px solid #fff;
+  border-bottom: 3px solid #fff;
+  transform: rotate(45deg);
+}
+
+.jp-interview-page .question-selection-dialog input[type="checkbox"]:focus-visible {
+  outline: 3px solid rgba(34, 104, 232, .3);
+  outline-offset: 3px;
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-item__num {
+  width: 30px;
+  height: 30px;
+  border-color: #555f93;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #787eae 0%, #555f93 100%);
+  color: #fff;
+  box-shadow:
+    2px 3px 0 rgba(48, 54, 95, .24),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.jp-interview-page .question-selection-dialog .q-gen-item__text {
+  color: #182f41;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.jp-interview-page .question-selection-dialog #create-live-session {
+  min-height: 48px;
+  padding-inline: 24px;
+  border: 2px solid #173d58;
+  box-shadow: 3px 5px 0 rgba(20, 57, 83, .22);
+}
+
+@media (max-width: 640px) {
+  .jp-interview-page .question-selection-dialog > header {
+    padding: 20px 18px 16px;
+  }
+
+  .jp-interview-page .question-selection-dialog .q-gen-list {
+    margin: 12px;
+    padding: 10px;
+  }
+
+  .jp-interview-page .question-selection-dialog .q-gen-item {
+    padding: 13px 11px;
+  }
+
+  .jp-interview-page .question-selection-dialog > footer {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .jp-interview-page .question-selection-dialog #create-live-session {
+    width: 100%;
+  }
 }
 
 .jp-interview-page .material-review-dialog > header {

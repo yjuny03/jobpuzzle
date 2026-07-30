@@ -80,7 +80,7 @@
       sendBtn.disabled = true;
       var sendBtnOriginalText = sendBtn.textContent;
       sendBtn.textContent = '전송 중...';
-      fetch('/api/user/passwd-reset/send-code', {
+      fetch(window.JobPuzzleRoutes.path('/user/passwd-reset/send-code'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -125,7 +125,7 @@
       }
 
       verifyBtn.disabled = true;
-      fetch('/api/user/passwd-reset/verify', {
+      fetch(window.JobPuzzleRoutes.path('/user/passwd-reset/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -162,7 +162,7 @@
       }
 
       resetBtn.disabled = true;
-      fetch('/api/user/passwd-reset/reset', {
+      fetch(window.JobPuzzleRoutes.path('/user/passwd-reset/reset'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

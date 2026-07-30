@@ -11,6 +11,7 @@
         pollTimer: null,
         retryTimer: null,
         statusSequence: 0,
+        lastProgressSignature: '',
         automaticRetries: 0,
         maximumAutomaticRetries: 2
     };
@@ -95,7 +96,7 @@
     }
 
     function analysisApi(suffix, options) {
-        return api('/api/analysis/cases/' + caseId + suffix, options);
+        return api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + suffix), options);
     }
 
     function friendlyError(error) {
@@ -124,6 +125,52 @@
         return node;
     }
 
+    function completedStageCount(status) {
+        return stages.reduce(function (count, stage) {
+            return count + (status[stage[0]] === 'SUCCEEDED' ? 1 : 0);
+        }, 0);
+    }
+
+    function appendAnalysisLoader(card, status, mode) {
+        var completeCount = completedStageCount(status);
+        var progress = Math.round((completeCount / stages.length) * 100);
+        var visual = el('div', 'analysis-loader analysis-loader--' + mode);
+        var puzzleWrap = el('div', 'analysis-loader__puzzle');
+        var canvas = el('canvas', 'analysis-puzzle-canvas');
+        canvas.id = 'analysisPuzzleCanvas';
+        canvas.dataset.jobPuzzleScene = '';
+        canvas.dataset.analysisPuzzle = '';
+        canvas.dataset.analysisStage = String(completeCount);
+        canvas.setAttribute('aria-hidden', 'true');
+        puzzleWrap.appendChild(canvas);
+        visual.appendChild(puzzleWrap);
+
+        var content = el('div', 'analysis-loader__content');
+        content.appendChild(el('span', 'analysis-loader__status',
+            mode === 'ready' ? '분석 실행 전'
+                : mode === 'recovery' ? '연결 복구 중' : '백그라운드 분석 중'));
+        content.appendChild(el('strong', null,
+            mode === 'ready' ? '시작 버튼을 누르면 분석이 진행돼요'
+                : mode === 'recovery' ? '분석 상태를 다시 연결하고 있어요'
+                : (completeCount ? completeCount + '단계까지 완료했어요' : '첫 번째 분석 단계를 준비하고 있어요')));
+        content.appendChild(el('p', null,
+            mode === 'ready'
+                ? '아직 AI 분석 요청은 실행되지 않았습니다. 선택한 자료를 확인한 뒤 직접 시작해 주세요.'
+                : '이 화면을 벗어나도 서버의 분석 작업은 계속됩니다. 다른 서비스를 이용한 뒤 다시 확인할 수 있어요.'));
+
+        var progressHead = el('div', 'analysis-loader__progress-head');
+        progressHead.appendChild(el('span', null, '실제 처리 단계'));
+        progressHead.appendChild(el('b', null, completeCount + ' / ' + stages.length));
+        content.appendChild(progressHead);
+        var track = el('div', 'analysis-loader__track');
+        var fill = el('i');
+        fill.style.width = progress + '%';
+        track.appendChild(fill);
+        content.appendChild(track);
+        visual.appendChild(content);
+        card.appendChild(visual);
+    }
+
     function renderProgress(status, runError) {
         clear();
         root.setAttribute('aria-busy', status.analysisCaseStatus === 'ANALYZING' ? 'true' : 'false');
@@ -131,12 +178,18 @@
         var isFailed = status.analysisCaseStatus === 'FAILED';
         var isRunning = status.analysisCaseStatus === 'ANALYZING';
         var isReady = status.analysisCaseStatus === 'INPUT_CONFIRMED';
-        card.appendChild(el('p', 'report-eyebrow', isFailed ? 'ANALYSIS NEEDS REVIEW' : isRunning ? 'ANALYSIS IN PROGRESS' : 'ANALYSIS READY'));
-        card.appendChild(el('h2', null, isFailed ? '분석 결과를 확인해 주세요' : isRunning ? '지원 자료를 차근차근 읽고 있어요' : '분석을 시작할 준비가 되었어요'));
+        var isPreparing = status.clientPreparing === true;
+        card.appendChild(el('p', 'report-eyebrow', isFailed ? 'ANALYSIS NEEDS REVIEW' : isPreparing ? 'ANALYSIS PREPARING' : isRunning ? 'ANALYSIS IN PROGRESS' : 'ANALYSIS READY'));
+        card.appendChild(el('h2', null, isFailed ? '분석 결과를 확인해 주세요' : isPreparing ? '분석에 필요한 자료를 준비하고 있어요' : isRunning ? '지원 자료를 차근차근 읽고 있어요' : '분석을 시작할 준비가 되었어요'));
         card.appendChild(el('p', 'progress-card__description', isFailed
             ? '선택한 자료와 앞선 분석 결과는 보존되어 있습니다. 같은 자료로 다시 실행할 수 있어요.'
+            : isPreparing ? '지원 자료의 색인을 확인한 뒤 AI 분석을 시작합니다. 잠시만 기다려 주세요.'
             : isRunning ? '페이지를 닫아도 서버의 분석 작업은 계속 진행됩니다.' : '선택한 공고와 지원 자료를 바탕으로 맞춤 분석을 시작합니다.'));
+        if (isReady) appendAnalysisLoader(card, status, 'ready');
+        if (isRunning) appendAnalysisLoader(card, status, 'running');
         var list = el('ol', 'analysis-stage-chain');
+        list.style.setProperty('--stage-chain-progress',
+            Math.max(0, Math.min(100, (completedStageCount(status) / (stages.length - 1)) * 100)) + '%');
         stages.forEach(function (stage) {
             var value = status[stage[0]] || 'NOT_STARTED';
             var row = el('li', 'analysis-stage-node analysis-stage-node--' + value);
@@ -169,6 +222,14 @@
             });
             actions.appendChild(button);
             card.appendChild(actions);
+        } else if (isRunning) {
+            var runningActions = el('div', 'report-actions report-actions--running');
+            var leaveLink = el('a', 'btn btn--ghost', '다른 서비스 이용하기');
+            leaveLink.href = window.JobPuzzleRoutes.path('/interview');
+            runningActions.appendChild(leaveLink);
+            runningActions.appendChild(el('p', 'analysis-stop-note',
+                '현재 서버는 실행 중인 AI 작업의 취소를 지원하지 않아, 화면을 이동해도 분석은 계속됩니다.'));
+            card.appendChild(runningActions);
         }
         root.appendChild(card);
     }
@@ -377,13 +438,19 @@
         var actions = el('div', 'report-actions');
         if (result.interviewStartAllowed) {
             var interviewLink = el('a', 'btn btn--primary', '질문을 선택하고 면접 시작');
-            interviewLink.href = '/interview.html?analysisCaseId=' + encodeURIComponent(caseId);
+            interviewLink.href = window.JobPuzzleRoutes.path(
+                '/interview?analysisCaseId=' + encodeURIComponent(caseId)
+            );
             interviewLink.style.textDecoration = 'none';
             actions.appendChild(interviewLink);
         } else if (result.linkedSessionId) {
             var destination = result.linkedSessionStatus === 'COMPLETED'
-                ? '/interview-result.html?sessionId=' + encodeURIComponent(result.linkedSessionId)
-                : '/interview.html?resumeSessionId=' + encodeURIComponent(result.linkedSessionId);
+                ? window.JobPuzzleRoutes.path(
+                    '/interview-results?sessionId=' + encodeURIComponent(result.linkedSessionId)
+                )
+                : window.JobPuzzleRoutes.path(
+                    '/interview?resumeSessionId=' + encodeURIComponent(result.linkedSessionId)
+                );
             var returnLink = el(
                 'a',
                 'btn btn--secondary',
@@ -439,6 +506,7 @@
         card.appendChild(el('h2', null, '분석 연결을 다시 확인하고 있어요'));
         card.appendChild(el('p', 'progress-card__description',
             '일시적인 응답 지연을 감지해 ' + delaySeconds + '초 후 자동으로 이어서 진행합니다.'));
+        appendAnalysisLoader(card, status, 'recovery');
         var list = el('ol', 'analysis-stage-chain');
         stages.forEach(function (stage) {
             var value = status[stage[0]] === 'FAILED' ? 'RUNNING' : (status[stage[0]] || 'NOT_STARTED');
@@ -479,8 +547,20 @@
         if (status.analysisCaseStatus === 'COMPLETED') {
             clearTimeout(state.pollTimer);
             clearTimeout(state.retryTimer);
-            window.location.replace('/analysis-results/' + encodeURIComponent(caseId));
+            window.location.replace(window.JobPuzzleRoutes.path('/analysis-results/' + encodeURIComponent(caseId)));
             return;
+        }
+        if (status.analysisCaseStatus === 'ANALYZING') {
+            var signature = [status.analysisCaseStatus].concat(stages.map(function (stage) {
+                return status[stage[0]] || 'NOT_STARTED';
+            })).join('|');
+            if (state.lastProgressSignature === signature && root.childElementCount) {
+                schedulePoll();
+                return;
+            }
+            state.lastProgressSignature = signature;
+        } else {
+            state.lastProgressSignature = '';
         }
         if (canRetryAutomatically(status)) {
             scheduleAutomaticRetry(status);
@@ -512,9 +592,17 @@
     function runAnalysis(reuseExistingIndex) {
         if (state.running) return;
         state.running = true;
+        renderProgress({
+            analysisCaseStatus: 'ANALYZING',
+            clientPreparing: true,
+            jobPostingAnalysisStatus: 'NOT_STARTED',
+            candidateMaterialAnalysisStatus: 'NOT_STARTED',
+            guideContextStatus: 'NOT_STARTED',
+            customizedAnalysisStatus: 'NOT_STARTED'
+        });
         var ensureIndexed = reuseExistingIndex
             ? Promise.resolve()
-            : api('/api/analysis-cases/' + caseId + '/index', { method: 'POST' });
+            : api(window.JobPuzzleRoutes.path('/analysis-cases/' + caseId + '/index'), { method: 'POST' });
         ensureIndexed
             .then(function () {
                 var runPromise = analysisApi('/run', { method: 'POST' });

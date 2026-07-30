@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/answer-evaluations")
+@RequestMapping("/answer-evaluations")
 public class AnswerEvaluationController {
 
     private final AnswerEvaluationService answerEvaluationService;

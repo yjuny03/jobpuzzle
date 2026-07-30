@@ -29,7 +29,7 @@
       var password = document.getElementById('password').value;
       var autoLogin = document.getElementById('autoLogin').checked;
 
-      fetch('/api/user/login', {
+      fetch(window.JobPuzzleRoutes.path('/user/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -41,7 +41,7 @@
         .then(function (result) {
           if (result.ok && result.body.success) {
             // 로그인 성공 - 메인으로 이동
-            window.location.href = '/index.html';
+            window.location.href = window.JobPuzzleRoutes.path('/');
             return;
           }
 

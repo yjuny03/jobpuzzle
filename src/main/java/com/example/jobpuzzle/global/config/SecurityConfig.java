@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.global.config;
 
+import com.example.jobpuzzle.global.security.CustomAccessDeniedHandler;
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetailsService;
 import com.example.jobpuzzle.global.security.OAuth2LoginSuccessHandler;
@@ -34,6 +35,9 @@ public class SecurityConfig {
     // 자동로그인 토큰을 DB(RefreshToken 테이블)에 저장/조회하는 구현체
     private final PersistentTokenRepository persistentTokenRepository;
 
+    // 로그인은 했지만 권한이 없는 요청(예: 일반 회원의 관리자 화면/API 접근) 처리
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+
     // 자동로그인 토큰 서명에 쓰는 애플리케이션 키 (외부에 노출되면 안 됨)
     private static final String REMEMBER_ME_KEY = "jobpuzzle-remember-me-key";
 
@@ -50,7 +54,6 @@ public class SecurityConfig {
     // 로그인 없이 볼 수 있는 화면(뷰) 경로
     private static final String[] PUBLIC_VIEW_URLS = {
             "/",
-            "/index.html",
             "/login",
             "/join",
             "/find-id",
@@ -61,15 +64,26 @@ public class SecurityConfig {
 
     // 인증 없이 호출 가능한 공개 API 경로
     private static final String[] PUBLIC_API_URLS = {
-            "/api/user/join",
-            "/api/user/join/**",
-            "/api/user/login",
-            "/api/user/check-id",
-            "/api/user/check-email",
-            "/api/user/find-id/**",
-            "/api/user/passwd-reset/**",
-            "/api/user/unlock/**",
-            "/api/job-category"
+            "/user/join",
+            "/user/join/**",
+            "/user/login",
+            "/user/check-id",
+            "/user/check-email",
+            "/user/find-id/**",
+            "/user/passwd-reset/**",
+            "/user/unlock/**",
+            "/job-category"
+    };
+
+    // 관리자만 접근 가능한 화면 경로
+    private static final String[] ADMIN_VIEW_URLS = {
+            "/admin/**"
+    };
+
+    // 관리자만 접근 가능한 API 경로
+    private static final String[] ADMIN_API_URLS = {
+            "/admin-api/**",
+            "/guide-admin/**"
     };
 
     // 비밀번호 암호화에 쓰는 인코더
@@ -109,9 +123,15 @@ public class SecurityConfig {
                         .requestMatchers(STATIC_URLS).permitAll()
                         .requestMatchers(PUBLIC_VIEW_URLS).permitAll()
                         .requestMatchers(PUBLIC_API_URLS).permitAll()
-
+                        // 관리자 전용 경로는 인증 여부보다 먼저 role을 검사해야 해서 anyRequest()보다 위에 둠
+                        .requestMatchers(ADMIN_VIEW_URLS).hasRole("ADMIN")
+                        .requestMatchers(ADMIN_API_URLS).hasRole("ADMIN")
                         // 위에서 허용 안 한 나머지 요청은 전부 인증(로그인) 필요
                         .anyRequest().authenticated()
+                )
+                // 로그인은 했지만 권한이 없는 요청(관리자 전용 경로에 일반 회원 접근 등) 처리
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .accessDeniedHandler(customAccessDeniedHandler)
                 )
                 // 세션이 없을 때 자동로그인 쿠키로 재인증을 시도하는 필터 등록
                 .rememberMe(rememberMe -> rememberMe

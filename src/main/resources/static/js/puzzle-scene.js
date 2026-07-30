@@ -3,11 +3,14 @@
 (function () {
     'use strict';
 
+    function mountPuzzleScene(canvas) {
+    if (!canvas || canvas.dataset.puzzleSceneMounted === 'true') return;
+    canvas.dataset.puzzleSceneMounted = 'true';
     //  01. WebGL 대상 canvas와 렌더링 컨텍스트 준비: 미지원 시 canvas를 숨기고 종료
-    var canvas = document.getElementById('jobPuzzleCanvas');
-    if (!canvas) return;
     var gl = canvas.getContext('webgl', { alpha:true, antialias:true, premultipliedAlpha:false });
     if (!gl) { canvas.hidden = true; return; }
+    var analysisMode=canvas.hasAttribute('data-analysis-puzzle');
+    var resultMode=canvas.hasAttribute('data-result-puzzle');
 
     //  02. 퍼즐 클릭 단계별 UI 데이터: 하단 단계 문구와 우측 홀로그램 화면을 함께 변경
     var stages = [
@@ -144,6 +147,7 @@
 
     //  09. 장면 상태: 현재 단계, 시간, 전체 회전, 드래그 여부, 포인터 위치, 모션 감소 설정
     var stage=-1,started=Infinity,last=performance.now(),rx=-.17,ry=.23,tx=rx,ty=ry,drag=false,moved=false,px=0,py=0;
+    var analysisStage=-1,analysisTimer=0,analysisScatterTimer=0,analysisObserver=null,resultTimer=0;
     var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     //  홀로그램 전환 상태: 연속 클릭 중에는 마지막 요청 단계를 보관해 순서가 꼬이지 않게 처리
     var currentHologramIndex=0,hologramTransitioning=false,pendingHologramIndex=null,hologramTimer=0;
@@ -211,6 +215,24 @@
         switchHologram(stage<0?0:stage);
         if(bar)bar.style.width=(stage<0?0:(stage+1)/6*100)+'%';
     }
+    function setAnalysisStage(next){
+        next=Math.max(0,Math.min(4,Number(next)||0));
+        if(next===analysisStage)return;
+        analysisStage=next;
+        window.clearTimeout(analysisTimer);
+        window.clearTimeout(analysisScatterTimer);
+        canvas.classList.remove('is-stage-assembled');
+        pieces.forEach(function(p){p.goal=0;});
+        if(next<=0)return;
+        pieces.forEach(function(p){p.goal=1;});
+        analysisTimer=window.setTimeout(function(){
+            canvas.classList.add('is-stage-assembled');
+        },reduce?80:850);
+        analysisScatterTimer=window.setTimeout(function(){
+            canvas.classList.remove('is-stage-assembled');
+            pieces.forEach(function(p){p.goal=0;});
+        },reduce?420:2300);
+    }
     //  10. WebGL 렌더링 보조 함수: 버퍼 바인딩, 한 조각 그리기, canvas 해상도 동기화
     function bind(m){gl.bindBuffer(gl.ARRAY_BUFFER,m.a);gl.enableVertexAttribArray(loc.p);gl.vertexAttribPointer(loc.p,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,m.b);gl.enableVertexAttribArray(loc.n);gl.vertexAttribPointer(loc.n,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m.e);}
     function draw(m,model,color){bind(m);gl.uniformMatrix4fv(loc.m,false,model);gl.uniform3fv(loc.c,color);gl.drawElements(gl.TRIANGLES,m.count,gl.UNSIGNED_SHORT,0);}
@@ -221,21 +243,31 @@
     //  클릭 가능한 빈 영역인지 판별
     function interactiveTarget(target){return !target.closest('a,button,input,select,textarea,.hero__copy,.hero__card-wrap,.user-menu,.site-header');}
     //  pointerdown: 드래그 시작 위치 저장 및 포인터 캡처
-    interaction.addEventListener('pointerdown',function(e){if(!interactiveTarget(e.target))return;drag=true;moved=false;px=e.clientX;py=e.clientY;if(interaction.setPointerCapture)interaction.setPointerCapture(e.pointerId);});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointerdown',function(e){if(!interactiveTarget(e.target))return;drag=true;moved=false;px=e.clientX;py=e.clientY;if(interaction.setPointerCapture)interaction.setPointerCapture(e.pointerId);});
     //  pointermove: 이동량으로 전체 퍼즐의 X/Y 회전 목표값 변경
-    interaction.addEventListener('pointermove',function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;ty+=dx*.008;tx=Math.max(-.72,Math.min(.5,tx+dy*.008));px=e.clientX;py=e.clientY;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointermove',function(e){if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;ty+=dx*.008;tx=Math.max(-.72,Math.min(.5,tx+dy*.008));px=e.clientX;py=e.clientY;});
     //  pointerup/pointercancel: 드래그 상태 종료
-    interaction.addEventListener('pointerup',function(){drag=false;});
-    interaction.addEventListener('pointercancel',function(){drag=false;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointerup',function(){drag=false;});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('pointercancel',function(){drag=false;});
     //  단순 클릭이면 다음 조립 단계로 이동하고, 6단계 이후에는 초기 상태로 순환
-    interaction.addEventListener('click',function(e){if(moved||!interactiveTarget(e.target))return;setStage(stage>=5?-1:stage+1);});
+    if(!analysisMode&&!resultMode) interaction.addEventListener('click',function(e){if(moved||!interactiveTarget(e.target))return;setStage(stage>=5?-1:stage+1);});
 
     //  12. 매 프레임 실행되는 WebGL 렌더 루프
     function render(now){
+        if(!canvas.isConnected){
+            window.clearTimeout(analysisTimer);
+            window.clearTimeout(analysisScatterTimer);
+            window.clearInterval(resultTimer);
+            if(analysisObserver)analysisObserver.disconnect();
+            return;
+        }
         //  canvas 크기 보정, 프레임 시간 계산, 각 조각 조립 진행률과 전체 회전값을 부드럽게 보간
         resize();
         var dt=Math.min(40,now-last)/1000; last=now;
-        pieces.forEach(function(p){p.p+=(p.goal-p.p)*Math.min(1,dt*4.8);});
+        pieces.forEach(function(p){
+            var assemblySpeed=analysisMode?(p.goal?3.7:1.05):4.8;
+            p.p+=(p.goal-p.p)*Math.min(1,dt*assemblySpeed);
+        });
         rx+=(tx-rx)*.07; ry+=(ty-ry)*.07;
         //  깊이 테스트 활성화, 양면 표시, 투명 배경으로 프레임 초기화
         gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
@@ -251,7 +283,9 @@
         var floatY=Math.sin(now*.00072)*.07*idle;
         var driftX=Math.cos(now*.00047)*.035*idle;
         var breathe=1+Math.sin(now*.00061)*.009*idle;
-        var globalRot=[rx+Math.sin(now*.00039)*.025*idle,ry+Math.cos(now*.00033)*.035*idle,Math.sin(now*.00028)*.018*idle];
+        var globalRot=analysisMode
+            ? [rx+Math.sin(now*.00031)*.055*idle,ry+now*.0001*idle,Math.sin(now*.00024)*.03*idle]
+            : [rx+Math.sin(now*.00039)*.025*idle,ry+Math.cos(now*.00033)*.035*idle,Math.sin(now*.00028)*.018*idle];
         var global=M([driftX,floatY,0],globalRot,[breathe,breathe,breathe]);
 
         //  각 조각을 시작 위치에서 목표 위치로 이동시키고, 미조립 상태에는 파동/회전 모션을 추가해 그리기
@@ -266,8 +300,35 @@
     //  13. 로더 종료 후 장면 시작 상태를 한 번만 설정
     function beginScene(){if(started!==Infinity)return;started=performance.now();setStage(-1);}
     //  초기 단계 설정 및 렌더 루프 즉시 시작; 로더 이벤트 또는 12초 fallback으로 beginScene 호출
-    setStage(-1); requestAnimationFrame(render);
-    if(window.__jobPuzzleLoaderFinished) beginScene();
-    else {document.addEventListener('jobpuzzle:loaderclosed',beginScene,{once:true});window.setTimeout(beginScene,12000);}
+    if(analysisMode){
+        setAnalysisStage(canvas.dataset.analysisStage);
+        analysisObserver=new MutationObserver(function(){setAnalysisStage(canvas.dataset.analysisStage);});
+        analysisObserver.observe(canvas,{attributes:true,attributeFilter:['data-analysis-stage']});
+        requestAnimationFrame(render);
+    }else if(resultMode){
+        setStage(-1);
+        resultTimer=window.setInterval(function(){
+            if(document.hidden)return;
+            setStage(stage>=5?-1:stage+1);
+        },1050);
+        requestAnimationFrame(render);
+    }else{
+        setStage(-1); requestAnimationFrame(render);
+        if(window.__jobPuzzleLoaderFinished) beginScene();
+        else {document.addEventListener('jobpuzzle:loaderclosed',beginScene,{once:true});window.setTimeout(beginScene,12000);}
+    }
+    }
+
+    function scanPuzzleScenes(){
+        Array.prototype.forEach.call(
+            document.querySelectorAll('#jobPuzzleCanvas, [data-job-puzzle-scene]'),
+            mountPuzzleScene
+        );
+    }
+    scanPuzzleScenes();
+    if(window.MutationObserver&&document.body){
+        var sceneObserver=new MutationObserver(scanPuzzleScenes);
+        sceneObserver.observe(document.body,{childList:true,subtree:true});
+    }
 })();
 

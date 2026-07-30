@@ -13,13 +13,13 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/job-category")
+@RequestMapping("/job-category")
 public class JobCategoryController {
 
     private final JobCategoryRepository jobCategoryRepository;
 
     // 회원가입 화면의 대분류/중분류/경력 드롭다운을 구성하기 위한 전체 직무 카테고리 목록
-    // GET /api/job-category
+    // GET /jobpuzzle/job-category
     @GetMapping
     public ResponseEntity<ApiResponse<List<JobCategoryResponse>>> getAllJobCategories() {
         List<JobCategoryResponse> response = jobCategoryRepository.findAll().stream()
