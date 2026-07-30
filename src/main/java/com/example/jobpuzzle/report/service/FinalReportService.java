@@ -101,13 +101,18 @@ public class FinalReportService {
             return;
         }
 
-        try {
-            String prompt = buildPrompt(lease);
-            FinalReportResult result = aiClientService.finalReport(lease.selection(), prompt);
-            saveSuccess(lease, result);
-        } catch (RuntimeException exception) {
-            recordFailure(lease.aiCallLogId(), exception);
+        String prompt = buildPrompt(lease);
+        RuntimeException lastException = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                FinalReportResult result = aiClientService.finalReport(lease.selection(), prompt);
+                saveSuccess(lease, result);
+                return;
+            } catch (RuntimeException exception) {
+                lastException = exception;
+            }
         }
+        recordFailure(lease.aiCallLogId(), lastException);
     }
 
     // 저장된 리포트가 있으면 그대로 반환
@@ -522,6 +527,20 @@ public class FinalReportService {
         if (result.getWeaknessTagSummary() != null
                 && result.getWeaknessTagSummary().stream().anyMatch(tag -> tag.getCount() < 0)) {
             throw new IllegalStateException("JSON-07 weaknessTagSummary count must not be negative");
+        }
+
+        // basis_summary 등은 DB에서 NOT NULL이므로, AI가 계약을 어기고 누락하면 저장 전에 걸러서 재시도로 넘긴다.
+        if (result.getBasisSummary() == null) {
+            throw new IllegalStateException("JSON-07 basisSummary must not be null");
+        }
+        if (result.getWeaknessTagSummary() == null) {
+            throw new IllegalStateException("JSON-07 weaknessTagSummary must not be null");
+        }
+        if (result.getNextPracticeRecommendation() == null) {
+            throw new IllegalStateException("JSON-07 nextPracticeRecommendation must not be null");
+        }
+        if (result.getLearningDirection() == null) {
+            throw new IllegalStateException("JSON-07 learningDirection must not be null");
         }
     }
 

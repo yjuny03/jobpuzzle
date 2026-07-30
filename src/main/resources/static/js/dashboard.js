@@ -1,37 +1,66 @@
-// dashboard.js — dummy-data driven interactions for the dashboard page
+// dashboard.js — 대시보드의 세션·약점 예시와 실제 액션플랜을 표시
 
 (function () {
   'use strict';
 
-  var TODAY = '2026-07-13';
-
-  var ASSIGNMENTS = [
-    { id: 'a1', title: '장애 대응 경험 정리 과제', due: '2026-07-05', done: false, relatedTag: '운영·장애대응 경험 부족', desc: '서비스 운영 중 발생했던 장애 상황을 감지 → 대응 → 재발 방지 순서로 정리해보세요. 장애 발생 시점, 원인 파악 과정, 복구 조치, 이후 개선 사항을 구체적으로 작성하면 좋아요.' },
-    { id: 'a2', title: '협업 커뮤니케이션 사례 작성', due: '2026-07-10', done: false, relatedTag: null, desc: '팀 프로젝트에서 의견 차이를 조율했던 경험을 상황 → 대화 방식 → 결과 순서로 정리해보세요. 갈등을 해결한 기준과 이후 협업 방식의 변화까지 담으면 좋아요.' },
-    { id: 'a3', title: '성과 수치화 연습 과제', due: '2026-07-20', done: false, relatedTag: '성과 수치화 부족', desc: '최근 프로젝트에서 얻은 성과를 트래픽 처리량, 응답 속도, 오류율 등 구체적인 수치로 표현하는 연습을 해보세요.' },
-    { id: 'a4', title: '데이터 시각화 학습 정리', due: null, done: false, relatedTag: '운영·장애대응 경험 부족', desc: '그라파나 같은 모니터링·시각화 도구를 학습하고, 어떤 지표를 시각화했는지, 왜 그 지표를 선택했는지 정리해보세요.' },
-    { id: 'a5', title: '포트폴리오 보완 과제', due: null, done: false, relatedTag: null, desc: '담당 기능, 사용 기술, 문제 해결 과정을 포트폴리오에 구체적으로 추가해보세요.' }
-  ];
+  var now = new Date();
+  var TODAY = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  var ASSIGNMENTS = [];
+  var dashboardCalendar = null;
 
   var els = {};
   var state = { editingDueId: null, detailId: null };
 
+  // 공통 API 응답을 검사하고 실제 data만 반환한다.
+  function api(path, options) {
+    return fetch(window.JobPuzzleRoutes.path(path), Object.assign({ credentials: 'same-origin' }, options || {}))
+      .then(function (response) {
+        return response.json().then(function (body) {
+          if (!response.ok || !body.success) throw new Error(body.message || '요청에 실패했습니다.');
+          return body.data;
+        });
+      });
+  }
+
+  // 서버 액션플랜 응답을 기존 대시보드 과제 표시 모델로 변환한다.
+  function toAssignment(plan) {
+    return {
+      id: String(plan.actionPlanId),
+      title: plan.suggestion || '보완 과제',
+      due: plan.deadline,
+      done: plan.status === 'DONE',
+      relatedTag: plan.requirement || plan.relatedRequirementId,
+      desc: plan.missingPoint || '보완이 필요한 내용을 확인해 주세요.'
+    };
+  }
+
+  // AI 문장을 innerHTML에 넣기 전에 특수문자를 이스케이프한다.
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // 완료 여부와 마감일까지 남은 날짜로 대시보드 상태를 계산한다.
   function assignmentStatus(a) {
     if (a.done) return 'done';
     if (!a.due) return 'none';
-    return a.due < TODAY ? 'overdue' : 'upcoming';
+    var notice = window.ActionPlanDeadline.getNotice(a.due, 'PENDING');
+    if (notice && notice.label === '기한 종료') return 'overdue';
+    if (notice && notice.tone === 'danger') return 'today';
+    if (notice && notice.tone === 'warning') return 'soon';
+    return 'upcoming';
   }
   function statusLabel(status) {
-    return { done: '완료됨', overdue: '마감 초과', upcoming: '진행 중', none: '마감일 미지정' }[status];
+    return { done: '완료됨', overdue: '기한 종료', today: '오늘 마감', soon: '마감 임박', upcoming: '진행 중', none: '마감일 미지정' }[status];
   }
-  function statusClasses(status) {
-    return {
-      done: { bg: '#E6F4EC', color: '#1E7A4C' },
-      overdue: { bg: '#FBEEEC', color: '#B5433D' },
-      upcoming: { bg: '#EAF2FB', color: '#185FA5' },
-      none: { bg: '#F0F2F5', color: '#8A93A3' }
-    }[status];
+
+  // 임박한 과제는 남은 날짜를 바로 알 수 있도록 D-day 문구를 우선 표시한다.
+  function assignmentStatusLabel(a, status) {
+    var notice = window.ActionPlanDeadline.getNotice(a.due, a.done ? 'DONE' : 'PENDING');
+    return notice ? notice.label : statusLabel(status);
   }
+
   function dueLabel(a) {
     return a.due ? '마감일 ' + a.due.slice(5).replace('-', '.') : '마감일 미지정';
   }
@@ -99,25 +128,32 @@
     } else {
       if (status === 'none') html += '<button class="btn-sm" data-start-edit="' + a.id + '">마감일 지정</button>';
       if (status === 'overdue') html += '<button class="btn-sm" data-start-edit="' + a.id + '">마감일 재지정</button>';
-      if (status === 'overdue' || status === 'upcoming') html += '<button class="btn-complete" data-complete="' + a.id + '">완료</button>';
+      if (status !== 'none' && status !== 'done') html += '<button class="btn-complete" data-complete="' + a.id + '">완료</button>';
     }
     return html;
   }
 
   function renderTasks() {
     var list = document.getElementById('task-list');
-    list.innerHTML = ASSIGNMENTS.map(function (a) {
+    if (ASSIGNMENTS.length === 0) {
+      list.innerHTML = '<p class="todo-empty">등록된 액션플랜이 없습니다.</p>';
+      renderCalendar();
+      renderStats();
+      return;
+    }
+    list.innerHTML = ASSIGNMENTS.slice(0, 8).map(function (a) {
       var status = assignmentStatus(a);
-      var sc = statusClasses(status);
-      return '<div class="task-row">' +
-        '<div><p class="task-row__title' + (status === 'done' ? ' task-row__title--done' : '') + '">' + a.title + '</p><p class="task-row__due">' + dueLabel(a) + '</p></div>' +
+      return '<div class="task-row task-row--' + status + '">' +
+        '<div><p class="task-row__title' + (status === 'done' ? ' task-row__title--done' : '') + '">' + escapeHtml(a.title) + '</p><p class="task-row__due">' + escapeHtml(dueLabel(a)) + '</p></div>' +
         '<div class="task-row__actions">' +
-          '<span class="badge-pill" style="background:' + sc.bg + '; color:' + sc.color + ';">' + statusLabel(status) + '</span>' +
+          '<span class="badge-pill task-status task-status--' + status + '">' + assignmentStatusLabel(a, status) + '</span>' +
           '<button class="btn-sm" data-open-detail="' + a.id + '">상세보기</button>' +
           taskRowActionsHtml(a) +
         '</div>' +
       '</div>';
-    }).join('');
+    }).join('') + (ASSIGNMENTS.length > 8
+      ? '<a class="task-list__all" href="' + window.JobPuzzleRoutes.path('/action-plans') + '">전체 액션플랜 보기</a>'
+      : '');
     bindTaskRowEvents(list);
 
     renderCalendar();
@@ -133,9 +169,15 @@
         var id = btn.dataset.saveDue;
         var input = scope.querySelector('[data-due-input="' + id + '"]');
         var a = ASSIGNMENTS.find(function (x) { return x.id === id; });
-        if (a && input.value) a.due = input.value;
-        state.editingDueId = null;
-        renderTasks();
+        if (!a) return;
+        api('/action-plan/' + encodeURIComponent(id) + '/deadline', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deadline: input.value || null })
+        }).then(function (updated) {
+          a.due = updated.deadline;
+          state.editingDueId = null;
+          renderTasks();
+        });
       });
     });
     scope.querySelectorAll('[data-complete]').forEach(function (btn) {
@@ -149,12 +191,17 @@
   function completeAssignment(id) {
     var a = ASSIGNMENTS.find(function (x) { return x.id === id; });
     if (!a) return;
-    a.done = true;
-    closeDetail();
-    renderTasks();
-    renderTodos();
-    document.getElementById('complete-title').textContent = a.title + ' 완료!';
-    document.getElementById('complete-modal').hidden = false;
+    api('/action-plan/' + encodeURIComponent(id) + '/completion', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: true })
+    }).then(function () {
+      a.done = true;
+      closeDetail();
+      renderTasks();
+      renderTodos();
+      document.getElementById('complete-title').textContent = a.title + ' 완료!';
+      document.getElementById('complete-modal').hidden = false;
+    });
   }
 
   function openDetail(id) {
@@ -162,13 +209,11 @@
     if (!a) return;
     state.detailId = id;
     var status = assignmentStatus(a);
-    var sc = statusClasses(status);
     document.getElementById('detail-title').textContent = a.title;
     document.getElementById('detail-title').style.textDecoration = status === 'done' ? 'line-through' : 'none';
     var statusEl = document.getElementById('detail-status');
-    statusEl.textContent = statusLabel(status);
-    statusEl.style.background = sc.bg;
-    statusEl.style.color = sc.color;
+    statusEl.textContent = assignmentStatusLabel(a, status);
+    statusEl.className = 'badge-pill task-status dashboard-task-modal__status task-status--' + status;
     document.getElementById('detail-due').textContent = dueLabel(a);
     var tagEl = document.getElementById('detail-tag');
     if (a.relatedTag) { tagEl.textContent = '#' + a.relatedTag; tagEl.style.display = 'inline-block'; } else { tagEl.style.display = 'none'; }
@@ -183,31 +228,21 @@
     state.detailId = null;
   }
 
+  // 실제 월간 달력에 액션플랜 날짜 표시와 선택 상세를 동기화한다.
   function renderCalendar() {
-    var grid = document.getElementById('calendar-grid');
-    var weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-    var html = weekdays.map(function (w) { return '<div class="cal-weekday">' + w + '</div>'; }).join('');
-
-    var firstWeekday = 4; // July 2026: 1st is Thursday
-    var daysInMonth = 31;
-    var dueMap = {};
-    ASSIGNMENTS.forEach(function (a) { if (a.due && !a.done) dueMap[a.due] = a; });
-
-    for (var i = 0; i < firstWeekday; i++) html += '<div class="cal-cell cal-cell--empty"></div>';
-    for (var day = 1; day <= daysInMonth; day++) {
-      var dateStr = '2026-07-' + (day < 10 ? '0' + day : '' + day);
-      var task = dueMap[dateStr];
-      var isToday = dateStr === TODAY;
-      var status = task ? assignmentStatus(task) : null;
-      html += '<div class="cal-cell' + (task ? ' cal-cell--clickable' : '') + '"' + (task ? ' data-cal-task="' + task.id + '"' : '') + '>' +
-        '<span class="cal-cell__day' + (isToday ? ' cal-cell__day--today' : '') + '">' + day + '</span>' +
-        (task ? '<div class="cal-cell__task cal-cell__task--' + (status === 'overdue' ? 'overdue' : 'upcoming') + '">' + task.title + '</div>' : '') +
-      '</div>';
-    }
-    grid.innerHTML = html;
-    grid.querySelectorAll('[data-cal-task]').forEach(function (cell) {
-      cell.addEventListener('click', function () { openDetail(cell.dataset.calTask); });
-    });
+    if (!dashboardCalendar) return;
+    dashboardCalendar.setItems(ASSIGNMENTS.map(function (a) {
+      var status = assignmentStatus(a);
+      var notice = window.ActionPlanDeadline.getNotice(a.due, a.done ? 'DONE' : 'PENDING');
+      return {
+        id: a.id,
+        date: a.due,
+        title: a.title,
+        description: a.desc,
+        tone: a.done ? 'done' : (notice ? notice.tone : 'normal'),
+        statusLabel: a.done ? '완료' : (notice ? notice.label : statusLabel(status))
+      };
+    }));
   }
 
   function renderStats() {
@@ -222,7 +257,19 @@
   document.addEventListener('DOMContentLoaded', function () {
     renderTabs();
     renderTodos();
-    renderTasks();
+    var calendarRoot = document.getElementById('dashboard-action-plan-calendar');
+    if (calendarRoot) {
+      dashboardCalendar = new window.ActionPlanCalendar(calendarRoot, {
+        onItemClick: function (id) { openDetail(id); }
+      });
+    }
+    api('/action-plan').then(function (plans) {
+      ASSIGNMENTS = (plans || []).map(toAssignment);
+      renderTodos();
+      renderTasks();
+    }).catch(function () {
+      document.getElementById('task-list').innerHTML = '<p class="todo-empty">액션플랜을 불러오지 못했습니다.</p>';
+    });
 
     document.getElementById('detail-close-btn').addEventListener('click', closeDetail);
     document.getElementById('detail-modal').addEventListener('click', function (e) {

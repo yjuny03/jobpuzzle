@@ -31,7 +31,6 @@ public class AdminGuideCreateRequest {
     // scopeType=PARENT_CATEGORY일 때만 사용
     private String scopeMainCategory;
 
-    @NotBlank(message = "적용 범위 설명을 입력해주세요.")
     @Size(max = 500, message = "적용 범위 설명은 500자 이내로 입력해주세요.")
     private String applicableScope;
 

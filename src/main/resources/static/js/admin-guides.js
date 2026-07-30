@@ -28,6 +28,25 @@
     return '<span class="badge-pill" style="background:' + bg + '; color:' + color + ';">' + esc(label) + '</span>';
   }
 
+  function notice(type, message) {
+    if (typeof window.showToast === 'function') return window.showToast(type, message);
+    alert(message);
+  }
+
+  /** 목록에서도 상세 진입 전에 현재 벡터 색인 단계와 실패 여부를 확인할 수 있게 한다. */
+  function pipelineBadge(g) {
+    if (g.indexingStatus === 'FAILED') {
+      return '<span class="guide-list-stage guide-list-stage--error">색인 실패</span>';
+    }
+    if (g.indexingStatus === 'INDEXING') {
+      return '<span class="guide-list-stage guide-list-stage--running">벡터 색인 중</span>';
+    }
+    if (g.indexingStatus === 'INDEXED') {
+      return '<span class="guide-list-stage guide-list-stage--ready">색인 완료</span>';
+    }
+    return '<span class="guide-list-stage guide-list-stage--waiting">청크·색인 대기</span>';
+  }
+
   var state = { guides: [], jobCategories: [] };
 
   function loadJobCategories() {
@@ -44,7 +63,7 @@
     return api('/admin/guides').then(function (guides) {
       state.guides = guides;
       renderRows();
-    }).catch(function (e) { alert(e.message); });
+    }).catch(function (e) { notice('error', e.message); });
   }
 
   function renderRows() {
@@ -56,7 +75,7 @@
         : (g.scopeType === 'PARENT_CATEGORY' ? ' (' + esc(g.scopeMainCategory || '') + ')' : '');
       return '<div class="table-row" style="grid-template-columns:1fr 1.6fr 1fr 0.8fr 0.6fr 1fr; cursor:pointer;" data-guide="' + g.guideId + '">' +
         '<span style="font-size:12.5px; font-weight:600;">' + esc(g.guideCode) + '</span>' +
-        '<span style="font-size:13px;">' + esc(g.title) + '</span>' +
+        '<span class="guide-list-title"><strong>' + esc(g.title) + '</strong>' + pipelineBadge(g) + '</span>' +
         '<span style="font-size:12px; color:#5B6370;">' + esc(scope) + scopeDetail + '</span>' +
         '<span>' + pill(status.label, status.bg, status.color) + '</span>' +
         '<span style="font-size:12.5px; color:#8A93A3;">' + esc(g.version) + '</span>' +
@@ -101,6 +120,7 @@
     document.getElementById('guide-evidence-rules').value = '';
     document.getElementById('guide-question-direction').value = '';
     document.getElementById('guide-avoid-questions').value = '';
+    document.getElementById('guide-extra-instructions').open = false;
     document.getElementById('guide-source-type').value = 'DIRECT_INPUT';
     document.getElementById('guide-file').value = '';
     document.getElementById('guide-source-text').value = '';
@@ -130,14 +150,22 @@
       sourceText: document.getElementById('guide-source-text').value.trim()
     };
 
-    if (!request.guideCode || !request.title || !request.applicableScope) {
-      alert('가이드 코드, 제목, 적용 범위 설명은 필수예요.');
+    if (!request.guideCode || !request.title) {
+      notice('error', '가이드 코드와 제목은 필수예요.');
+      return;
+    }
+    var fileInput = document.getElementById('guide-file');
+    if (request.sourceType === 'PDF' && !fileInput.files[0]) {
+      notice('error', '전처리할 PDF 파일을 선택해 주세요.');
+      return;
+    }
+    if (request.sourceType === 'DIRECT_INPUT' && !request.sourceText) {
+      notice('error', '전처리할 가이드 원문을 입력해 주세요.');
       return;
     }
 
     var formData = new FormData();
     formData.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }));
-    var fileInput = document.getElementById('guide-file');
     if (request.sourceType === 'PDF' && fileInput.files[0]) {
       formData.append('file', fileInput.files[0]);
     }
@@ -151,9 +179,10 @@
       })
       .then(function () {
         closeForm();
+        notice('success', '새 가이드 초안을 등록했습니다.');
         loadGuides();
       })
-      .catch(function (e) { alert(e.message); });
+      .catch(function (e) { notice('error', e.message); });
   }
 
   document.addEventListener('DOMContentLoaded', function () {

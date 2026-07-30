@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // FinalReportService.validateResult()가 JSON-07 응답의 최소 검증(overallScore 범위,
-// WEAKNESS_REVIEW 모드 정합성, weaknessTagSummary count)을 제대로 걸러내는지 확인한다.
+// WEAKNESS_REVIEW 모드 정합성, weaknessTagSummary count, NOT NULL 컬럼에 대응하는 필드 누락)을
+// 제대로 걸러내는지 확인한다.
 @ExtendWith(MockitoExtension.class)
 class FinalReportServiceTest {
 
@@ -71,11 +72,30 @@ class FinalReportServiceTest {
         SessionScoreSummary score = SessionScoreSummary.builder().overallScore(80).build();
         FinalReportResult result = FinalReportResult.builder()
                 .overallScore(80)
+                .basisSummary(FinalReportResult.BasisSummary.builder().jobCategory("백엔드").build())
                 .weaknessTagSummary(List.of(
                         FinalReportResult.WeaknessTagSummary.builder().tag("specificity_weak").count(2).build()))
+                .nextPracticeRecommendation(List.of())
+                .learningDirection(List.of())
                 .build();
 
         assertThatCode(() -> invokeValidateResult(result, session, score)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsMissingBasisSummary() {
+        InterviewSession session = session(InterviewSessionMode.BASIC);
+        SessionScoreSummary score = SessionScoreSummary.builder().overallScore(80).build();
+        FinalReportResult result = FinalReportResult.builder()
+                .overallScore(80)
+                .weaknessTagSummary(List.of())
+                .nextPracticeRecommendation(List.of())
+                .learningDirection(List.of())
+                .build();
+
+        assertThatThrownBy(() -> invokeValidateResult(result, session, score))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("basisSummary");
     }
 
     @Test

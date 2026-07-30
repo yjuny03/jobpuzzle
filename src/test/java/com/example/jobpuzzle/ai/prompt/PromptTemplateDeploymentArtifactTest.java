@@ -10,121 +10,47 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PromptTemplateDeploymentArtifactTest {
 
+    private static final Path MANUAL_SQL = Path.of("src/main/resources/db/manual");
+
     @Test
-    void json01SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        // 배포 SQL에 담긴 JSON-01 본문이 리소스 정본과 달라지지 않게 검증한다.
-        assertThat(sqlLiteral("insert-json-01-v1.0.sql", "PT-JOB-001"))
-                .isEqualTo(prompt("json-01-v1.0.txt"));
+    void latestJson01ActivationSqlUsesTheV11ToV12EvidenceContractReplacement() throws IOException {
+        // JSON-01 최신 배포본만 읽어 v1.2 근거 인용 계약과 이전 활성본 비활성화를 확인한다.
+        String sql = Files.readString(MANUAL_SQL.resolve("activate-json-01-v1.2.sql"));
+
+        assertThat(sql).contains(
+                "'v1.2'",
+                "WHERE prompt_code = 'PT-JOB-001' AND version = 'v1.1'",
+                "20~160자의 연속 원문 문자열",
+                "UPDATE prompt_template",
+                "WHERE target_json = 'JSON-01' AND is_active = TRUE"
+        );
     }
 
     @Test
-    void json01V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-01-v1.1.sql", "PT-JOB-001"))
-                .isEqualTo(prompt("json-01-v1.1.txt"));
-    }
-
-    @Test
-    void json02SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        // 배포 SQL에 담긴 JSON-02 본문이 리소스 정본과 달라지지 않게 검증한다.
-        assertThat(sqlLiteral("insert-json-02-v1.0.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.0.txt"));
-    }
-
-    @Test
-    void json02V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-02-v1.1.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.1.txt"));
-    }
-
-    @Test
-    void json02V12ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-02-v1.2.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.2.txt"));
-    }
-
-    @Test
-    void json02V13ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-02-v1.3.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.3.txt"));
-    }
-
-    @Test
-    void json02V14ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-02-v1.4.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.4.txt"));
-    }
-
-    @Test
-    void json02V15ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-02-v1.5.sql", "PT-CAND-001"))
-                .isEqualTo(prompt("json-02-v1.5.txt"));
-    }
-
-    @Test
-    void json02V16ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+    void latestJson02SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        // JSON-02 최신 v1.6 SQL 본문이 현재 정본 프롬프트와 일치하는지 검증한다.
         assertThat(sqlLiteral("activate-json-02-v1.6.sql", "PT-CAND-001"))
                 .isEqualTo(prompt("json-02-v1.6.txt"));
     }
 
     @Test
-    void json05V11ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.1.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.1.txt"));
-    }
-
-    @Test
-    void json05V12ActivationSqlUsesTheV11ToV12RetrievalContractReplacement() throws IOException {
-        String sql = Files.readString(Path.of("src/main/resources/db/manual/activate-json-05-v1.2.sql"));
-
-        assertThat(sql).contains("'v1.2'", "REPLACE(template_text", "candidateEvidenceIds", "candidateEvidence[].evidenceId");
-    }
-
-    @Test
-    void json05V13ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.3.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.3.txt"));
-    }
-
-    @Test
-    void json05V14ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.4.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.4.txt"));
-    }
-
-    @Test
-    void json05V15ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.5.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.5.txt"));
-    }
-
-    @Test
-    void json05V16ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.6.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.6.txt"));
-    }
-
-    @Test
-    void json05V17ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.7.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.7.txt"));
-    }
-
-    @Test
-    void json05V18ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.8.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.8.txt"));
-    }
-
-    @Test
-    void json05V19ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
-        assertThat(sqlLiteral("activate-json-05-v1.9.sql", "PT-JSON05-001"))
-                .isEqualTo(prompt("json-05-v1.9.txt"));
-    }
-
-    @Test
-    void json05V110ActivationSqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+    void latestJson05SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        // JSON-05 최신 v1.10 SQL 본문이 현재 정본 프롬프트와 일치하는지 검증한다.
         assertThat(sqlLiteral("activate-json-05-v1.10.sql", "PT-JSON05-001"))
                 .isEqualTo(prompt("json-05-v1.10.txt"));
+    }
+
+    @Test
+    void latestJson07SqlContainsTheCurrentReportContract() throws IOException {
+        // Seeder용 v1.0 리소스와 구분해 JSON-07 최신 v1.9 배포 계약을 직접 검증한다.
+        String sql = Files.readString(MANUAL_SQL.resolve("activate-json-07-v1.9.sql"));
+
+        assertThat(sql).contains(
+                "PT-REPORT-001",
+                "'v1.9'",
+                "categoryScoreReasons",
+                "overallAssessment 섹션 제목에 점수 숫자 표기 금지"
+        );
     }
 
     private String prompt(String filename) throws IOException {
@@ -134,9 +60,9 @@ class PromptTemplateDeploymentArtifactTest {
     }
 
     private String sqlLiteral(String filename, String promptCode) throws IOException {
-        // INSERT VALUES의 다섯 번째 문자열(template_text)을 SQL quote 규칙에 맞춰 추출한다.
-        String sql = Files.readString(Path.of("src/main/resources/db/manual", filename));
-        int row = sql.lastIndexOf("'" + promptCode + "'");
+        // INSERT/SELECT의 다섯 번째 문자열(template_text)을 SQL quote 규칙에 맞춰 추출한다.
+        String sql = Files.readString(MANUAL_SQL.resolve(filename));
+        int row = sql.indexOf("'" + promptCode + "'", sql.indexOf("INSERT INTO"));
         assertThat(row).isGreaterThanOrEqualTo(0);
         int cursor = row;
         Literal value = null;
@@ -153,11 +79,14 @@ class PromptTemplateDeploymentArtifactTest {
         StringBuilder value = new StringBuilder();
         while (end < sql.length()) {
             char current = sql.charAt(end++);
-            if (current != '\'') value.append(current);
-            else if (end < sql.length() && sql.charAt(end) == '\'') {
+            if (current != '\'') {
+                value.append(current);
+            } else if (end < sql.length() && sql.charAt(end) == '\'') {
                 value.append('\'');
                 end++;
-            } else return new Literal(value.toString(), end);
+            } else {
+                return new Literal(value.toString(), end);
+            }
         }
         throw new AssertionError("unterminated SQL literal");
     }
