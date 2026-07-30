@@ -237,9 +237,7 @@
     selectionHistoryActive = true;
     selectionModal.querySelectorAll('[data-close-selection]').forEach(function (button) {
       button.addEventListener('click', function () {
-        if (analysisCaseId) {
-          window.location.href = window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(analysisCaseId));
-        } else if (selectionHistoryActive) window.history.back();
+        if (selectionHistoryActive) window.history.back();
         else closeSelectionModal(true);
       });
     });
@@ -251,6 +249,14 @@
     selectionModal = null;
     document.body.classList.remove('has-selection-modal');
     if (fromHistory) selectionHistoryActive = false;
+  }
+
+  // 질문 선택을 취소하면 선택용 해시와 분석 진입 파라미터를 현재 주소에서 제거합니다.
+  function clearSelectionLocation() {
+    var cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('analysisCaseId');
+    cleanUrl.hash = '';
+    window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
   }
 
   function createSession() {
@@ -747,11 +753,9 @@
   });
   window.addEventListener('popstate', function () {
     if (!selectionModal) return;
-    if (analysisCaseId) {
-      window.location.replace(window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(analysisCaseId)));
-      return;
-    }
+    // 모달을 닫은 뒤 분석 결과에서 전달된 일회성 선택 문맥이 주소에 남지 않게 합니다.
     closeSelectionModal(true);
+    clearSelectionLocation();
   });
   window.InterviewLive = { startBasic: startBasic, startWeakness: startWeakness };
 })();

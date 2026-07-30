@@ -32,8 +32,6 @@ public final class SecurityRequestClassifier {
                 || path.equals("/action-plan")
                 || path.startsWith("/action-plan/")
                 || path.startsWith("/job-category")
-                || path.startsWith("/job-analysis-report")
-                || path.startsWith("/recommendation")
                 || path.startsWith("/final-report")
                 || path.startsWith("/admin-api")
                 || path.startsWith("/guide-admin");
