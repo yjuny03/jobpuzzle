@@ -63,8 +63,8 @@
       var role = ROLE_BADGE[u.role] || { bg: '#F6F8FB', color: '#5B6370', label: u.role };
       var status = STATUS_BADGE[u.status] || { bg: '#F6F8FB', color: '#5B6370', label: u.status };
       return '<div class="table-row" style="grid-template-columns:1fr 1fr 1.6fr 0.7fr 0.8fr 0.7fr 1fr;">' +
-        '<span style="font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:flex-start; gap:3px;">' +
-          socialIcon(u.socialProvider) + esc(u.loginId) +
+        '<span style="font-size:13px; font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-width:0;">' +
+          socialIcon(u.socialProvider) + '<span style="overflow-wrap:anywhere;">' + esc(u.loginId) + '</span>' +
         '</span>' +
         '<span style="font-size:13px;">' + esc(u.name) + '</span>' +
         '<span style="font-size:12.5px; color:#5B6370;">' + esc(u.email) + '</span>' +

@@ -56,7 +56,7 @@
         els.userAvatar = document.getElementById('user-avatar');
         els.userChip = document.getElementById('user-chip');
         els.userMenu = document.getElementById('user-menu');
-        els.adminLink = document.getElementById('admin-link');
+        els.adminLink = document.getElementById('admin-nav-link');
         els.heroCtaLabel = document.getElementById('hero-cta-label');
         els.heroCta = document.getElementById('hero-cta');
         els.heroCtaHint = document.getElementById('hero-cta-hint');

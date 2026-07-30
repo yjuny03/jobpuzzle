@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.admin.service;
 
+import com.example.jobpuzzle.admin.dto.AdminAiCallLogDetailResponse;
 import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
 import com.example.jobpuzzle.admin.dto.AdminGuideCreateRequest;
 import com.example.jobpuzzle.admin.dto.AdminGuideResponse;
@@ -8,8 +9,10 @@ import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
 import com.example.jobpuzzle.admin.support.GuideTextChunker;
+import com.example.jobpuzzle.ai.log.AiCallLog;
 import com.example.jobpuzzle.ai.log.AiCallLogRepository;
 import com.example.jobpuzzle.ai.log.AiCallLogStatus;
+import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.document.extraction.PdfExtractionResult;
 import com.example.jobpuzzle.document.extraction.PdfPageResult;
 import com.example.jobpuzzle.document.extraction.PdfTextExtractor;
@@ -365,10 +368,17 @@ public class AdminService {
         return PageResponse.from(response);
     }
 
-    // AI 분석 오류 로그 조회 - status가 없으면 전체 상태
-    public PageResponse<AdminAiCallLogResponse> getAiErrorLogs(AiCallLogStatus status, Pageable pageable) {
-        Page<AdminAiCallLogResponse> response = aiCallLogRepository.search(status, pageable)
+    // AI 분석 오류 로그 조회 - status·stage가 없으면 전체
+    public PageResponse<AdminAiCallLogResponse> getAiErrorLogs(AiCallLogStatus status, AiExecutionStage stage, Pageable pageable) {
+        Page<AdminAiCallLogResponse> response = aiCallLogRepository.search(status, stage, pageable)
                 .map(AdminAiCallLogResponse::from);
         return PageResponse.from(response);
+    }
+
+    // AI 분석 오류 로그 단건 조회
+    public AdminAiCallLogDetailResponse getAiErrorLog(Long aiCallLogId) {
+        AiCallLog log = aiCallLogRepository.findById(aiCallLogId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AI_CALL_LOG_NOT_FOUND));
+        return AdminAiCallLogDetailResponse.from(log);
     }
 }

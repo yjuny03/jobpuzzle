@@ -6,8 +6,10 @@
 <title>AI 오류 로그 — JobPuzzle 관리자</title>
 <link rel="stylesheet" href="/css/common.css" th:href="@{/css/common.css}">
 <link rel="stylesheet" href="/css/app.css" th:href="@{/css/app.css}">
+<link rel="stylesheet" href="/css/app-theme.css" th:href="@{/css/app-theme.css}">
+<link rel="stylesheet" href="/css/admin.css" th:href="@{/css/admin.css}">
 </head>
-<body>
+<body class="jp-app-theme jp-admin-page">
 
 <div th:replace="~{fragments/header :: appHeader('admin')}"></div>
 
@@ -32,6 +34,17 @@
         <option value="RUNNING">실행중</option>
         <option value="SUCCEEDED">성공</option>
         <option value="FAILED">실패</option>
+      </select>
+      <select class="select-input" id="ai-log-stage-filter" style="max-width:180px;">
+        <option value="">전체 단계</option>
+        <option value="JOB_POSTING_ANALYSIS">채용공고 분석</option>
+        <option value="CANDIDATE_MATERIAL_ANALYSIS">지원자 자료 분석</option>
+        <option value="CUSTOMIZED_SYNTHESIS">맞춤 결과 생성</option>
+        <option value="BASIC_QUESTION_GENERATION">기본 질문 생성</option>
+        <option value="WEAKNESS_QUESTION_GENERATION">약점 질문 생성</option>
+        <option value="ANSWER_EVALUATION">답변 평가</option>
+        <option value="WEAKNESS_REEVALUATION">약점 재평가</option>
+        <option value="FINAL_REPORT">최종 리포트</option>
       </select>
     </div>
 

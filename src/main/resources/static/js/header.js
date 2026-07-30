@@ -86,7 +86,7 @@
         nameEl.textContent = (user.name || user.loginId) + '님';
         avatarEl.textContent = (user.name || user.loginId).charAt(0);
 
-        var adminLink = document.getElementById('app-admin-link');
+        var adminLink = document.getElementById('app-admin-nav-link');
         if (adminLink) {
             adminLink.hidden = user.role !== 'ADMIN';
         }
@@ -132,7 +132,7 @@
             var avatarEl = document.getElementById('user-avatar');
             if (nameEl) nameEl.textContent = name + '님';
             if (avatarEl) avatarEl.textContent = name.charAt(0);
-            var adminLink = document.getElementById('admin-link');
+            var adminLink = document.getElementById('admin-nav-link');
             if (adminLink) adminLink.hidden = user.role !== 'ADMIN';
         } else {
             if (authGuest) authGuest.hidden = false;
