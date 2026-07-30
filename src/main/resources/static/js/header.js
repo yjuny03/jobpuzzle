@@ -109,11 +109,46 @@
         });
     }
 
+    // landingHeader (guest/user 전환): 랜딩 페이지는 landing.js가 이미 처리하므로
+    // 여기서는 auth-guest가 있고 landing.js가 없는 페이지(로그인, 회원가입, 아이디/비번 찾기 등)만 다룬다.
+    function applyGuestHeaderState(user) {
+        var authGuest = document.getElementById('auth-guest');
+        var authUser = document.getElementById('auth-user');
+        if (!authGuest && !authUser) return;
+
+        if (user) {
+            if (authGuest) authGuest.hidden = true;
+            if (authUser) authUser.hidden = false;
+            var name = user.name || user.loginId || '';
+            var nameEl = document.getElementById('user-name');
+            var avatarEl = document.getElementById('user-avatar');
+            if (nameEl) nameEl.textContent = name + '님';
+            if (avatarEl) avatarEl.textContent = name.charAt(0);
+            var adminLink = document.getElementById('admin-link');
+            if (adminLink) adminLink.hidden = user.role !== 'ADMIN';
+        } else {
+            if (authGuest) authGuest.hidden = false;
+            if (authUser) authUser.hidden = true;
+        }
+    }
+
+    function loadGuestHeaderAuthState() {
+        if (window.__jobPuzzleLandingHandlesAuthHeader) return;
+        if (!document.getElementById('auth-guest')) return;
+        fetch(window.JobPuzzleRoutes.path('/user/me'), { credentials: 'same-origin' })
+            .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
+            .then(function (result) {
+                applyGuestHeaderState(result.ok && result.body.success ? result.body.data : null);
+            })
+            .catch(function () { applyGuestHeaderState(null); });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initMenus();
         initHeaderTheme();
         bindLogout();
         loadCurrentUser();
+        loadGuestHeaderAuthState();
         document.addEventListener('app-user-updated', function (event) { renderUserDisplay(event.detail); });
     });
 })();

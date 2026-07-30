@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/css/auth.css" th:href="@{/css/auth.css}">
 </head>
 
-<body>
+<body class="jp-auth-theme">
 
   <div th:replace="~{fragments/header :: landingHeader}"></div>
 
@@ -30,7 +30,7 @@
           <label class="field-label" for="password">비밀번호</label>
           <input class="text-input" type="password" id="password" name="password" autocomplete="current-password" required>
         </div>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text-muted);">
+        <label class="auth-checkbox-label">
           <input type="checkbox" id="autoLogin">
           자동로그인
         </label>
@@ -49,10 +49,12 @@
 
       <!-- TODO(team): 카카오·구글 콘솔 callback URI에 /jobpuzzle context path를 반영한다. -->
       <a class="auth-kakao-btn" href="/jobpuzzle/oauth2/authorization/kakao" th:href="@{/oauth2/authorization/kakao}">
+        <img src="/images/kakao_logo.png" th:src="@{/images/kakao_logo.png}" alt="" class="auth-oauth-btn__icon">
         카카오로 시작하기
       </a>
 
       <a class="auth-google-btn" href="/jobpuzzle/oauth2/authorization/google" th:href="@{/oauth2/authorization/google}">
+        <img src="/images/google_logo.png" th:src="@{/images/google_logo.png}" alt="" class="auth-oauth-btn__icon">
         구글로 시작하기
       </a>
 
