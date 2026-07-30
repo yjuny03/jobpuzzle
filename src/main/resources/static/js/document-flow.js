@@ -9,6 +9,7 @@
     COVER_LETTER: '자기소개서', PORTFOLIO: '포트폴리오', EXPERIENCE_NOTE: '경험 자료'
   };
   var DIRECT_INPUT_ALLOWED = ['JOB_POSTING', 'COMPANY_INFO', 'EXPERIENCE_NOTE'];
+  var CHAR_LIMIT = 4500;
 
   function notify(type, message, duration) {
     if (typeof global.showToast === 'function') {
@@ -74,6 +75,36 @@
 
   function hasPageMarkers(content) {
     return /^\[\d+페이지\]\n/.test(content || '');
+  }
+
+  // 페이지 마커를 뺀 실제 내용 기준 총 글자 수 (분석에 쓰이는 원문 길이와 맞춘다)
+  function totalContentLength(pages) {
+    return pages.reduce(function (sum, p) { return sum + (p || '').length; }, 0);
+  }
+
+  function charCountLabel(total) {
+    return total.toLocaleString() + '/' + CHAR_LIMIT.toLocaleString() + '자';
+  }
+
+  // 글자 수 표시 + 4500자 초과 시 빨간 경고 문구 마크업
+  function charCountHtml(total) {
+    var over = total > CHAR_LIMIT;
+    return '<div class="char-count' + (over ? ' char-count--over' : '') + '" data-panel-el="char-count">' +
+      '<span data-panel-el="char-count-value">' + charCountLabel(total) + '</span>' +
+      '<p class="char-count__warning" data-panel-el="char-count-warning"' + (over ? '' : ' hidden') + '>' +
+        '4500자가 넘어가면 분석할 때 사용할 수 없습니다.' +
+      '</p>' +
+    '</div>';
+  }
+
+  // 리렌더 없이 글자 수 표시만 갱신 (수정 중 textarea 포커스를 유지하기 위함)
+  function updateCharCountDisplay(container, total) {
+    var el = container.querySelector('[data-panel-el="char-count"]');
+    if (!el) return;
+    var over = total > CHAR_LIMIT;
+    el.classList.toggle('char-count--over', over);
+    el.querySelector('[data-panel-el="char-count-value"]').textContent = charCountLabel(total);
+    el.querySelector('[data-panel-el="char-count-warning"]').hidden = !over;
   }
 
   function joinPages(pages, withMarkers) {
@@ -221,6 +252,7 @@
         html += '<div class="extract-body"><div class="extract-body__content">' +
           '<textarea class="textarea-input page-viewer" data-panel-el="content-editor" style="font-family:inherit;">' + esc(editPages[state.pageIndex]) + '</textarea>' +
           renderPageNav(editPages.length, state.pageIndex, '페이지 수정 중') +
+          charCountHtml(totalContentLength(editPages)) +
           '</div><div class="extract-body__actions">' +
           '<button class="btn btn--ghost" style="border:1px solid #E3E7ED;" data-panel-action="edit-cancel">취소</button>' +
           '<button class="btn btn--primary" data-panel-action="edit-save">저장</button>' +
@@ -231,6 +263,7 @@
         html += '<div class="extract-body"><div class="extract-body__content">' +
           '<div class="page-viewer">' + esc(pages[state.pageIndex]).replace(/\n/g, '<br>') + '</div>' +
           renderPageNav(pages.length, state.pageIndex, '페이지') +
+          charCountHtml(totalContentLength(pages)) +
           '</div><div class="extract-body__actions">' +
           (canEdit ? '<button class="btn-sm btn-sm--primary-tint" data-panel-action="enter-edit">수정</button>' : '') +
           (canConfirm ? '<button class="btn btn--primary" data-panel-action="confirm">확정하기</button>' : '') +
@@ -251,6 +284,15 @@
       });
 
       var pageCount = state.editMode ? state.editingPages.length : splitPages(extraction.content).length;
+
+      if (state.editMode) {
+        var editor = container.querySelector('[data-panel-el="content-editor"]');
+        if (editor) editor.addEventListener('input', function () {
+          var pages = state.editingPages.slice();
+          pages[state.pageIndex] = editor.value;
+          updateCharCountDisplay(container, totalContentLength(pages));
+        });
+      }
 
       bindPanelAction('first', function () { captureCurrentEditingPage(); state.pageIndex = 0; render(); });
       bindPanelAction('prev', function () { captureCurrentEditingPage(); state.pageIndex--; render(); });
