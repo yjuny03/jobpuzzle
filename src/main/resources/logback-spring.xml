@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{48} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
     <!-- JSON-05 진단은 개발/ai-e2e에서만 별도 파일에 남긴다. 다른 logger와 원문 데이터는 이 appender로 전달하지 않는다. -->
     <springProfile name="dev,ai-e2e">
         <appender name="JSON05_DIAGNOSTIC_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">

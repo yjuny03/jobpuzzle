@@ -13,6 +13,11 @@ public class AnswerSubmitResponse {
     private String summary;
     private boolean evaluationFailed;
     private String failureTraceId;
+    private boolean evaluationRetryRequired;
+    private String evaluationRetryMessage;
+    private boolean retryAnswerRequired;
+    private int remainingAnswerRetries;
+    private String retryAnswerMessage;
     private Long followUpQuestionMessageId;
     private String followUpQuestion;
     private InterviewSessionStatus sessionStatus;

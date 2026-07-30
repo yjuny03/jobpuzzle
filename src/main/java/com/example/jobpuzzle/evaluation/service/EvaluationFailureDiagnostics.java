@@ -2,10 +2,18 @@ package com.example.jobpuzzle.evaluation.service;
 
 import com.example.jobpuzzle.ai.log.AiCallLogErrorType;
 import com.example.jobpuzzle.ai.validation.AiProcessingException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 final class EvaluationFailureDiagnostics {
+
+    private static final int MAX_FAILURE_DETAIL_LENGTH = 900;
+    private static final int MAX_RESPONSE_PREVIEW_LENGTH = 500;
 
     private EvaluationFailureDiagnostics() {
     }
@@ -31,6 +39,25 @@ final class EvaluationFailureDiagnostics {
         return root.getClass().getSimpleName() + ": " + message;
     }
 
+    static String failureDetail(Throwable failure) {
+        List<String> causes = new ArrayList<>();
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = failure;
+        while (current != null && visited.add(current)) {
+            String message = current.getMessage() == null ? "(no message)" : singleLine(current.getMessage());
+            causes.add(current.getClass().getSimpleName() + ": " + message);
+            current = current.getCause();
+        }
+        return limit(String.join(" <- ", causes), MAX_FAILURE_DETAIL_LENGTH);
+    }
+
+    static String responsePreview(String rawResponse) {
+        if (rawResponse == null) {
+            return "(null)";
+        }
+        return limit(singleLine(rawResponse), MAX_RESPONSE_PREVIEW_LENGTH);
+    }
+
     static AiCallLogErrorType errorType(Throwable failure) {
         Throwable current = failure;
         while (current != null) {
@@ -40,5 +67,13 @@ final class EvaluationFailureDiagnostics {
             current = current.getCause();
         }
         return AiCallLogErrorType.PROVIDER_ERROR;
+    }
+
+    private static String singleLine(String value) {
+        return value.replaceAll("[\\r\\n\\t]+", " ").trim();
+    }
+
+    private static String limit(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }

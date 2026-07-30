@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class InterviewSessionService {
 
+    private static final int MAX_ADDITIONAL_ANSWER_RETRIES = 2;
+
     private static final List<InterviewSessionStatus> UNFINISHED_STATUSES =
             List.of(InterviewSessionStatus.CREATED, InterviewSessionStatus.IN_PROGRESS);
 
@@ -360,9 +362,13 @@ public class InterviewSessionService {
         }
 
         InterviewMessage parentQuestion = resolveParentQuestion(userId, sessionQuestion, request);
-        if (interviewMessageRepository.existsByParentMessage_MessageIdAndSender(
+        if (interviewMessageRepository.existsByParentMessage_MessageIdAndSenderAndMessageTypeIn(
                 parentQuestion.getMessageId(),
-                InterviewMessageSender.USER
+                InterviewMessageSender.USER,
+                List.of(
+                        InterviewMessageType.ORIGINAL_ANSWER,
+                        InterviewMessageType.FOLLOW_UP_ANSWER
+                )
         )) {
             throw new CustomException(ErrorCode.ANSWER_ALREADY_CONFIRMED);
         }
@@ -378,11 +384,58 @@ public class InterviewSessionService {
 
         AnswerEvaluationService.EvaluationOutcome outcome =
                 answerEvaluationService.evaluateAnswer(answer);
-        if (outcome.evaluationFailed() || outcome.followUpMessage() == null) {
+        if (outcome.evaluationFailed()) {
+            answer.markEvaluationFailed();
+            return AnswerSubmitResponse.builder()
+                    .answerMessageId(answer.getMessageId())
+                    .summary("AI 평가 응답을 처리하지 못했습니다. 입력한 답변을 유지한 채 다시 평가할 수 있습니다.")
+                    .evaluationFailed(true)
+                    .failureTraceId(outcome.failureTraceId())
+                    .evaluationRetryRequired(true)
+                    .evaluationRetryMessage("답변 내용은 그대로 유지됩니다. 잠시 후 다시 제출해 주세요.")
+                    .sessionStatus(session.getStatus())
+                    .nextQuestion(SessionQuestionResponse.from(sessionQuestion))
+                    .build();
+        }
+        if (outcome.retryAnswerRequired()) {
+            long previousRejectedAttempts = interviewMessageRepository
+                    .countBySessionQuestion_SessionQuestionIdAndMessageType(
+                            sessionQuestion.getSessionQuestionId(),
+                            InterviewMessageType.REJECTED_ANSWER
+                    );
+            boolean retriesExhausted =
+                    previousRejectedAttempts >= MAX_ADDITIONAL_ANSWER_RETRIES;
+            if (retriesExhausted) {
+                sessionQuestion.complete();
+            } else {
+                answer.rejectAnswer();
+            }
+            SessionQuestionResponse nextQuestion = retriesExhausted
+                    ? getNextQuestion(userId, session.getSessionId())
+                    : SessionQuestionResponse.from(sessionQuestion);
+            return AnswerSubmitResponse.builder()
+                    .answerMessageId(answer.getMessageId())
+                    .summary(retriesExhausted
+                            ? "답변을 평가할 수 없어 이 질문을 미평가로 종료합니다."
+                            : outcome.retryAnswerMessage())
+                    .evaluationFailed(retriesExhausted)
+                    .retryAnswerRequired(!retriesExhausted)
+                    .remainingAnswerRetries((int) Math.max(
+                            0,
+                            MAX_ADDITIONAL_ANSWER_RETRIES - previousRejectedAttempts - 1
+                    ))
+                    .retryAnswerMessage(retriesExhausted
+                            ? null
+                            : "질문과 관련된 경험이나 생각을 다시 답변해 주세요.")
+                    .sessionStatus(session.getStatus())
+                    .nextQuestion(nextQuestion)
+                    .build();
+        }
+        if (outcome.followUpMessage() == null) {
             sessionQuestion.complete();
         }
 
-        SessionQuestionResponse nextQuestion = outcome.evaluationFailed() || outcome.followUpMessage() == null
+        SessionQuestionResponse nextQuestion = outcome.followUpMessage() == null
                 ? getNextQuestion(userId, session.getSessionId())
                 : SessionQuestionResponse.from(sessionQuestion);
         return AnswerSubmitResponse.builder()
@@ -392,7 +445,7 @@ public class InterviewSessionService {
                 .summary(outcome.evaluation() == null
                         ? "AI 평가에 실패했습니다. 답변은 저장되었고 점수 계산에서는 제외됩니다."
                         : outcome.evaluation().getSummary())
-                .evaluationFailed(outcome.evaluationFailed())
+                .evaluationFailed(false)
                 .failureTraceId(outcome.failureTraceId())
                 .followUpQuestionMessageId(
                         outcome.followUpMessage() == null ? null : outcome.followUpMessage().getMessageId()
@@ -439,6 +492,36 @@ public class InterviewSessionService {
                 session,
                 Math.toIntExact(sessionQuestionRepository.countBySession_SessionId(sessionId))
         );
+    }
+
+    public SessionResponse finishSelectedQuestions(Long userId, Long sessionId) {
+        InterviewSession session = getOwnedSession(userId, sessionId);
+        validateEditable(session);
+        List<InterviewSessionQuestion> questions =
+                sessionQuestionRepository.findBySession_SessionIdOrderByDisplayOrderAsc(sessionId);
+        questions.forEach(question -> {
+            if (hasOriginalAnswer(question.getSessionQuestionId())) {
+                question.complete();
+            } else {
+                question.skip();
+            }
+        });
+        return SessionResponse.from(session, questions.size(), hasAnyAnswer(sessionId));
+    }
+
+    public SessionQuestionResponse finishCurrentQuestion(
+            Long userId,
+            Long sessionQuestionId
+    ) {
+        InterviewSessionQuestion question = sessionQuestionRepository
+                .findBySessionQuestionIdAndSession_User_UserId(sessionQuestionId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_QUESTION_NOT_FOUND));
+        validateEditable(question.getSession());
+        if (!hasOriginalAnswer(sessionQuestionId)) {
+            throw new CustomException(ErrorCode.SESSION_CANNOT_BE_COMPLETED);
+        }
+        question.complete();
+        return toSessionQuestionResponse(question);
     }
 
     private void resolveWeaknessIfEligible(

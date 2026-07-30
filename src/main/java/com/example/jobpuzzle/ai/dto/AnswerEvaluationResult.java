@@ -35,6 +35,8 @@ public class AnswerEvaluationResult {
 
     private List<String> improvementDirection;
 
+    private AnswerDisposition answerDisposition;
+
     // 다음 꼬리질문 1개 또는 null
     private FollowUp followUp;
 

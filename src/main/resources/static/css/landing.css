@@ -1364,9 +1364,12 @@
 }
 
 .landing-page .site-scroll-progress {
-    position: absolute !important;
+    position: fixed !important;
     top: 0 !important;
-    border-radius: 18px 18px 0 0;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 10000 !important;
+    border-radius: 0;
     background: transparent !important;
 }
 

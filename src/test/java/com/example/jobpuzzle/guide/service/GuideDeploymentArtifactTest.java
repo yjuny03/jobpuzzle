@@ -19,13 +19,15 @@ class GuideDeploymentArtifactTest {
         // 정본 markdown의 각 chunk 본문과 순서가 최초 등록 SQL에 동일하게 포함되는지 검증한다.
         String guide = Files.readString(Path.of("src/main/resources/guides/backend-new-v1.0.md"));
         String sql = Files.readString(Path.of("src/main/resources/db/manual/insert-backend-new-guide-v1.0.sql"));
+        String normalizedSql = normalizeIndentation(sql);
         Matcher matcher = CHUNK.matcher(guide);
         int expectedIndex = 0;
         while (matcher.find()) {
             String title = matcher.group(2);
             String content = matcher.group(3).trim();
             assertThat(Integer.parseInt(matcher.group(1))).isEqualTo(expectedIndex++);
-            assertThat(sql).contains("'" + title + "'", "'" + content + "'");
+            assertThat(normalizedSql)
+                    .contains("'" + title + "'", "'" + normalizeIndentation(content) + "'");
         }
         assertThat(expectedIndex).isEqualTo(2);
     }
@@ -36,5 +38,12 @@ class GuideDeploymentArtifactTest {
         String sql = Files.readString(Path.of("src/main/resources/db/manual/insert-backend-new-guide-v1.0.sql"));
         assertThat(sql).contains("'CATEGORY'", "'CATEGORY', 1, NULL", "'ACTIVE'", "'DIRECT_INPUT'");
         assertThat(sql).contains("@backend_new_guide_id, 0", "@backend_new_guide_id, 1");
+    }
+
+    private String normalizeIndentation(String value) {
+        return value.replace("\r\n", "\n").lines()
+                .map(String::strip)
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
     }
 }

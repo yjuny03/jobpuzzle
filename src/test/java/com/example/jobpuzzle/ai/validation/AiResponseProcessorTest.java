@@ -210,6 +210,66 @@ class AiResponseProcessorTest {
                 .containsExactly(UserDocumentType.RESUME);
     }
 
+    @Test
+    void normalizesCommonJson06CollectionAndFollowUpShapeMistakes() {
+        String response = """
+                {
+                  "interviewMode":"BASIC",
+                  "currentFollowUpDepth":0,
+                  "score":18,
+                  "scoreLabel":"미흡",
+                  "passThreshold":70,
+                  "evaluationDetail":{
+                    "intentMatch":{"score":20,"comment":"관련성 부족"},
+                    "specificity":10,
+                    "ownRole":null,
+                    "problemSolving":{"score":15,"comment":"과정 부족"},
+                    "resultExpression":null,
+                    "requirementConnection":null,
+                    "guideAlignment":null,
+                    "deliveryClarity":{"score":30,"comment":"짧음"}
+                  },
+                  "weaknessTags":"질문의도파악",
+                  "summary":"보완 필요",
+                  "improvementDirection":{"first":"구체적인 사례를 설명하세요."},
+                  "followUp":["약점과 보완 노력을 구체적으로 설명해 주세요."]
+                }
+                """;
+
+        var result = processor.parseAnswerEvaluation(response);
+
+        assertThat(result.getImprovementDirection())
+                .containsExactly("구체적인 사례를 설명하세요.");
+        assertThat(result.getWeaknessTags()).containsExactly("질문의도파악");
+        assertThat(result.getEvaluationDetail().getSpecificity().getScore()).isEqualTo(10);
+        assertThat(result.getFollowUp().getQuestion())
+                .isEqualTo("약점과 보완 노력을 구체적으로 설명해 주세요.");
+    }
+
+    @Test
+    void normalizesCommonJson10FollowUpShapeMistakes() {
+        String response = """
+                {
+                  "targetWeaknessTag":"기술 역량 보완",
+                  "targetDimension":"guideAlignment",
+                  "currentFollowUpDepth":0,
+                  "score":45,
+                  "passThreshold":70,
+                  "comment":"실제 적용 경험을 더 설명해야 합니다.",
+                  "passed":false,
+                  "followUp":["Spring Boot를 실제 프로젝트에 적용한 사례를 설명해 주세요."]
+                }
+                """;
+
+        var result = processor.parseWeaknessAnswerEvaluation(response);
+
+        assertThat(result.getFollowUp().getDepth()).isEqualTo(1);
+        assertThat(result.getFollowUp().getQuestion())
+                .isEqualTo("Spring Boot를 실제 프로젝트에 적용한 사례를 설명해 주세요.");
+        assertThat(result.getFollowUp().getType())
+                .isEqualTo(com.example.jobpuzzle.interview.entity.FollowUpQuestionType.IMPROVEMENT_PLAN);
+    }
+
     private void assertFailure(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable, AiCallLogErrorType expected) {
         assertThatThrownBy(callable).isInstanceOf(AiProcessingException.class)
                 .extracting(error -> ((AiProcessingException) error).getErrorType()).isEqualTo(expected);

@@ -157,7 +157,12 @@
               var occurredAt = occurrence.occurredAt
                 ? new Date(occurrence.occurredAt).toLocaleString('ko-KR')
                 : '';
-              return '<span>' + esc(occurredAt) + ' · ' + esc(occurrence.mode || '') +
+              var occurrenceMode = {
+                BASIC: '기본 질문',
+                COMPANY_FIT: '회사 맞춤',
+                WEAKNESS_REVIEW: '약점 보완'
+              }[occurrence.mode] || occurrence.mode || '';
+              return '<span>' + esc(occurredAt) + ' · ' + esc(occurrenceMode) +
                 (occurrence.score == null ? '' : ' · ' + esc(occurrence.score) + '점') + '</span>';
             }).join('') + '</div>'
           : '';

@@ -5,6 +5,7 @@
   var sessionInfo = null;
   var remainingQuestions = [];
   var sessionQuestions = [];
+  var pendingSelectedQuestions = [];
   var sessionScoreByQuestion = {};
   var CATEGORY_LABELS = {
     intentMatch: '질문 의도 이해',
@@ -48,6 +49,18 @@
     if (mode === 'BASIC') return '기본 모의면접';
     if (mode === 'COMPANY_FIT') return '회사 맞춤 면접';
     return '약점 보완 면접';
+  }
+
+  function weaknessLabel(tag) {
+    var value = String(tag || '').toLowerCase();
+    if (value.indexOf('requirementconnection') >= 0) return '공고 요구사항 연결 부족';
+    if (value.indexOf('specificity') >= 0) return '답변의 구체성 부족';
+    if (value.indexOf('ownrole') >= 0) return '본인 역할 설명 부족';
+    if (value.indexOf('problemsolving') >= 0) return '문제 해결 과정 부족';
+    if (value.indexOf('resultexpression') >= 0) return '성과·결과 표현 부족';
+    if (value.indexOf('guidealignment') >= 0) return '직무 기준 연결 부족';
+    if (value.indexOf('deliveryclarity') >= 0) return '답변 전달력 부족';
+    return '질문 의도 파악 부족';
   }
 
   var QUESTION_TYPE_LABELS = {
@@ -384,13 +397,25 @@
     area.hidden = false;
     area.innerHTML =
       '<div><span>중간 결과</span><h2>지금까지의 답변을 확인하고 다음 단계를 선택하세요</h2>' +
-      '<p>아직 리포트가 확정되지 않았습니다. 남은 질문을 추가하면 같은 면접 점수에 이어서 반영됩니다.</p></div>' +
+      '<p>아직 리포트가 확정되지 않았습니다. 선택해 둔 질문을 이어서 답하거나 남은 질문을 추가할 수 있습니다.</p></div>' +
       '<div class="interim-actions__buttons">' +
+      (pendingSelectedQuestions.length
+        ? '<button id="resume-selected-questions" class="btn btn--outline">선택한 질문 ' +
+          pendingSelectedQuestions.length + '개 이어서 답변</button>'
+        : '') +
       (remainingQuestions.length
         ? '<button id="open-remaining-questions" class="btn btn--outline">남은 질문 ' +
           remainingQuestions.length + '개 추가</button>'
-        : '<span class="interim-actions__done">준비된 질문을 모두 선택했습니다</span>') +
+        : (pendingSelectedQuestions.length
+          ? ''
+          : '<span class="interim-actions__done">준비된 질문을 모두 답변했습니다</span>')) +
       '<button id="finalize-session" class="btn btn--primary">면접 끝내고 리포트 확정</button></div>';
+    var resumeButton = document.getElementById('resume-selected-questions');
+    if (resumeButton) {
+      resumeButton.addEventListener('click', function () {
+        window.location.href = '/interview.html?resumeSessionId=' + encodeURIComponent(sessionId);
+      });
+    }
     var addButton = document.getElementById('open-remaining-questions');
     if (addButton) addButton.addEventListener('click', openRemainingModal);
     document.getElementById('finalize-session').addEventListener('click', finalizeSession);
@@ -419,7 +444,7 @@
         encodeURIComponent(item.sessionId) + '"><div><span>' + esc(modeLabel(item.mode)) +
         '</span><h2>' + item.questionCount + '개 질문 면접</h2><p>' +
         esc(formatDate(item.completedAt)) +
-        (item.targetWeaknessTag ? ' · #' + esc(item.targetWeaknessTag) : '') +
+        (item.targetWeaknessTag ? ' · #' + esc(weaknessLabel(item.targetWeaknessTag)) : '') +
         '</p></div><strong>결과 보기</strong></a>';
     }).join('') :
       '<div class="history-empty"><h2>첫 면접을 시작해 보세요</h2>' +
@@ -442,6 +467,9 @@
     ]).then(function (values) {
       sessionInfo = values[0];
       remainingQuestions = values[3] || [];
+      pendingSelectedQuestions = (values[2] || []).filter(function (question) {
+        return question.status === 'PENDING' || question.status === 'IN_PROGRESS';
+      });
       renderSession(values[1], values[2]);
       if (sessionInfo.status !== 'COMPLETED') {
         var finalTabButton = document.querySelector('.tabbar__btn[data-tab="final"]');

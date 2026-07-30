@@ -35,4 +35,33 @@ class EvaluationFailureDiagnosticsTest {
         assertThat(EvaluationFailureDiagnostics.errorType(failure))
                 .isEqualTo(AiCallLogErrorType.RESPONSE_VALIDATION_FAILED);
     }
+
+    @Test
+    void preservesTheUsefulExceptionChainForPersistentDiagnostics() {
+        RuntimeException failure = new IllegalStateException(
+                "AI answer evaluation failed",
+                new AiProcessingException(
+                        AiCallLogErrorType.RESPONSE_PARSE_FAILED,
+                        "JSON-06 parse failed: chars=91\nfirst=TEXT"
+                )
+        );
+
+        assertThat(EvaluationFailureDiagnostics.failureDetail(failure))
+                .isEqualTo(
+                        "IllegalStateException: AI answer evaluation failed"
+                                + " <- AiProcessingException: JSON-06 parse failed: chars=91 first=TEXT"
+                );
+    }
+
+    @Test
+    void createsBoundedSingleLineProviderResponsePreview() {
+        String rawResponse = "설명문입니다.\n" + "가".repeat(700);
+
+        String preview = EvaluationFailureDiagnostics.responsePreview(rawResponse);
+
+        assertThat(preview)
+                .startsWith("설명문입니다. ")
+                .doesNotContain("\n")
+                .hasSize(500);
+    }
 }
