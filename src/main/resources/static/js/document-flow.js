@@ -8,7 +8,7 @@
     JOB_POSTING: '채용공고', COMPANY_INFO: '회사정보', RESUME: '이력서',
     COVER_LETTER: '자기소개서', PORTFOLIO: '포트폴리오', EXPERIENCE_NOTE: '경험 자료'
   };
-  var DIRECT_INPUT_ALLOWED = ['JOB_POSTING', 'COMPANY_INFO', 'EXPERIENCE_NOTE'];
+  var CHAR_LIMIT = 4500;
 
   function notify(type, message, duration) {
     if (typeof global.showToast === 'function') {
@@ -76,9 +76,67 @@
     return /^\[\d+페이지\]\n/.test(content || '');
   }
 
+  // 페이지 마커를 뺀 실제 내용 기준 총 글자 수 (분석에 쓰이는 원문 길이와 맞춘다)
+  function totalContentLength(pages) {
+    return pages.reduce(function (sum, p) { return sum + (p || '').length; }, 0);
+  }
+
+  function charCountLabel(total) {
+    return total.toLocaleString() + '/' + CHAR_LIMIT.toLocaleString() + '자';
+  }
+
+  // 글자 수 표시 + 4500자 초과 시 빨간 경고 문구 마크업
+  function charCountHtml(total) {
+    var over = total > CHAR_LIMIT;
+    return '<div class="char-count' + (over ? ' char-count--over' : '') + '" data-panel-el="char-count">' +
+      '<span data-panel-el="char-count-value">' + charCountLabel(total) + '</span>' +
+      '<p class="char-count__warning" data-panel-el="char-count-warning"' + (over ? '' : ' hidden') + '>' +
+        '4500자가 넘어가면 분석할 때 사용할 수 없습니다.' +
+      '</p>' +
+    '</div>';
+  }
+
+  // 리렌더 없이 글자 수 표시만 갱신 (수정 중 textarea 포커스를 유지하기 위함)
+  function updateCharCountDisplay(container, total) {
+    var el = container.querySelector('[data-panel-el="char-count"]');
+    if (!el) return;
+    var over = total > CHAR_LIMIT;
+    el.classList.toggle('char-count--over', over);
+    el.querySelector('[data-panel-el="char-count-value"]').textContent = charCountLabel(total);
+    el.querySelector('[data-panel-el="char-count-warning"]').hidden = !over;
+  }
+
   function joinPages(pages, withMarkers) {
     if (!withMarkers) return pages[0] || '';
     return pages.map(function (text, idx) { return '[' + (idx + 1) + '페이지]\n' + text; }).join('\n\n');
+  }
+
+  // alert() 대신 앱 전역 모달 디자인(.modal-overlay/.modal-box, my-data.html의 삭제 확인 모달과 동일)으로 삭제 확인을 받는다.
+  // 확인 시 true, 취소/배경 클릭 시 false로 resolve.
+  function confirmModal(title, desc) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML =
+        '<div class="modal-box modal-box--sm">' +
+          '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B5433D" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '<p style="font-size:15px; font-weight:700; margin:14px 0 6px;">' + esc(title) + '</p>' +
+          '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">' + esc(desc) + '</p>' +
+          '<div class="flex-row gap-10" style="justify-content:center;">' +
+            '<button class="btn btn--ghost" style="border:1px solid #E3E7ED;" data-confirm-cancel>취소</button>' +
+            '<button class="btn" style="background:#B5433D; color:#fff;" data-confirm-ok>삭제하기</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+
+      function close(result) {
+        document.body.removeChild(overlay);
+        resolve(result);
+      }
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
+      overlay.querySelector('[data-confirm-cancel]').addEventListener('click', function () { close(false); });
+      overlay.querySelector('[data-confirm-ok]').addEventListener('click', function () { close(true); });
+    });
   }
 
   // 선택된 파일 목록을 안내 텍스트로 요약 (이미지 여러 장 선택 시 파일명 나열)
@@ -103,9 +161,6 @@
           return doc;
         });
       });
-    }
-    if (DIRECT_INPUT_ALLOWED.indexOf(category) === -1) {
-      return Promise.reject(new Error('이 자료 유형은 직접 입력을 지원하지 않아요.'));
     }
     return api('/documents/text', { method: 'POST', json: { documentType: category, content: opts.content, displayName: name } })
       .then(function (extraction) { return { documentId: extraction.documentId }; });
@@ -153,12 +208,12 @@
 
     var state = {
       documentId: null, documentMeta: null, versions: [], selectedExtractionId: null,
-      editMode: false, pageIndex: 0, editingPages: null, editingHasMarkers: false
+      editMode: false, pageIndex: 0, editingPages: null, editingHasMarkers: false, nameEditMode: false
     };
 
     function load(documentId) {
       state.documentId = documentId;
-      state.editMode = false; state.editingPages = null; state.pageIndex = 0;
+      state.editMode = false; state.editingPages = null; state.pageIndex = 0; state.nameEditMode = false;
       return Promise.all([
         api('/documents/' + documentId).then(function (detail) { state.documentMeta = detail.document; }),
         loadVersions()
@@ -196,9 +251,20 @@
       var canEdit = !isFailed;
       var status = statusLabel(extraction.extractionStatus, extraction.versionStatus);
 
+      var nameHtml = state.nameEditMode ?
+        '<div class="flex-row gap-8" style="align-items:center;">' +
+          '<input type="text" class="text-input" data-panel-el="name-input" value="' + esc(doc.displayName) + '" maxlength="255" style="font-size:15px; font-weight:700; padding:6px 10px; width:220px;">' +
+          '<button class="btn-sm btn-sm--primary-tint" data-panel-action="name-save">저장</button>' +
+          '<button class="btn-sm" data-panel-action="name-cancel">취소</button>' +
+        '</div>' :
+        '<div class="flex-row gap-8" style="align-items:center;">' +
+          '<p style="font-size:16px; font-weight:700; margin:0;">' + esc(doc.displayName) + '</p>' +
+          '<button class="btn-sm" data-panel-action="name-edit">이름 수정</button>' +
+        '</div>';
+
       var html = '<div class="flex-row" style="justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:8px;">' +
-        '<div><p style="font-size:16px; font-weight:700; margin:0 0 4px;">' + esc(doc.displayName) + '</p>' +
-        '<p style="font-size:12px; color:#8A93A3; margin:0;">' + CATEGORY_LABEL[doc.documentType] + ' · ' + doc.sourceType + '</p></div>' +
+        '<div>' + nameHtml +
+        '<p style="font-size:12px; color:#8A93A3; margin:4px 0 0;">' + CATEGORY_LABEL[doc.documentType] + ' · ' + doc.sourceType + '</p></div>' +
         '<div class="flex-row gap-8" style="flex-wrap:wrap;">' +
           '<span class="badge-pill" style="background:#F5F1FF; color:' + status.color + ';">' + status.text + '</span>' +
           '<select class="select-input" style="width:auto; padding:6px 10px; font-size:12.5px;" data-panel-el="version-select">' +
@@ -221,6 +287,11 @@
         html += '<div class="extract-body"><div class="extract-body__content">' +
           '<textarea class="textarea-input page-viewer" data-panel-el="content-editor" style="font-family:inherit;">' + esc(editPages[state.pageIndex]) + '</textarea>' +
           renderPageNav(editPages.length, state.pageIndex, '페이지 수정 중') +
+          '<div class="flex-row gap-8" style="margin-top:6px;">' +
+            '<button class="btn-sm" data-panel-action="add-page">이 페이지 다음에 추가</button>' +
+            '<button class="btn-sm btn-sm--danger" data-panel-action="delete-page"' + (editPages.length <= 1 ? ' disabled' : '') + '>이 페이지 삭제</button>' +
+          '</div>' +
+          charCountHtml(totalContentLength(editPages)) +
           '</div><div class="extract-body__actions">' +
           '<button class="btn btn--ghost" style="border:1px solid #E3E7ED;" data-panel-action="edit-cancel">취소</button>' +
           '<button class="btn btn--primary" data-panel-action="edit-save">저장</button>' +
@@ -231,6 +302,7 @@
         html += '<div class="extract-body"><div class="extract-body__content">' +
           '<div class="page-viewer">' + esc(pages[state.pageIndex]).replace(/\n/g, '<br>') + '</div>' +
           renderPageNav(pages.length, state.pageIndex, '페이지') +
+          charCountHtml(totalContentLength(pages)) +
           '</div><div class="extract-body__actions">' +
           (canEdit ? '<button class="btn-sm btn-sm--primary-tint" data-panel-action="enter-edit">수정</button>' : '') +
           (canConfirm ? '<button class="btn btn--primary" data-panel-action="confirm">확정하기</button>' : '') +
@@ -243,6 +315,19 @@
     }
 
     function bindEvents(extraction, hasAnyVersion) {
+      if (state.nameEditMode) {
+        var nameInput = container.querySelector('[data-panel-el="name-input"]');
+        nameInput.focus();
+        nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
+        nameInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+          if (e.key === 'Escape') { state.nameEditMode = false; render(); }
+        });
+      }
+      bindPanelAction('name-edit', function () { state.nameEditMode = true; render(); });
+      bindPanelAction('name-cancel', function () { state.nameEditMode = false; render(); });
+      bindPanelAction('name-save', saveName);
+
       var versionSelect = container.querySelector('[data-panel-el="version-select"]');
       if (versionSelect) versionSelect.addEventListener('change', function () {
         state.selectedExtractionId = parseInt(versionSelect.value, 10);
@@ -251,6 +336,15 @@
       });
 
       var pageCount = state.editMode ? state.editingPages.length : splitPages(extraction.content).length;
+
+      if (state.editMode) {
+        var editor = container.querySelector('[data-panel-el="content-editor"]');
+        if (editor) editor.addEventListener('input', function () {
+          var pages = state.editingPages.slice();
+          pages[state.pageIndex] = editor.value;
+          updateCharCountDisplay(container, totalContentLength(pages));
+        });
+      }
 
       bindPanelAction('first', function () { captureCurrentEditingPage(); state.pageIndex = 0; render(); });
       bindPanelAction('prev', function () { captureCurrentEditingPage(); state.pageIndex--; render(); });
@@ -279,6 +373,23 @@
           .catch(function (e) { notify('error', e.message); });
       });
 
+      bindPanelAction('add-page', function () {
+        captureCurrentEditingPage();
+        state.editingPages.splice(state.pageIndex + 1, 0, '');
+        state.pageIndex++;
+        render();
+      });
+      bindPanelAction('delete-page', function () {
+        if (state.editingPages.length <= 1) { notify('warning', '최소 한 페이지는 남아있어야 해요.'); return; }
+        var targetPage = state.pageIndex + 1;
+        confirmModal(targetPage + '페이지를 삭제할까요?', '삭제하면 되돌릴 수 없습니다.').then(function (ok) {
+          if (!ok) return;
+          state.editingPages.splice(state.pageIndex, 1);
+          if (state.pageIndex >= state.editingPages.length) state.pageIndex = state.editingPages.length - 1;
+          render();
+        });
+      });
+
       bindPanelAction('enter-edit', function () {
         state.editingPages = splitPages(extraction.content);
         state.editingHasMarkers = hasPageMarkers(extraction.content);
@@ -291,7 +402,8 @@
       });
       bindPanelAction('edit-save', function () {
         captureCurrentEditingPage();
-        var content = joinPages(state.editingPages, state.editingHasMarkers).trim();
+        var withMarkers = state.editingHasMarkers || state.editingPages.length > 1;
+        var content = joinPages(state.editingPages, withMarkers).trim();
         if (!content) { notify('warning', '내용을 입력해주세요.'); return; }
         if (hasAnyVersion && options.openScaleModal) {
           options.openScaleModal(function (changeType) { submitEdit(extraction.extractionId, content, changeType); });
@@ -316,6 +428,21 @@
       function bindPanelAction(name, fn) {
         var el = container.querySelector('[data-panel-action="' + name + '"]');
         if (el) el.addEventListener('click', fn);
+      }
+
+      // 자료명 수정은 버전·확정 상태와 무관한 별도 API라 versions를 다시 불러올 필요 없이 화면만 갱신한다.
+      function saveName() {
+        var input = container.querySelector('[data-panel-el="name-input"]');
+        var value = input.value.trim();
+        if (!value) { notify('warning', '자료명을 입력해주세요.'); return; }
+        api('/documents/' + state.documentId + '/name', { method: 'PATCH', json: { displayName: value } })
+          .then(function () {
+            state.documentMeta.displayName = value;
+            state.nameEditMode = false;
+            render();
+            notify('success', '자료명을 수정했습니다.');
+          })
+          .catch(function (e) { notify('error', e.message); });
       }
     }
 
@@ -342,7 +469,7 @@
   global.DocumentFlow = {
     api: api,
     CATEGORY_LABEL: CATEGORY_LABEL,
-    DIRECT_INPUT_ALLOWED: DIRECT_INPUT_ALLOWED,
+    CHAR_LIMIT: CHAR_LIMIT,
     versionLabel: versionLabel,
     statusLabel: statusLabel,
     splitPages: splitPages,

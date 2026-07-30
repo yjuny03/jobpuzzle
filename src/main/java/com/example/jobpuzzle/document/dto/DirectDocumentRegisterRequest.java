@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 직접 입력 등록 - 채용공고/회사정보/경험정리만 허용 (DocumentService.registerTextDocument 참고)
+// 직접 입력 등록 (DocumentService.registerTextDocument 참고)
 @Getter
 @NoArgsConstructor
 public class DirectDocumentRegisterRequest {
