@@ -27,6 +27,11 @@ public enum ErrorCode {
     VECTOR_STORE_ERROR(HttpStatus.BAD_GATEWAY, "ANALYSIS_014", "vector 저장소 호출에 실패했습니다."),
     VECTOR_COLLECTION_INCOMPATIBLE(HttpStatus.CONFLICT, "ANALYSIS_015", "vector collection의 모델 또는 차원 계약이 일치하지 않습니다."),
     ACTION_PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_016", "액션플랜을 찾을 수 없습니다."),
+    // Qdrant Cloud point 한도(app.rag.qdrant.capacity)를 초과할 색인 요청을 /index 단계에서 차단할 때 사용한다.
+    // Qdrant 연결 실패 등 저장소 자체 오류(VECTOR_STORE_ERROR)와 구분해, 사용자가 "지금은 저장 용량이 부족해
+    // 재시도하면 될 수 있는 상황"임을 알 수 있게 한다. 현재 point 수·hard limit 등 판단 근거 수치는
+    // 서버 로그에만 남기고 이 코드의 메시지에는 포함하지 않는다.
+    VECTOR_CAPACITY_EXCEEDED(HttpStatus.SERVICE_UNAVAILABLE, "ANALYSIS_017", "현재 분석 자료를 저장할 수 있는 용량이 부족합니다. 잠시 후 다시 시도해 주세요."),
     SNAPSHOT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_001", "확정된 분석 스냅샷을 찾을 수 없습니다."),
     ANALYSIS_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "ANALYSIS_002", "존재하지 않는 분석 작업입니다."),
     ANALYSIS_CASE_NOT_DRAFT(HttpStatus.BAD_REQUEST, "ANALYSIS_003", "DRAFT 상태의 분석 작업만 자료·기준을 변경할 수 있습니다."),

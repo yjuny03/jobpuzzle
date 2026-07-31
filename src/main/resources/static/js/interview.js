@@ -274,12 +274,13 @@
             '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
             '<p class="material-doc-meta" style="color:' + status.color + ';">' + status.text + ' · 내 자료 관리에서 확정해주세요</p></div></div>';
         }
-        // 4500자를 넘는 자료는 분석에 쓸 수 없어 목록에서 선택을 막는다 (document-flow.js CHAR_LIMIT와 동일 기준)
-        var overLimit = typeof d.contentLength === 'number' && d.contentLength > DF.CHAR_LIMIT;
+        // 문서 유형별 상한을 넘는 자료는 분석에 쓸 수 없어 목록에서 선택을 막는다 (document-flow.js charLimitFor와 동일 기준)
+        var docLimit = DF.charLimitFor(d.documentType);
+        var overLimit = typeof d.contentLength === 'number' && d.contentLength > docLimit;
         if (overLimit) {
           return '<div class="material-doc-row" style="opacity:.55; cursor:default;"><div class="material-checkbox"></div>' +
             '<div><p class="material-doc-title">' + esc(d.displayName) + '</p>' +
-            '<p class="material-doc-meta" style="color:#B5433D;">' + d.contentLength.toLocaleString() + '/' + DF.CHAR_LIMIT.toLocaleString() + '자 · 4500자가 넘어가는 자료는 선택할 수 없습니다</p></div></div>';
+            '<p class="material-doc-meta" style="color:#B5433D;">' + d.contentLength.toLocaleString() + '/' + docLimit.toLocaleString() + '자 · ' + docLimit.toLocaleString() + '자가 넘어가는 자료는 선택할 수 없습니다</p></div></div>';
         }
         var checked = !!state.selectedDocIds[d.documentId];
         return '<div class="material-doc-row' + (checked ? ' is-checked' : '') + '" data-toggle-doc="' + d.documentId + '"><div class="material-checkbox"></div>' +

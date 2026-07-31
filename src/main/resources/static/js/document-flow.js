@@ -8,7 +8,15 @@
     JOB_POSTING: '채용공고', COMPANY_INFO: '회사정보', RESUME: '이력서',
     COVER_LETTER: '자기소개서', PORTFOLIO: '포트폴리오', EXPERIENCE_NOTE: '경험 자료'
   };
-  var CHAR_LIMIT = 4500;
+  // 문서 유형별 분석 가능 글자 수 상한. 채용공고·회사정보는 JSON-01(4-1) 입력 한도가 넉넉해 8000자,
+  // 이력서·자기소개서·포트폴리오·경험자료는 JSON-02(4-6b) partition 한도에 맞춰 15000자로 둔다.
+  var CHAR_LIMITS = {
+    JOB_POSTING: 8000, COMPANY_INFO: 8000,
+    RESUME: 15000, COVER_LETTER: 15000, PORTFOLIO: 15000, EXPERIENCE_NOTE: 15000
+  };
+  function charLimitFor(documentType) {
+    return CHAR_LIMITS[documentType] || 8000;
+  }
 
   function notify(type, message, duration) {
     if (typeof global.showToast === 'function') {
@@ -81,28 +89,28 @@
     return pages.reduce(function (sum, p) { return sum + (p || '').length; }, 0);
   }
 
-  function charCountLabel(total) {
-    return total.toLocaleString() + '/' + CHAR_LIMIT.toLocaleString() + '자';
+  function charCountLabel(total, limit) {
+    return total.toLocaleString() + '/' + limit.toLocaleString() + '자';
   }
 
-  // 글자 수 표시 + 4500자 초과 시 빨간 경고 문구 마크업
-  function charCountHtml(total) {
-    var over = total > CHAR_LIMIT;
+  // 글자 수 표시 + 문서 유형별 상한 초과 시 빨간 경고 문구 마크업
+  function charCountHtml(total, limit) {
+    var over = total > limit;
     return '<div class="char-count' + (over ? ' char-count--over' : '') + '" data-panel-el="char-count">' +
-      '<span data-panel-el="char-count-value">' + charCountLabel(total) + '</span>' +
+      '<span data-panel-el="char-count-value">' + charCountLabel(total, limit) + '</span>' +
       '<p class="char-count__warning" data-panel-el="char-count-warning"' + (over ? '' : ' hidden') + '>' +
-        '4500자가 넘어가면 분석할 때 사용할 수 없습니다.' +
+        limit.toLocaleString() + '자가 넘어가면 분석할 때 사용할 수 없습니다.' +
       '</p>' +
     '</div>';
   }
 
   // 리렌더 없이 글자 수 표시만 갱신 (수정 중 textarea 포커스를 유지하기 위함)
-  function updateCharCountDisplay(container, total) {
+  function updateCharCountDisplay(container, total, limit) {
     var el = container.querySelector('[data-panel-el="char-count"]');
     if (!el) return;
-    var over = total > CHAR_LIMIT;
+    var over = total > limit;
     el.classList.toggle('char-count--over', over);
-    el.querySelector('[data-panel-el="char-count-value"]').textContent = charCountLabel(total);
+    el.querySelector('[data-panel-el="char-count-value"]').textContent = charCountLabel(total, limit);
     el.querySelector('[data-panel-el="char-count-warning"]').hidden = !over;
   }
 
@@ -291,7 +299,7 @@
             '<button class="btn-sm" data-panel-action="add-page">이 페이지 다음에 추가</button>' +
             '<button class="btn-sm btn-sm--danger" data-panel-action="delete-page"' + (editPages.length <= 1 ? ' disabled' : '') + '>이 페이지 삭제</button>' +
           '</div>' +
-          charCountHtml(totalContentLength(editPages)) +
+          charCountHtml(totalContentLength(editPages), charLimitFor(doc.documentType)) +
           '</div><div class="extract-body__actions">' +
           '<button class="btn btn--ghost" style="border:1px solid #E3E7ED;" data-panel-action="edit-cancel">취소</button>' +
           '<button class="btn btn--primary" data-panel-action="edit-save">저장</button>' +
@@ -302,7 +310,7 @@
         html += '<div class="extract-body"><div class="extract-body__content">' +
           '<div class="page-viewer">' + esc(pages[state.pageIndex]).replace(/\n/g, '<br>') + '</div>' +
           renderPageNav(pages.length, state.pageIndex, '페이지') +
-          charCountHtml(totalContentLength(pages)) +
+          charCountHtml(totalContentLength(pages), charLimitFor(doc.documentType)) +
           '</div><div class="extract-body__actions">' +
           (canEdit ? '<button class="btn-sm btn-sm--primary-tint" data-panel-action="enter-edit">수정</button>' : '') +
           (canConfirm ? '<button class="btn btn--primary" data-panel-action="confirm">확정하기</button>' : '') +
@@ -342,7 +350,7 @@
         if (editor) editor.addEventListener('input', function () {
           var pages = state.editingPages.slice();
           pages[state.pageIndex] = editor.value;
-          updateCharCountDisplay(container, totalContentLength(pages));
+          updateCharCountDisplay(container, totalContentLength(pages), charLimitFor(state.documentMeta.documentType));
         });
       }
 
@@ -469,7 +477,7 @@
   global.DocumentFlow = {
     api: api,
     CATEGORY_LABEL: CATEGORY_LABEL,
-    CHAR_LIMIT: CHAR_LIMIT,
+    charLimitFor: charLimitFor,
     versionLabel: versionLabel,
     statusLabel: statusLabel,
     splitPages: splitPages,
