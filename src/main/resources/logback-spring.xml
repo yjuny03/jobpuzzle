@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <!-- Spring Boot 기본 콘솔/파일 appender와 root logger(INFO)를 그대로 가져온다.
+         이걸 include 안 하면 콘솔에 아무 로그(에러 포함)도 안 찍힌다. -->
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
     <!-- JSON-05 진단은 개발/ai-e2e에서만 별도 파일에 남긴다. 다른 logger와 원문 데이터는 이 appender로 전달하지 않는다. -->
     <springProfile name="dev,ai-e2e">
         <appender name="JSON05_DIAGNOSTIC_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
