@@ -39,7 +39,8 @@
 }
 
 .weak-pick-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
@@ -60,7 +61,7 @@
 }
 .weak-pick-row { position: relative; }
 .weak-pick-row:hover,
-.weak-pick-row:focus-within { z-index: 120; }
+.weak-pick-row:focus-within { z-index: auto; }
 .weak-pick-name {
   display: block;
   color: #164f7d;
@@ -81,14 +82,13 @@
   border: 1px solid #f5d4ba;
 }
 .weak-pick-history {
-  position: absolute;
-  z-index: 200;
-  right: 0;
-  top: calc(100% - 1px);
+  position: static;
+  grid-column: 1 / -1;
   display: none;
-  width: min(720px, calc(100vw - 56px));
+  width: auto;
   max-height: min(620px, 72vh);
   overflow-y: auto;
+  margin-top: 14px;
   padding: 0 22px 22px;
   border: 1px solid #315a78;
   border-radius: 18px;
@@ -254,8 +254,7 @@
 .weak-history-group--resolved { opacity: .84; }
 @media (max-width: 760px) {
   .weak-pick-history {
-    right: -12px;
-    width: calc(100vw - 36px);
+    width: auto;
     padding-inline: 15px;
   }
   .weak-pick-history > header { margin-inline: -15px; padding-inline: 15px; }
@@ -1243,6 +1242,27 @@
   border-radius: 8px;
   padding: 6px 10px;
 }
+.live-question-position {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #587085;
+  font-weight: 700;
+}
+.live-question-position > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 9px;
+  border: 1px solid #9bc3dd;
+  border-radius: 8px;
+  background: #e9f5fc;
+  color: #135d8d;
+  font-size: 12px;
+}
+.live-question-position em,
+.live-question-position b { font-style: normal; color: #0c4f7d; font-size: 15px; }
+.live-question-position i { width: 1px; height: 18px; background: #c3d5e1; }
 .live-question-label,
 .live-answer-label {
   display: block;
@@ -1715,7 +1735,6 @@
 }
 
 .jp-interview-page .mode-card__desc,
-.jp-interview-page .weak-pick-row p,
 .jp-interview-page .review-mini-label,
 .jp-interview-page .evaluation-guide summary small,
 .jp-interview-page .evaluation-guide__grid p,
@@ -1728,6 +1747,8 @@
   color: var(--jp-text-secondary);
   font-weight: 500;
 }
+
+.jp-interview-page .weak-pick-row p { font-weight: 500; }
 
 .jp-interview-page .material-columns {
   gap: 20px;

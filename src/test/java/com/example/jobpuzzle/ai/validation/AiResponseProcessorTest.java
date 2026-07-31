@@ -270,6 +270,27 @@ class AiResponseProcessorTest {
                 .isEqualTo(com.example.jobpuzzle.interview.entity.FollowUpQuestionType.IMPROVEMENT_PLAN);
     }
 
+    @Test
+    void keepsWeaknessReviewDiagnosticKeywords() {
+        String response = """
+                {
+                  "targetWeaknessTag":"본인 역할 설명 부족",
+                  "targetDimension":"ownRole",
+                  "currentFollowUpDepth":1,
+                  "score":58,
+                  "passThreshold":70,
+                  "comment":"본인이 주도한 역할과 판단 근거가 부족합니다.",
+                  "weaknessTags":["역할 설명 부족", "주도성 부족"],
+                  "passed":false,
+                  "followUp":null
+                }
+                """;
+
+        var result = processor.parseWeaknessAnswerEvaluation(response);
+
+        assertThat(result.getWeaknessTags()).containsExactly("역할 설명 부족", "주도성 부족");
+    }
+
     private void assertFailure(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable, AiCallLogErrorType expected) {
         assertThatThrownBy(callable).isInstanceOf(AiProcessingException.class)
                 .extracting(error -> ((AiProcessingException) error).getErrorType()).isEqualTo(expected);

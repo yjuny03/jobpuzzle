@@ -60,7 +60,15 @@
   }
 
   function weaknessLabel(tag) {
-    var value = String(tag || '').toLowerCase();
+    var original = String(tag || '');
+    if (/[가-힣]/.test(original)) return original;
+    var value = original.toLowerCase();
+    var compact = value.replace(/[_\-\s]/g, '');
+    if (compact.indexOf('lackofspecificdetail') >= 0) return '구체성 부족';
+    if (compact.indexOf('lackoftechnicaldepth') >= 0) return '기술적 깊이 부족';
+    if (compact.indexOf('insufficientcloudexperience') >= 0) return '클라우드 경험 부족';
+    if (compact.indexOf('vaguerole') >= 0) return '역할 설명 부족';
+    if (compact.indexOf('limitedownership') >= 0) return '주도성 부족';
     if (value.indexOf('requirementconnection') >= 0) return '공고 요구사항 연결 부족';
     if (value.indexOf('specificity') >= 0) return '답변의 구체성 부족';
     if (value.indexOf('ownrole') >= 0) return '본인 역할 설명 부족';
@@ -68,7 +76,8 @@
     if (value.indexOf('resultexpression') >= 0) return '성과·결과 표현 부족';
     if (value.indexOf('guidealignment') >= 0) return '직무 기준 연결 부족';
     if (value.indexOf('deliveryclarity') >= 0) return '답변 전달력 부족';
-    return '질문 의도 파악 부족';
+    if (value.indexOf('intentmatch') >= 0) return '질문 의도 파악 부족';
+    return '세부 진단 보완 필요';
   }
 
   var QUESTION_TYPE_LABELS = {
@@ -396,11 +405,11 @@
 
     html += '<div id="dimension-visual" class="dimension-visual"></div>';
 
-    html += '<div class="result-section-title"><span>이번 면접에서 확인된 약점</span><small>번호를 누르면 해당 질문으로 이동해요</small></div>';
+    html += '<div class="result-section-title"><span>답변 과정에서 발견 약점 포인트</span><small>번호를 누르면 해당 질문으로 이동해요</small></div>';
     html += weaknessTags.length
       ? '<div class="weakness-tag-list">' + weaknessTags.map(function (item) {
           return '<div class="weakness-tag-row">' +
-            '<div class="weakness-tag-row__head"><strong>' + esc(item.tag) + '</strong><em>' + item.count + '회</em></div>' +
+            '<div class="weakness-tag-row__head"><strong>' + esc(weaknessLabel(item.tag)) + '</strong><em>' + item.count + '회</em></div>' +
             (item.reason ? '<p class="weakness-tag-row__reason">' + esc(item.reason) + '</p>' : '') +
             '<div class="weakness-tag-row__questions-line">' +
             '<span class="weakness-tag-row__questions-label">약점이 나온 질문</span>' +
@@ -558,6 +567,9 @@
 
   function renderQuestionDetail(question, questionScore, score) {
     var detail = document.getElementById('q-detail');
+    var displayOrder = Number(question.displayOrder) > 0
+      ? question.displayOrder
+      : (questions.indexOf(question) + 1);
     var finalScore = questionScore && questionScore.finalScore != null
       ? questionScore.finalScore
       : null;
@@ -569,7 +581,7 @@
     }, 0);
     detail.innerHTML =
       '<div class="question-detail-head"><span class="question-number-badge">질문 ' +
-      question.displayOrder + '</span>' +
+      displayOrder + '</span>' +
       '<strong class="' + scoreTone(finalScore) + '">' +
       unevaluatedLabel(question, questionScore) +
       '</strong></div>' +
@@ -635,7 +647,7 @@
 
   function focusLabels(items) {
     return (items || []).map(function (item) {
-      return CATEGORY_LABELS[item] || item;
+      return CATEGORY_LABELS[item] || weaknessLabel(item);
     }).join(' · ');
   }
 
@@ -649,19 +661,21 @@
     closeRemainingModal();
     var modal = document.createElement('div');
     modal.id = 'remaining-question-modal';
-    modal.className = 'remaining-question-modal';
+    modal.className = 'remaining-question-modal question-selection-modal';
     modal.innerHTML =
-      '<div class="remaining-question-backdrop" data-close-remaining></div>' +
-      '<section class="remaining-question-dialog" role="dialog" aria-modal="true">' +
-      '<header><div><span>이어 연습하기</span><h2>남은 질문을 추가해 보세요</h2>' +
+      '<div class="remaining-question-backdrop question-selection-backdrop" data-close-remaining></div>' +
+      '<section class="remaining-question-dialog question-selection-dialog" role="dialog" aria-modal="true">' +
+      '<header><div><span class="question-selection-mode">이어 연습하기</span><h2>남은 질문을 추가해 보세요</h2>' +
       '<p>추가한 질문의 평가도 지금까지의 점수와 함께 집계됩니다.</p></div>' +
-      '<button type="button" data-close-remaining aria-label="닫기">×</button></header>' +
-      '<div class="remaining-question-list">' + remainingQuestions.map(function (question) {
-        return '<label><input type="checkbox" value="' + question.questionId + '" checked>' +
-          '<div><strong>' + esc(question.questionText) + '</strong>' +
-          '<p><b>이 질문의 의도</b>' + esc(question.intent || '답변의 핵심 근거를 확인합니다.') + '</p>' +
-          '<small><b>집중 평가 기준</b>' + esc(focusLabels(question.evaluationFocus)) + '</small>' +
-          '</div></label>';
+      '<button type="button" class="question-selection-close" data-close-remaining aria-label="닫기">×</button></header>' +
+      '<div class="remaining-question-list q-gen-list">' + remainingQuestions.map(function (question, index) {
+        return '<label class="q-gen-item q-gen-item--detailed"><input type="checkbox" value="' + question.questionId + '" checked>' +
+          '<span class="q-gen-item__num">' + (index + 1) + '</span>' +
+          '<span class="q-gen-item__content"><strong class="q-gen-item__text">' + esc(question.questionText) + '</strong>' +
+          '<button type="button" class="question-hint-toggle" aria-expanded="false"><span>질문 힌트 보기</span><span class="question-hint-chevron" aria-hidden="true"></span></button>' +
+          '<span class="question-hint-panel" hidden><small><b>이 질문의 의도</b>' + esc(question.intent || '답변의 핵심 근거를 확인합니다.') + '</small>' +
+          '<small><b>집중 평가 기준</b>' + esc(focusLabels(question.evaluationFocus)) + '</small></span>' +
+          '</span></label>';
       }).join('') + '</div>' +
       '<footer><span>하나 이상 선택해 주세요.</span>' +
       '<button id="add-remaining-questions" class="btn btn--primary">선택한 질문 이어서 연습</button></footer>' +
@@ -670,6 +684,17 @@
     document.body.classList.add('has-result-modal');
     modal.querySelectorAll('[data-close-remaining]').forEach(function (button) {
       button.addEventListener('click', closeRemainingModal);
+    });
+    modal.querySelectorAll('.question-hint-toggle').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var panel = button.parentElement.querySelector('.question-hint-panel');
+        var expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('span').textContent = expanded ? '질문 힌트 보기' : '질문 힌트 숨기기';
+        panel.hidden = expanded;
+      });
     });
     document.getElementById('add-remaining-questions').addEventListener('click', function () {
       var ids = Array.prototype.slice.call(

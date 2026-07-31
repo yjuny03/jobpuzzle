@@ -346,13 +346,40 @@ public class AnswerEvaluationService {
         int score = mockScore(answer.getMessageText());
         return new EvaluationPayload(
                 score, PASS_THRESHOLD, buildDetails(question, mode, score),
-                mode == InterviewSessionMode.COMPANY_FIT && score < PASS_THRESHOLD ? weaknessTags(question) : List.of(),
+                mockWeaknessTags(question, mode, score),
                 score >= PASS_THRESHOLD ? "핵심 근거가 확인되었습니다." : "구체적인 근거를 보완해야 합니다.",
                 score >= PASS_THRESHOLD ? List.of() : List.of("상황·본인 역할·행동·결과를 구체적으로 설명하세요."),
                 null, null, null,
                 score < 10 ? AnswerDisposition.RETRY_ANSWER
                         : score < PASS_THRESHOLD ? AnswerDisposition.FOLLOW_UP : AnswerDisposition.EVALUATE
         );
+    }
+
+    private List<String> mockWeaknessTags(
+            InterviewSessionQuestion question,
+            InterviewSessionMode mode,
+            int score
+    ) {
+        if (score >= PASS_THRESHOLD) {
+            return List.of();
+        }
+        if (mode == InterviewSessionMode.COMPANY_FIT) {
+            return weaknessTags(question);
+        }
+        if (mode != InterviewSessionMode.WEAKNESS_REVIEW) {
+            return List.of();
+        }
+        return switch (question.getSession().getTargetDimension()) {
+            case "intentMatch" -> List.of("질문 의도 파악 부족");
+            case "specificity" -> List.of("구체성 부족");
+            case "ownRole" -> List.of("역할 설명 부족");
+            case "problemSolving" -> List.of("문제 해결 과정 부족");
+            case "resultExpression" -> List.of("성과 근거 부족");
+            case "requirementConnection" -> List.of("요구사항 연결 부족");
+            case "guideAlignment" -> List.of("직무 기준 연결 부족");
+            case "deliveryClarity" -> List.of("답변 구조 부족");
+            default -> List.of("보완 근거 부족");
+        };
     }
 
     private EvaluationPayload anthropicPayload(
@@ -388,7 +415,9 @@ public class AnswerEvaluationService {
                         new AnswerEvaluation.DimensionEvaluation(value.getScore(), value.getComment())
                 );
                 return new EvaluationPayload(
-                    averageScore(details), PASS_THRESHOLD, details, List.of(), value.getComment(), List.of(),
+                    averageScore(details), PASS_THRESHOLD, details,
+                    normalizeWeaknessTags(value.getWeaknessTags()),
+                    value.getComment(), List.of(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getQuestion(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getType(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getReason(),
@@ -600,6 +629,20 @@ public class AnswerEvaluationService {
                 .filter(focus -> focus != InterviewQuestionEvaluationFocus.requirementConnection)
                 .map(focus -> focus.name() + "Weak")
                 .distinct()
+                .toList();
+    }
+
+    private List<String> normalizeWeaknessTags(List<String> weaknessTags) {
+        if (weaknessTags == null) {
+            return List.of();
+        }
+        return weaknessTags.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(tag -> !tag.isBlank())
+                .filter(tag -> tag.length() <= 40)
+                .distinct()
+                .limit(3)
                 .toList();
     }
 

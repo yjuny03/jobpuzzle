@@ -349,7 +349,7 @@
         ? Object.keys(value).map(function (key) { return value[key]; })
         : value ? [value] : [];
     return items.length
-      ? items.map(function (item) { return labels[item] || item; }).join(' · ')
+      ? items.map(function (item) { return labels[item] || weaknessLabel(item) || '평가 기준'; }).join(' · ')
       : '질문의 의도와 답변 근거';
   }
 
@@ -495,10 +495,10 @@
   }
 
   function renderSelection() {
-    var rows = questionSet.questions.map(function (question) {
+    var rows = questionSet.questions.map(function (question, index) {
       return '<label class="q-gen-item q-gen-item--detailed" style="cursor:pointer;">' +
         '<input type="checkbox" name="question" value="' + question.questionId + '" checked>' +
-        '<span class="q-gen-item__num">' + question.displayOrder + '</span>' +
+        '<span class="q-gen-item__num">' + (index + 1) + '</span>' +
         '<span class="q-gen-item__content"><strong class="q-gen-item__text">' +
         esc(question.question) + '</strong><button type="button" class="question-hint-toggle" ' +
         'aria-expanded="false"><span>질문 힌트 보기</span><span class="question-hint-chevron" aria-hidden="true"></span></button>' +
@@ -697,9 +697,10 @@
         }).join('') + '</div>'
       : '';
     root.innerHTML = '<div class="card card--pad-lg live-interview-card">' +
-      '<div class="live-question-heading"><span>질문 ' + esc(question.displayOrder || currentIndex + 1) +
-      ' · 선택 질문 ' + (currentIndex + 1) + ' / ' + questions.length +
-      '</span><strong>' + esc(modeLabel(session.mode)) + '</strong></div>' +
+      '<div class="live-question-heading"><span class="live-question-position">' +
+      '<strong>질문 <em>' + esc(question.displayOrder || currentIndex + 1) + '</em></strong>' +
+      '<i aria-hidden="true"></i><span>선택 질문 <b>' + (currentIndex + 1) + '</b> / ' + questions.length +
+      '</span></span><strong>' + esc(modeLabel(session.mode)) + '</strong></div>' +
       '<p class="live-question-label">첫 질문</p>' +
       '<p class="live-original-question">' + esc(question.questionText) + '</p>' +
       conversationHtml +

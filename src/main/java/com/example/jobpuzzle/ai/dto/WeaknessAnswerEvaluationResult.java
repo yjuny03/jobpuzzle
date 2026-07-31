@@ -4,6 +4,8 @@ import com.example.jobpuzzle.interview.entity.FollowUpQuestionType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,6 +27,13 @@ public class WeaknessAnswerEvaluationResult {
     private int passThreshold;
 
     private String comment;
+
+    /**
+     * 선택한 상위 약점 관점 안에서 확인된 하위 진단 키워드입니다.
+     * 예: ["역할 설명 부족", "주도성 부족"]
+     */
+    @Builder.Default
+    private List<String> weaknessTags = List.of();
 
     // score >= passThreshold
     private boolean passed;
