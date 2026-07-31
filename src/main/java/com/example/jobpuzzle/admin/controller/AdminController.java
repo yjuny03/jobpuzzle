@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.admin.controller;
 
+import com.example.jobpuzzle.admin.dto.AdminAiCallLogDetailResponse;
 import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
 import com.example.jobpuzzle.admin.dto.AdminGuideCreateRequest;
 import com.example.jobpuzzle.admin.dto.AdminGuideResponse;
@@ -9,6 +10,7 @@ import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
 import com.example.jobpuzzle.admin.service.AdminService;
 import com.example.jobpuzzle.ai.log.AiCallLogStatus;
+import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
@@ -98,13 +100,20 @@ public class AdminController {
     }
 
     // AI 분석 오류 로그 조회
-    // GET /jobpuzzle/admin-api/ai-call-logs?status=&page=&size=
+    // GET /jobpuzzle/admin-api/ai-call-logs?status=&stage=&page=&size=
     @GetMapping("/ai-call-logs")
     public ResponseEntity<ApiResponse<PageResponse<AdminAiCallLogResponse>>> getAiErrorLogs(
             @RequestParam(required = false) AiCallLogStatus status,
+            @RequestParam(required = false) AiExecutionStage stage,
             @PageableDefault(sort = "aiCallLogId", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.getAiErrorLogs(status, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAiErrorLogs(status, stage, pageable)));
+    }
+
+    // AI 분석 오류 로그 단건 조회
+    @GetMapping("/ai-call-logs/{aiCallLogId}")
+    public ResponseEntity<ApiResponse<AdminAiCallLogDetailResponse>> getAiErrorLog(@PathVariable Long aiCallLogId) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAiErrorLog(aiCallLogId)));
     }
 
     // 가이드 목록 조회
@@ -144,18 +153,12 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    // 가이드 활성화 - 같은 범위에 이미 활성화된 가이드가 있으면 force=true를 줘야 진행됨
-    @PatchMapping("/guides/{guideId}/activate")
-    public ResponseEntity<ApiResponse<AdminGuideResponse>> activateGuide(
-            @PathVariable Long guideId,
-            @RequestParam(defaultValue = "false") boolean force
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.activateGuide(guideId, force)));
-    }
-
-    // 가이드 비활성화
+    // 활성 가이드를 분석 대상에서 제외한다.
     @PatchMapping("/guides/{guideId}/deactivate")
-    public ResponseEntity<ApiResponse<AdminGuideResponse>> deactivateGuide(@PathVariable Long guideId) {
-        return ResponseEntity.ok(ApiResponse.success(adminService.deactivateGuide(guideId)));
+    public ResponseEntity<ApiResponse<AdminGuideResponse>> deactivateGuide(
+            @PathVariable Long guideId,
+            @AuthenticationPrincipal(expression = "user") User admin
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.deactivateGuide(guideId, admin)));
     }
 }

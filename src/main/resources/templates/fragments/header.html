@@ -15,6 +15,8 @@
         <a href="/jobpuzzle/my-data" th:href="@{/my-data}">자료 관리</a>
         <a href="/jobpuzzle/interview" th:href="@{/interview}">면접 준비</a>
         <a href="/jobpuzzle/reports" th:href="@{/reports}">리포트</a>
+        <a href="/jobpuzzle/action-plans" th:href="@{/action-plans}">액션플랜</a>
+        <a href="/jobpuzzle/admin/users" th:href="@{/admin/users}" id="admin-nav-link" hidden>관리자</a>
       </nav>
 
       <div class="site-header__actions">
@@ -43,14 +45,6 @@
               th:href="@{/settings}"
               class="user-menu__item"
               >설정</a
-            >
-            <a
-              href="/jobpuzzle/admin/users"
-              th:href="@{/admin/users}"
-              id="admin-link"
-              class="user-menu__item"
-              hidden
-              >관리자</a
             >
             <div class="user-menu__divider"></div>
             <a
@@ -98,6 +92,20 @@
           th:classappend="${activePage == 'reports'} ? 'is-active' : ''"
           >리포트</a
         >
+        <a
+          href="/jobpuzzle/action-plans"
+          th:href="@{/action-plans}"
+          th:classappend="${activePage == 'actionPlans'} ? 'is-active' : ''"
+          >액션플랜</a
+        >
+        <a
+          href="/jobpuzzle/admin/users"
+          th:href="@{/admin/users}"
+          th:classappend="${activePage == 'admin'} ? 'is-active' : ''"
+          id="app-admin-nav-link"
+          hidden
+          >관리자</a
+        >
       </nav>
 
       <div class="site-header__actions">
@@ -122,14 +130,6 @@
               th:href="@{/settings}"
               class="user-menu__item"
               >설정</a
-            >
-            <a
-              href="/jobpuzzle/admin/users"
-              th:href="@{/admin/users}"
-              id="app-admin-link"
-              class="user-menu__item"
-              hidden
-              >관리자</a
             >
             <div class="user-menu__divider"></div>
             <a

@@ -40,8 +40,8 @@
         })
         .then(function (result) {
           if (result.ok && result.body.success) {
-            // 로그인 성공 - 메인으로 이동
-            window.location.href = window.JobPuzzleRoutes.path('/');
+            // 보호된 화면에서 이동해 왔다면 서버가 보관한 원래 주소로, 아니면 메인으로 이동한다.
+            window.location.href = result.body.data || window.JobPuzzleRoutes.path('/');
             return;
           }
 

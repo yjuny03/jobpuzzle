@@ -1,9 +1,11 @@
 package com.example.jobpuzzle.global.config;
 
 import com.example.jobpuzzle.global.security.CustomAccessDeniedHandler;
+import com.example.jobpuzzle.global.security.CustomAuthenticationEntryPoint;
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetailsService;
 import com.example.jobpuzzle.global.security.OAuth2LoginSuccessHandler;
+import com.example.jobpuzzle.global.security.SecurityRequestClassifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 
 @Configuration // 이 클래스가 스프링 설정 클래스임을 선언
 @EnableWebSecurity // 스프링 시큐리티의 웹 보안 기능을 활성화
@@ -37,6 +41,9 @@ public class SecurityConfig {
 
     // 로그인은 했지만 권한이 없는 요청(예: 일반 회원의 관리자 화면/API 접근) 처리
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
+
+    // 로그인하지 않은 화면 요청과 기능 요청을 각각 리다이렉트/JSON으로 처리
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     // 자동로그인 토큰 서명에 쓰는 애플리케이션 키 (외부에 노출되면 안 됨)
     private static final String REMEMBER_ME_KEY = "jobpuzzle-remember-me-key";
@@ -114,6 +121,16 @@ public class SecurityConfig {
         return services;
     }
 
+    /** 로그인 후 원래 화면으로 돌아갈 수 있도록 화면 GET 요청만 세션에 저장한다. */
+    @Bean
+    public RequestCache requestCache() {
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setRequestMatcher(request ->
+                "GET".equalsIgnoreCase(request.getMethod())
+                        && !SecurityRequestClassifier.isFunctionRequest(request));
+        return requestCache;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
         http
@@ -131,8 +148,10 @@ public class SecurityConfig {
                 )
                 // 로그인은 했지만 권한이 없는 요청(관리자 전용 경로에 일반 회원 접근 등) 처리
                 .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
                         .accessDeniedHandler(customAccessDeniedHandler)
                 )
+                .requestCache(requestCache -> requestCache.requestCache(requestCache()))
                 // 세션이 없을 때 자동로그인 쿠키로 재인증을 시도하는 필터 등록
                 .rememberMe(rememberMe -> rememberMe
                         .rememberMeServices(rememberMeServices())

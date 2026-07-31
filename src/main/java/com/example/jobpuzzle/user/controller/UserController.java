@@ -23,6 +23,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final RequestCache requestCache;
 
     // 회원가입
     // POST /jobpuzzle/user/join { loginId, password, email, name }
@@ -82,11 +85,18 @@ public class UserController {
     // 성공하면 세션에 로그인 상태가 저장되고, 이후 요청부터는 로그인된 상태로 인식됨
     // autoLogin이 true면 자동로그인 쿠키도 함께 발급됨
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Void>> login(@Valid @RequestBody LoginRequest request,
-                                                     HttpServletRequest httpRequest,
-                                                     HttpServletResponse httpResponse) {
+    public ResponseEntity<ApiResponse<String>> login(@Valid @RequestBody LoginRequest request,
+                                                       HttpServletRequest httpRequest,
+                                                       HttpServletResponse httpResponse) {
         userService.login(request, httpRequest, httpResponse);
-        return ResponseEntity.ok(ApiResponse.success(null));
+        SavedRequest savedRequest = requestCache.getRequest(httpRequest, httpResponse);
+        String redirectUrl = savedRequest == null
+                ? httpRequest.getContextPath() + "/"
+                : savedRequest.getRedirectUrl();
+        if (savedRequest != null) {
+            requestCache.removeRequest(httpRequest, httpResponse);
+        }
+        return ResponseEntity.ok(ApiResponse.success(redirectUrl));
     }
 
     // 로그아웃

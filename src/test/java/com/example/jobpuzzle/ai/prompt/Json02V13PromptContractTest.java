@@ -12,12 +12,11 @@ class Json02V13PromptContractTest {
 
     @Test
     void preservesV11DtoAndEvidenceContractAndAddsPartitionBoundaries() throws IOException {
-        String v11 = Files.readString(Path.of("src/main/resources/prompts/json-02-v1.1.txt"));
-        String v13 = Files.readString(Path.of("src/main/resources/prompts/json-02-v1.3.txt"));
+        String v11 = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.1.txt"));
+        String v13 = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.3.txt"));
 
-        String normalizedV13 = normalizeNewlines(v13);
-        String normalizedBoundaryRules = normalizeNewlines(partitionBoundaryRules());
-        assertThat(normalizedV13.replace(normalizedBoundaryRules, "").stripTrailing())
+
+        assertThat(normalizeNewlines(removePartitionBoundaryRules(v13)).stripTrailing())
                 .isEqualTo(normalizeNewlines(v11).stripTrailing());
         assertThat(v13)
                 .contains("[PARTITION_BOUNDARY_RULES]")
@@ -34,17 +33,12 @@ class Json02V13PromptContractTest {
                 .contains("experienceNote는 starCandidates 배열을 가진다.");
     }
 
-    private String partitionBoundaryRules() {
-        return """
-                [PARTITION_BOUNDARY_RULES]
-                이번 요청에서 실제 marker가 제공된 문서 유형만 분석한다.
-                다른 partition 또는 입력에 없는 문서의 사실·객체·sourceRefs를 생성하지 않는다.
-                availableDocumentTypes에는 이번 요청의 RESUME, COVER_LETTER, PORTFOLIO, EXPERIENCE_NOTE만 중복 없이 넣는다.
-                availableDocumentTypes에 없는 유형의 객체는 반드시 JSON null이다.
-                예: RESUME만 제공되면 coverLetter, portfolio, experienceNote는 반드시 null이며 {} 또는 빈 배열 객체로 대체하지 않는다.
-                이 규칙을 위반한 JSON은 무효다.
-
-                """;
+    private String removePartitionBoundaryRules(String value) {
+        // 섹션 제목 경계로 추가 블록만 제거해 OS별 줄바꿈과 빈 줄 개수에 영향받지 않게 비교한다.
+        return value.replaceFirst(
+                "(?s)\\[PARTITION_BOUNDARY_RULES]\\R.*?\\R(?=\\[SOURCE_REFERENCE_RULES])",
+                ""
+        );
     }
 
     private String normalizeNewlines(String value) {

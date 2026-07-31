@@ -535,7 +535,7 @@
         requestCloseSelection();
       });
     });
-    if (selectionModal) selectionModal.querySelectorAll('.question-hint-toggle').forEach(function (button) {
+    selectionModal.querySelectorAll('.question-hint-toggle').forEach(function (button) {
       button.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -573,6 +573,14 @@
     selectionModal = null;
     document.body.classList.remove('has-selection-modal');
     if (fromHistory) selectionHistoryActive = false;
+  }
+
+  // 질문 선택을 취소하면 선택용 해시와 분석 진입 파라미터를 현재 주소에서 제거합니다.
+  function clearSelectionLocation() {
+    var cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('analysisCaseId');
+    cleanUrl.hash = '';
+    window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
   }
 
   function createSession() {

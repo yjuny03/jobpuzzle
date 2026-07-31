@@ -28,7 +28,6 @@ class GuideIndexingStateServiceTest {
     @Test
     void beginAndCompleteFreezeChunkReferencesAndEmbeddingContract() {
         JobGuideDocument guide = draft(1L);
-        guide.markManuallyReadyForReview();
         JobGuideChunk chunk = JobGuideChunk.builder()
                 .guide(guide).chunkIndex(0).title("기준").content("내용").contentSummary("요약").build();
         ReflectionTestUtils.setField(chunk, "chunkId", 10L);

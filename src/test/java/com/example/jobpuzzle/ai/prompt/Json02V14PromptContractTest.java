@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class Json02V14PromptContractTest {
     @Test
     void preservesV13ContractAndAllowsOnlyNecessaryMultipleMarkerEvidence() throws Exception {
-        String prompt = Files.readString(Path.of("src/main/resources/prompts/json-02-v1.4.txt"));
+        String prompt = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.4.txt"));
         assertThat(prompt)
                 .contains("[PARTITION_BOUNDARY_RULES]", "반드시 JSON null", "evidenceText 필드는 반환하지 않는다.")
                 .contains("각 사실 항목의 sourceRefs는 반드시 비어 있지 않은 배열이다.")

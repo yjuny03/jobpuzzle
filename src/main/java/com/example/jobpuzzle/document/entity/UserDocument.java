@@ -66,6 +66,10 @@ public class UserDocument extends BaseEntity {
         this.keepOriginal = keepOriginal;
     }
 
+    public void rename(String displayName) {
+        this.displayName = displayName;
+    }
+
     // 업로드 순서대로 반복 호출되는 것을 전제로 pageOrder를 자동 채번
     public void addFile(String filePath, String fileName) {
         files.add(UserDocumentFile.builder()

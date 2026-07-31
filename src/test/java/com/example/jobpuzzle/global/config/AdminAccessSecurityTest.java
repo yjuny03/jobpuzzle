@@ -6,6 +6,7 @@ import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.service.AdminService;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.security.CustomAccessDeniedHandler;
+import com.example.jobpuzzle.global.security.CustomAuthenticationEntryPoint;
 import com.example.jobpuzzle.global.security.CustomOAuth2UserService;
 import com.example.jobpuzzle.global.security.CustomUserDetails;
 import com.example.jobpuzzle.global.security.CustomUserDetailsService;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // /admin/**, /admin-api/**가 SecurityConfig의 hasRole("ADMIN") 매처와 CustomAccessDeniedHandler로
 // 실제로 보호되는지 검증한다. (로그인 필요 -> 로그인 페이지 리다이렉트, 권한 없음 -> 403/메인 리다이렉트, 관리자 -> 통과)
 @WebMvcTest(controllers = {AdminViewController.class, AdminController.class})
-@Import({SecurityConfig.class, CustomAccessDeniedHandler.class})
+@Import({SecurityConfig.class, CustomAccessDeniedHandler.class, CustomAuthenticationEntryPoint.class})
 class AdminAccessSecurityTest {
 
     @Autowired private MockMvc mockMvc;
@@ -72,10 +73,11 @@ class AdminAccessSecurityTest {
     }
 
     @Test
-    void adminApiRedirectsAnonymousUserToLogin() throws Exception {
+    void adminApiReturnsJsonUnauthorizedForAnonymousUser() throws Exception {
         mockMvc.perform(get("/admin-api/users"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("http://localhost/login"));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("COMMON_005"));
     }
 
     @Test

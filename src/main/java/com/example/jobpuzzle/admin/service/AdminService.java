@@ -1,5 +1,6 @@
 package com.example.jobpuzzle.admin.service;
 
+import com.example.jobpuzzle.admin.dto.AdminAiCallLogDetailResponse;
 import com.example.jobpuzzle.admin.dto.AdminAiCallLogResponse;
 import com.example.jobpuzzle.admin.dto.AdminGuideCreateRequest;
 import com.example.jobpuzzle.admin.dto.AdminGuideResponse;
@@ -8,18 +9,20 @@ import com.example.jobpuzzle.admin.dto.AdminUserListResponse;
 import com.example.jobpuzzle.admin.dto.AdminUserSearchField;
 import com.example.jobpuzzle.admin.dto.JobCategoryCreateRequest;
 import com.example.jobpuzzle.admin.support.GuideTextChunker;
+import com.example.jobpuzzle.ai.log.AiCallLog;
 import com.example.jobpuzzle.ai.log.AiCallLogRepository;
 import com.example.jobpuzzle.ai.log.AiCallLogStatus;
+import com.example.jobpuzzle.ai.log.AiExecutionStage;
 import com.example.jobpuzzle.document.extraction.PdfExtractionResult;
 import com.example.jobpuzzle.document.extraction.PdfPageResult;
 import com.example.jobpuzzle.document.extraction.PdfTextExtractor;
 import com.example.jobpuzzle.global.common.dto.PageResponse;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
+import com.example.jobpuzzle.guide.entity.GuideScopeType;
 import com.example.jobpuzzle.guide.entity.JobGuideChunk;
 import com.example.jobpuzzle.guide.entity.JobGuideDocument;
 import com.example.jobpuzzle.guide.entity.JobGuideDocumentSourceType;
-import com.example.jobpuzzle.guide.entity.JobGuideDocumentStatus;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideChunkRepository;
 import com.example.jobpuzzle.guide.repository.JobGuideDocumentRepository;
@@ -27,13 +30,16 @@ import com.example.jobpuzzle.jobcategory.dto.JobCategoryResponse;
 import com.example.jobpuzzle.jobcategory.entity.JobCategory;
 import com.example.jobpuzzle.jobcategory.repository.JobCategoryRepository;
 import com.example.jobpuzzle.user.entity.User;
+import com.example.jobpuzzle.user.entity.UserRole;
 import com.example.jobpuzzle.user.entity.UserStatus;
 import com.example.jobpuzzle.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,6 +55,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class AdminService {
 
     private final UserRepository userRepository;
@@ -138,40 +145,71 @@ public class AdminService {
         return AdminGuideResponse.from(guide, chunkCount);
     }
 
-    // 가이드 등록 - file은 sourceType=PDF일 때만 사용
+    /**
+     * 새 가이드 계보의 첫 DRAFT를 생성한다.
+     * 버전은 서버가 v1.0으로 고정하고, 적용 범위와 관계없는 요청 필드는 저장 전에 제거한다.
+     */
     public AdminGuideResponse createGuide(AdminGuideCreateRequest request, MultipartFile file, User admin) {
+        requireAdmin(admin);
         if (request.getGuideCode() == null || request.getGuideCode().isBlank()) {
             throw new CustomException(ErrorCode.INVALID_REQUEST, "가이드 코드를 입력해주세요.");
         }
-        String version = "v1.0";
-        if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(request.getGuideCode(), version)) {
-            throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
+        if (jobGuideDocumentRepository.existsByGuideCode(request.getGuideCode().trim())) {
+            throw new CustomException(ErrorCode.GUIDE_CODE_DUPLICATED);
         }
-        JobGuideDocument guide = buildGuideAndChunks(request, file, admin, request.getGuideCode(), version, null);
+        String version = "v1.0";
+        GuideScopeType scopeType = request.getScopeType();
+        JobGuideDocument guide = buildGuideAndChunks(
+                request, file, admin, request.getGuideCode().trim(), version, null,
+                scopeType,
+                scopeType == GuideScopeType.CATEGORY ? request.getJobCategoryId() : null,
+                scopeType == GuideScopeType.PARENT_CATEGORY ? request.getScopeMainCategory() : null);
+        log.info("관리자 가이드 등록 guideId={} guideCode={} version={} sourceType={}",
+                guide.getGuideId(), guide.getGuideCode(), guide.getVersion(), guide.getSourceType());
         return toResponse(guide);
     }
 
-    // 가이드 새 버전 생성 - guideCode는 이전 버전에서 상속하고 버전만 자동 증가
+    /**
+     * 최신 가이드에서만 다음 DRAFT 버전을 생성한다.
+     *
+     * <p>비관적 잠금과 후속 버전 존재 검사를 함께 사용해 동시 요청에 의한 계보 분기를 막는다.
+     * 가이드 코드와 적용 범위는 이전 버전에서 강제 상속해 같은 계보의 검색 범위가 바뀌지 않게 한다.</p>
+     */
     public AdminGuideResponse createGuideVersion(Long guideId, AdminGuideCreateRequest request, MultipartFile file, User admin) {
-        JobGuideDocument previous = jobGuideDocumentRepository.findById(guideId)
+        requireAdmin(admin);
+        JobGuideDocument previous = jobGuideDocumentRepository.findWithLockByGuideId(guideId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
+        if (jobGuideDocumentRepository.existsByPreviousGuide_GuideId(previous.getGuideId())) {
+            throw new CustomException(ErrorCode.GUIDE_NOT_LATEST_VERSION);
+        }
 
         String nextVersion = bumpVersion(previous.getVersion());
         if (jobGuideDocumentRepository.existsByGuideCodeAndVersion(previous.getGuideCode(), nextVersion)) {
-            throw new CustomException(ErrorCode.GUIDE_CODE_VERSION_DUPLICATE);
+            throw new CustomException(ErrorCode.GUIDE_VERSION_DUPLICATED);
         }
 
-        JobGuideDocument guide = buildGuideAndChunks(request, file, admin, previous.getGuideCode(), nextVersion, previous);
+        JobGuideDocument guide = buildGuideAndChunks(
+                request, file, admin, previous.getGuideCode(), nextVersion, previous,
+                previous.getScopeType(),
+                previous.getJobCategory() == null ? null : previous.getJobCategory().getJobCategoryId(),
+                previous.getScopeMainCategory());
+        log.info("관리자 가이드 새 버전 생성 guideId={} previousGuideId={} guideCode={} version={}",
+                guide.getGuideId(), previous.getGuideId(), guide.getGuideCode(), guide.getVersion());
         return toResponse(guide);
     }
 
-    // 가이드 저장 + (원문이 있으면) 텍스트 추출과 청크 분할까지 한 트랜잭션으로 처리
+    /**
+     * 가이드 문서와 검색에 사용할 원문 청크를 같은 트랜잭션에서 저장한다.
+     * 저장된 청크는 관리자 검수 후 그대로 임베딩·벡터 색인된다.
+     */
     private JobGuideDocument buildGuideAndChunks(
             AdminGuideCreateRequest request, MultipartFile file, User admin,
-            String guideCode, String version, JobGuideDocument previousGuide
+            String guideCode, String version, JobGuideDocument previousGuide,
+            GuideScopeType scopeType,
+            Long jobCategoryId, String scopeMainCategory
     ) {
-        JobCategory jobCategory = request.getJobCategoryId() != null
-                ? jobCategoryRepository.findById(request.getJobCategoryId())
+        JobCategory jobCategory = jobCategoryId != null
+                ? jobCategoryRepository.findById(jobCategoryId)
                         .orElseThrow(() -> new CustomException(ErrorCode.JOB_CATEGORY_NOT_FOUND))
                 : null;
 
@@ -180,15 +218,16 @@ public class AdminService {
         JobGuideDocument guide = JobGuideDocument.builder()
                 .guideCode(guideCode)
                 .previousGuide(previousGuide)
-                .scopeType(request.getScopeType())
+                .scopeType(scopeType)
                 .jobCategory(jobCategory)
-                .scopeMainCategory(request.getScopeMainCategory())
+                .scopeMainCategory(scopeMainCategory)
                 .title(request.getTitle())
                 .sourceType(request.getSourceType())
                 .filePath(source.filePath())
                 .version(version)
                 .createdBy(admin)
-                .applicableScope(request.getApplicableScope())
+                // 추가 지침은 선택값이지만 기존 DB NOT NULL 계약을 유지하기 위해 빈 문자열로 저장한다.
+                .applicableScope(request.getApplicableScope() == null ? "" : request.getApplicableScope().trim())
                 .evaluationFocus(request.getEvaluationFocus())
                 .evidenceRules(request.getEvidenceRules())
                 .questionDirection(request.getQuestionDirection())
@@ -200,15 +239,32 @@ public class AdminService {
         return guide;
     }
 
+    /** 컨트롤러 보안 설정과 별개로 서비스 진입점에서도 관리자 권한을 검증한다. */
+    private void requireAdmin(User admin) {
+        if (admin == null || admin.getRole() != UserRole.ADMIN) {
+            throw new AccessDeniedException("관리자만 가이드를 관리할 수 있습니다.");
+        }
+    }
+
     // PDF면 파일을 저장하고 그 자리에서 텍스트를 추출, 직접입력이면 입력받은 원문을 그대로 사용
     private GuideSourceMaterial resolveSourceMaterial(AdminGuideCreateRequest request, MultipartFile file) {
-        if (request.getSourceType() == JobGuideDocumentSourceType.PDF && file != null && !file.isEmpty()) {
+        if (request.getSourceType() == JobGuideDocumentSourceType.PDF) {
+            if (file == null || file.isEmpty()) {
+                throw new CustomException(ErrorCode.GUIDE_SOURCE_REQUIRED);
+            }
             byte[] bytes = readBytes(file);
-            String filePath = storeGuideFile(bytes, file.getOriginalFilename());
             String extractedText = extractPdfText(bytes);
+            if (extractedText.isBlank()) {
+                throw new CustomException(ErrorCode.GUIDE_SOURCE_REQUIRED);
+            }
+            // 추출 검증 후에만 파일을 저장해 실패한 등록이 고아 파일을 남기지 않도록 한다.
+            String filePath = storeGuideFile(bytes, file.getOriginalFilename());
             return new GuideSourceMaterial(filePath, extractedText);
         }
-        return new GuideSourceMaterial(null, request.getSourceText());
+        if (request.getSourceText() == null || request.getSourceText().isBlank()) {
+            throw new CustomException(ErrorCode.GUIDE_SOURCE_REQUIRED);
+        }
+        return new GuideSourceMaterial(null, request.getSourceText().trim());
     }
 
     private void saveChunks(JobGuideDocument guide, String text) {
@@ -259,49 +315,15 @@ public class AdminService {
         return "v" + major + "." + (minor + 1);
     }
 
-    // 가이드 활성화 - 같은 범위에 이미 활성화된 가이드가 있으면 force=true일 때만 그 가이드를 비활성화하고 진행
-    public AdminGuideResponse activateGuide(Long guideId, boolean force) {
-        JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
-                .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
-
-        List<JobGuideDocument> conflicts = findActiveConflicts(guide);
-        if (!conflicts.isEmpty() && !force) {
-            JobGuideDocument conflict = conflicts.get(0);
-            throw new CustomException(ErrorCode.GUIDE_ACTIVE_DUPLICATED,
-                    "이미 활성화된 가이드가 있습니다: [" + conflict.getGuideCode() + " " + conflict.getVersion() + "] "
-                            + conflict.getTitle() + ". 계속하면 이 가이드는 비활성화되고 지금 가이드가 새로 활성화됩니다.");
-        }
-
-        conflicts.forEach(JobGuideDocument::deactivate);
-        guide.activate();
-        return toResponse(guide);
-    }
-
-    // 가이드 비활성화
-    public AdminGuideResponse deactivateGuide(Long guideId) {
+    /** 현재 활성 가이드를 분석 대상에서 제외하며 서비스 진입점에서도 관리자 권한을 검증한다. */
+    public AdminGuideResponse deactivateGuide(Long guideId, User admin) {
+        requireAdmin(admin);
         JobGuideDocument guide = jobGuideDocumentRepository.findById(guideId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GUIDE_NOT_FOUND));
         guide.deactivate();
+        log.info("관리자 가이드 비활성화 guideId={} guideCode={} version={}",
+                guideId, guide.getGuideCode(), guide.getVersion());
         return toResponse(guide);
-    }
-
-    // 같은 검색 범위(scope)에서 이 가이드를 제외하고 이미 ACTIVE인 가이드를 찾는다
-    private List<JobGuideDocument> findActiveConflicts(JobGuideDocument guide) {
-        List<JobGuideDocument> found = switch (guide.getScopeType()) {
-            case CATEGORY -> jobGuideDocumentRepository
-                    .findByScopeTypeAndJobCategory_MainCategoryAndJobCategory_SubCategoryAndJobCategory_CareerLevelAndStatus(
-                            guide.getScopeType(),
-                            guide.getJobCategory().getMainCategory(),
-                            guide.getJobCategory().getSubCategory(),
-                            guide.getJobCategory().getCareerLevel(),
-                            JobGuideDocumentStatus.ACTIVE
-                    );
-            case PARENT_CATEGORY -> jobGuideDocumentRepository.findByScopeTypeAndScopeMainCategoryAndStatus(
-                    guide.getScopeType(), guide.getScopeMainCategory(), JobGuideDocumentStatus.ACTIVE);
-            case GLOBAL_COMMON -> jobGuideDocumentRepository.findByScopeTypeAndStatus(
-                    guide.getScopeType(), JobGuideDocumentStatus.ACTIVE);
-        };
-        return found.stream().filter(g -> !g.getGuideId().equals(guide.getGuideId())).toList();
     }
 
     private String storeGuideFile(byte[] bytes, String originalFileName) {
@@ -346,10 +368,17 @@ public class AdminService {
         return PageResponse.from(response);
     }
 
-    // AI 분석 오류 로그 조회 - status가 없으면 전체 상태
-    public PageResponse<AdminAiCallLogResponse> getAiErrorLogs(AiCallLogStatus status, Pageable pageable) {
-        Page<AdminAiCallLogResponse> response = aiCallLogRepository.search(status, pageable)
+    // AI 분석 오류 로그 조회 - status·stage가 없으면 전체
+    public PageResponse<AdminAiCallLogResponse> getAiErrorLogs(AiCallLogStatus status, AiExecutionStage stage, Pageable pageable) {
+        Page<AdminAiCallLogResponse> response = aiCallLogRepository.search(status, stage, pageable)
                 .map(AdminAiCallLogResponse::from);
         return PageResponse.from(response);
+    }
+
+    // AI 분석 오류 로그 단건 조회
+    public AdminAiCallLogDetailResponse getAiErrorLog(Long aiCallLogId) {
+        AiCallLog log = aiCallLogRepository.findById(aiCallLogId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AI_CALL_LOG_NOT_FOUND));
+        return AdminAiCallLogDetailResponse.from(log);
     }
 }

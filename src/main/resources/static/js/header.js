@@ -2,30 +2,38 @@
 (function () {
     'use strict';
 
+    // 메뉴와 트리거뿐 아니라 헤더의 레이어 상태도 함께 갱신해 아래 페이지 버튼으로 클릭이 통과하지 않게 한다.
+    function setMenuState(trigger, menu, open) {
+        menu.hidden = !open;
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        var header = trigger.closest('[data-dynamic-header]');
+        if (header) header.classList.toggle('has-open-user-menu', open);
+    }
+
     function closeMenus(except) {
         document.querySelectorAll('[data-user-menu-trigger]').forEach(function (trigger) {
             var menu = document.getElementById(trigger.getAttribute('data-user-menu-trigger'));
             if (!menu || menu === except) return;
-            menu.hidden = true;
-            trigger.setAttribute('aria-expanded', 'false');
+            setMenuState(trigger, menu, false);
         });
     }
 
+    // 각 사용자 칩에 메뉴 토글을 직접 연결하고 실제 바깥 포인터 입력에서만 메뉴를 닫는다.
     function initMenus() {
-        document.addEventListener('click', function (event) {
-            var trigger = event.target.closest('[data-user-menu-trigger]');
-            if (trigger) {
+        document.querySelectorAll('[data-user-menu-trigger]').forEach(function (trigger) {
+            trigger.addEventListener('click', function (event) {
                 var menu = document.getElementById(trigger.getAttribute('data-user-menu-trigger'));
                 if (!menu) return;
                 event.preventDefault();
                 event.stopPropagation();
                 var opening = menu.hidden;
                 closeMenus(menu);
-                menu.hidden = !opening;
-                trigger.setAttribute('aria-expanded', opening ? 'true' : 'false');
-                return;
-            }
-            if (!event.target.closest('.user-menu')) closeMenus(null);
+                setMenuState(trigger, menu, opening);
+            });
+        });
+        document.addEventListener('pointerdown', function (event) {
+            if (event.target.closest('[data-user-menu-trigger], .user-menu')) return;
+            closeMenus(null);
         });
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') closeMenus(null);
@@ -78,7 +86,7 @@
         nameEl.textContent = (user.name || user.loginId) + '님';
         avatarEl.textContent = (user.name || user.loginId).charAt(0);
 
-        var adminLink = document.getElementById('app-admin-link');
+        var adminLink = document.getElementById('app-admin-nav-link');
         if (adminLink) {
             adminLink.hidden = user.role !== 'ADMIN';
         }
@@ -124,7 +132,7 @@
             var avatarEl = document.getElementById('user-avatar');
             if (nameEl) nameEl.textContent = name + '님';
             if (avatarEl) avatarEl.textContent = name.charAt(0);
-            var adminLink = document.getElementById('admin-link');
+            var adminLink = document.getElementById('admin-nav-link');
             if (adminLink) adminLink.hidden = user.role !== 'ADMIN';
         } else {
             if (authGuest) authGuest.hidden = false;

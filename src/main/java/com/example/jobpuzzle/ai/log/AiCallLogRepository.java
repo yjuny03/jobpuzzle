@@ -42,7 +42,8 @@ public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
     Optional<AiCallLog> findFirstByInputReferenceTypeAndInputReferenceIdOrderByAiCallLogIdDesc(
             AiInputReferenceType inputReferenceType, String inputReferenceId);
 
-    // 관리자 AI 오류 로그 조회 - status가 없으면 전체
-    @Query("SELECT l FROM AiCallLog l WHERE :status IS NULL OR l.status = :status")
-    Page<AiCallLog> search(@Param("status") AiCallLogStatus status, Pageable pageable);
+    // 관리자 AI 오류 로그 조회 - status·stage가 없으면 전체
+    @Query("SELECT l FROM AiCallLog l WHERE (:status IS NULL OR l.status = :status) "
+            + "AND (:stage IS NULL OR l.executionStage = :stage)")
+    Page<AiCallLog> search(@Param("status") AiCallLogStatus status, @Param("stage") AiExecutionStage stage, Pageable pageable);
 }

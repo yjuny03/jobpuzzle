@@ -28,6 +28,11 @@ public class AdminViewController {
         return "admin/ai-logs";
     }
 
+    @GetMapping("/admin/ai-logs/{aiCallLogId}")
+    public String aiLogDetail(@PathVariable Long aiCallLogId) {
+        return "admin/ai-log-detail";
+    }
+
     @GetMapping("/admin/guides")
     public String guides() {
         return "admin/guides";

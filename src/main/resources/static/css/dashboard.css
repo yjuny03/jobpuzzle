@@ -194,6 +194,15 @@
   flex-direction: column;
   gap: 8px;
 }
+
+.task-list__all {
+  display: inline-flex;
+  margin-top: 12px;
+  color: #176d79;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
 .task-row {
   display: flex;
   align-items: center;
@@ -630,8 +639,11 @@
 .jp-dashboard-theme .todo-row:hover,
 .jp-dashboard-theme .session-row:hover,
 .jp-dashboard-theme .task-row:hover {
-  border-color: var(--dash-blue);
-  background: var(--dash-paper-blue);
+  border-color: #B69362;
+  background: #EFE7D7;
+  box-shadow:
+    inset 6px 0 #B69362,
+    3px 4px 0 rgba(81, 64, 42, .12);
 }
 
 .jp-dashboard-theme .todo-row__icon {
@@ -722,6 +734,106 @@
   box-shadow: var(--dash-shadow-small);
 }
 
+.jp-dashboard-theme .task-row {
+  min-height: 82px;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, .1);
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.jp-dashboard-theme .task-row:hover {
+  transform: translateY(-1px);
+}
+
+.jp-dashboard-theme .task-row__title {
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.jp-dashboard-theme .task-row__due {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.jp-dashboard-theme .task-status {
+  border: 2px solid;
+  padding: 7px 10px;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, .12);
+  font-weight: 900;
+}
+
+.jp-dashboard-theme .task-status--done {
+  border-color: #5B8F78;
+  background: #D6E9DF;
+  color: #245F4B;
+}
+
+.jp-dashboard-theme .task-status--overdue,
+.jp-dashboard-theme .task-status--today {
+  border-color: #C98F8A;
+  background: #F0DEDB;
+  color: #A72F35;
+}
+
+.jp-dashboard-theme .task-status--soon {
+  border-color: #CDA65C;
+  background: #F7E9B8;
+  color: #805B00;
+}
+
+.jp-dashboard-theme .task-status--upcoming {
+  border-color: #789BB2;
+  background: #DCE8EF;
+  color: #285A7A;
+}
+
+.jp-dashboard-theme .task-status--none {
+  border-color: #9AA6AD;
+  background: #E4E8EA;
+  color: #5F6E78;
+}
+
+.jp-dashboard-theme .task-row .btn-sm,
+.jp-dashboard-theme .task-row .btn-save-due {
+  min-height: 36px;
+  border: 2px solid var(--dash-line-soft);
+  border-radius: 8px;
+  background: var(--dash-paper);
+  color: var(--dash-text-secondary);
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, .1);
+  font-weight: 800;
+}
+
+.jp-dashboard-theme .task-row .btn-sm:hover,
+.jp-dashboard-theme .task-row .btn-save-due:hover {
+  border-color: #285A7A;
+  background: #C9DEED;
+  color: #173E59;
+  box-shadow:
+    2px 3px 0 rgba(40, 90, 122, .2),
+    inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
+.jp-dashboard-theme .task-row .btn-complete {
+  min-height: 36px;
+  font-weight: 850;
+}
+
+.jp-dashboard-theme .task-row .btn-complete:hover {
+  background: #2F6D5C;
+}
+
+.jp-dashboard-theme .task-list__all {
+  width: fit-content;
+  border: 2px solid var(--dash-line);
+  border-radius: 9px;
+  background: var(--dash-blue);
+  color: #fff;
+  padding: 9px 12px;
+  box-shadow: var(--dash-shadow-small);
+}
+
 .jp-dashboard-theme .task-date-input {
   border: 2px solid var(--dash-line-soft);
   background: var(--dash-paper);
@@ -770,6 +882,131 @@
   background: var(--dash-paper);
   color: var(--dash-ink);
   box-shadow: var(--dash-shadow);
+}
+
+.jp-dashboard-theme .dashboard-task-modal {
+  width: min(520px, calc(100% - 30px));
+  max-width: 520px;
+  border-radius: 18px;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(201, 222, 237, .34), transparent 30%),
+    var(--dash-paper);
+}
+
+.jp-dashboard-theme .dashboard-task-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__title {
+  margin: 0;
+  color: var(--dash-ink);
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__status {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__due {
+  width: fit-content;
+  margin: 0 0 15px;
+  border: 2px solid var(--dash-line-soft);
+  border-radius: 8px;
+  background: #F4F0E6;
+  color: var(--dash-text-secondary);
+  padding: 7px 10px;
+  box-shadow: 2px 3px 0 rgba(38, 59, 75, .1);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__tag {
+  display: none;
+  max-width: 100%;
+  margin-bottom: 16px;
+  border: 2px solid #CDA65C;
+  border-radius: 11px;
+  background: #F7E9B8;
+  color: #805B00;
+  padding: 8px 11px;
+  box-shadow: 2px 3px 0 rgba(139, 101, 0, .17);
+  white-space: normal;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__description {
+  margin: 0 0 22px;
+  border: 2px solid var(--dash-line-soft);
+  border-radius: 12px;
+  background: #F3F0E7;
+  color: var(--dash-text-secondary);
+  padding: 15px;
+  box-shadow: 3px 4px 0 rgba(38, 59, 75, .1);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.75;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__actions .btn-sm,
+.jp-dashboard-theme .dashboard-task-modal__actions .btn-save-due {
+  min-height: 38px;
+  border: 2px solid #789BB2;
+  border-radius: 9px;
+  background: #DCE8EF;
+  color: #285A7A;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .16);
+  font-weight: 850;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__actions .btn-sm:hover,
+.jp-dashboard-theme .dashboard-task-modal__actions .btn-save-due:hover {
+  border-color: #285A7A;
+  background: #C9DEED;
+  color: #173E59;
+}
+
+.jp-dashboard-theme .dashboard-task-modal__actions .btn-complete {
+  min-height: 38px;
+  border: 2px solid var(--dash-line);
+  background: var(--dash-success);
+  box-shadow: var(--dash-shadow-small);
+  font-weight: 850;
+}
+
+.jp-dashboard-theme .dashboard-modal-close {
+  width: 100%;
+  min-height: 45px;
+  justify-content: center;
+  border: 2px solid #A94C52;
+  border-radius: 10px;
+  background: #D9676D;
+  color: #fff;
+  box-shadow:
+    3px 4px 0 rgba(145, 55, 50, .23),
+    inset 0 1px 0 rgba(255, 255, 255, .28);
+  font-weight: 900;
+}
+
+.jp-dashboard-theme .dashboard-modal-close:hover {
+  border-color: #83343A;
+  background: #B94B52;
+  color: #fff;
 }
 
 .jp-dashboard-theme .site-footer {

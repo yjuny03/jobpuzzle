@@ -46,6 +46,14 @@
     }, { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0, INSUFFICIENT: 0 });
   }
 
+  // 충족도별 연결 강도를 반영해 전체 요구사항 연결 점수를 계산합니다.
+  function calculateConnectionScore(counts, total) {
+    if (!total) return 0;
+    // LOW와 MEDIUM을 완전 충족으로 세지 않아 약한 연결이 점수를 과도하게 높이지 않도록 합니다.
+    var weightedSum = counts.HIGH * 100 + counts.MEDIUM * 50 + counts.LOW * 25;
+    return Math.round(weightedSum / total);
+  }
+
   function categoryText(category) {
     if (!category) return '직무 정보 없음';
     return [category.mainCategory, category.subCategory].filter(Boolean).join(' · ') || '직무 정보 없음';
@@ -106,9 +114,8 @@
     topbar.appendChild(node('span', 'result-date', '분석 #' + result.analysisCaseId + ' · 저장된 결과'));
     root.appendChild(topbar);
 
-    var connected = counts.HIGH + counts.MEDIUM + counts.LOW;
     var total = (result.requirementMatches || []).length;
-    var percent = total ? Math.round(connected / total * 100) : 0;
+    var percent = calculateConnectionScore(counts, total);
     var hero = node('section', 'result-hero');
     var copy = node('div', 'result-hero__copy');
     copy.appendChild(node('p', 'result-eyebrow', 'YOUR JOB FIT REPORT'));
@@ -125,10 +132,7 @@
     puzzle.dataset.resultPuzzle = '';
     puzzle.setAttribute('aria-hidden', 'true');
     hero.appendChild(puzzle);
-    var readinessStatus = result.readiness && result.readiness.status;
-    var scoreTone = readinessStatus === 'SUFFICIENT'
-      ? 'good'
-      : readinessStatus === 'PARTIAL' ? 'medium' : 'low';
+    var scoreTone = percent >= 70 ? 'good' : percent >= 40 ? 'medium' : 'low';
     var scoreWrap = node('div', 'result-score-wrap');
     var score = node('div', 'result-score result-score--' + scoreTone);
     score.style.setProperty('--result-score', percent);
@@ -372,17 +376,31 @@
 
   function renderPlans(result) {
     var plans = result.actionPlans || [];
-    var card = section('우선 보완할 내용', '면접 전에 준비하면 좋은 순서입니다.', plans.length);
-    var list = node('div', 'result-plan-list');
-    plans.slice(0, 4).forEach(function (plan, index) {
-      var item = node('article', 'result-plan');
-      item.appendChild(node('small', null, 'PRIORITY ' + String(index + 1).padStart(2, '0')));
-      item.appendChild(node('strong', null, plan.missingPoint || '보완할 근거'));
-      item.appendChild(node('p', null, plan.suggestion || '관련 경험을 구체적인 사례로 정리해 보세요.'));
+    var card = section('보완 과제', '분석 결과를 바탕으로 추천된 과제입니다. 일정과 완료 상태는 액션플랜에서 관리할 수 있습니다.', plans.length);
+    if (!plans.length) {
+      card.appendChild(node('p', 'result-empty', '이 분석에서 생성된 액션플랜이 없습니다.'));
+      return card;
+    }
+    var list = node('div', 'result-action-plan-list');
+    // 상단 개수와 실제 목록이 어긋나지 않도록 이 분석에서 생성된 과제를 모두 표시한다.
+    plans.forEach(function (plan, index) {
+      var item = node('article', 'result-action-plan');
+      item.appendChild(node('span', 'result-action-plan__number', String(index + 1)));
+      var copy = node('div', 'result-action-plan__copy');
+      copy.appendChild(node('strong', null, plan.suggestion || '보완 과제'));
+      if (plan.matchLevel) {
+        copy.appendChild(node('span',
+          'result-action-plan__level result-action-plan__level--' + String(plan.matchLevel).toLowerCase(),
+          plan.matchLevel));
+      }
+      copy.appendChild(node('p', null, plan.missingPoint || '보완이 필요한 내용을 확인해 주세요.'));
+      item.appendChild(copy);
       list.appendChild(item);
     });
-    if (!plans.length) list.appendChild(node('p', 'result-empty', '현재 등록된 보완 과제가 없습니다.'));
     card.appendChild(list);
+    var allLink = node('a', 'result-action-plan__all', '액션플랜에서 일정 관리하기 →');
+    allLink.href = window.JobPuzzleRoutes.path('/action-plans') + '?analysisCaseId=' + encodeURIComponent(result.analysisCaseId);
+    card.appendChild(allLink);
     return card;
   }
 
@@ -400,17 +418,14 @@
         ? (completed ? '완료된 면접 결과에서 답변과 평가를 다시 확인할 수 있어요.'
           : '분석 결과를 확인한 뒤 진행 중인 면접으로 돌아갈 수 있어요.')
         : '자료를 보완한 뒤 새로운 맞춤 분석을 진행해 보세요.'));
-    var link = node('a', 'result-cta__button',
-      canStart ? '맞춤 면접 시작'
-        : linkedSessionId ? (completed ? '완료한 면접 결과 보기' : '진행 중인 면접으로 돌아가기')
-          : '면접 준비로 이동');
-    link.href = canStart
-      ? window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId))
-      : linkedSessionId
-        ? (completed
-          ? window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(linkedSessionId))
-          : window.JobPuzzleRoutes.path('/interview?resumeSessionId=' + encodeURIComponent(linkedSessionId)))
-        : window.JobPuzzleRoutes.path('/interview');
+    var link = node('a', 'result-cta__button', canStart ? '맞춤 면접 시작'
+      : linkedSessionId ? (completed ? '완료한 면접 결과 보기' : '진행 중인 면접으로 돌아가기')
+        : '면접 준비로 이동');
+    link.href = canStart ? window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId))
+      : linkedSessionId ? (completed
+        ? window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(linkedSessionId))
+        : window.JobPuzzleRoutes.path('/interview?resumeSessionId=' + encodeURIComponent(linkedSessionId)))
+      : window.JobPuzzleRoutes.path('/interview');
     card.appendChild(link);
     return card;
   }
