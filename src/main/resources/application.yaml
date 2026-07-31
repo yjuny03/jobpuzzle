@@ -3,6 +3,8 @@ server:
     context-path: /jobpuzzle
 
 spring:
+#  profiles:
+#    include: local
   application:
     name: jobpuzzle
   datasource:
