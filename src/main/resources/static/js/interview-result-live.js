@@ -438,6 +438,20 @@
       }).join('') + '</div></section>';
   }
 
+  function unevaluatedLabel(question, questionScore) {
+    if (questionScore && questionScore.finalScore != null) {
+      return questionScore.finalScore + '점';
+    }
+    var hasUserAnswer = (question.conversation || []).some(function (message) {
+      return message.sender === 'USER' &&
+        (message.messageType === 'ORIGINAL_ANSWER' ||
+          message.messageType === 'FOLLOW_UP_ANSWER' ||
+          message.messageType === 'REJECTED_ANSWER' ||
+          message.messageType === 'EVALUATION_FAILED_ANSWER');
+    });
+    return hasUserAnswer ? '미평가' : '미응답';
+  }
+
   function renderQuestionDetail(question, questionScore, score) {
     var detail = document.getElementById('q-detail');
     var dimensionScores = questionScore ? questionScore.dimensionScores : {};
@@ -449,7 +463,7 @@
     detail.innerHTML =
       '<div class="question-detail-head"><span>질문 ' + question.displayOrder + '</span>' +
       '<strong class="' + scoreTone(questionScore && questionScore.finalScore || 0) + '">' +
-      (questionScore && questionScore.finalScore != null ? questionScore.finalScore + '점' : '미평가') +
+      unevaluatedLabel(question, questionScore) +
       '</strong></div>' +
       '<h2>' + esc(question.questionText) + '</h2>' +
       '<p class="question-intent">' + esc(question.intent || '질문 의도가 기록되지 않았습니다.') + '</p>' +
@@ -457,7 +471,7 @@
       '<div class="question-score-formula"><div><span>① 답변 분석</span><strong>' +
       answerEvaluationCount + '회</strong></div><i>→</i><div><span>② 핵심 평가 기준</span><strong>' +
       dimensionCount + '개</strong></div><i>→</i><div><span>③ 질문 종합 점수</span><strong>' +
-      (questionScore && questionScore.finalScore != null ? questionScore.finalScore + '점' : '미평가') +
+      unevaluatedLabel(question, questionScore) +
       '</strong></div></div>' +
       '<div class="dimension-list">' +
       dimensionItems(dimensionScores, dimensionCounts) + '</div>' +
@@ -487,7 +501,7 @@
         '" data-question-index="' + index + '"><span class="q-list-item__num">' +
         (index + 1) + '</span><span class="q-list-item__summary">' +
         esc(question.questionText) + '</span><strong>' +
-        (item && item.finalScore != null ? item.finalScore + '점' : '미평가') + '</strong></button>';
+        unevaluatedLabel(question, item) + '</strong></button>';
     }).join('');
     if (questions.length) {
       renderQuestionDetail(questions[0], scoreByQuestion[questions[0].sessionQuestionId], score);

@@ -38,8 +38,23 @@ public class InterviewQuestionGenerationInputMapper {
         );
     }
 
+    public WeaknessQuestionGenerationInput weaknessEvaluations(
+            String targetWeaknessTag,
+            String targetDimension,
+            List<AnswerEvaluation> evaluations
+    ) {
+        return new WeaknessQuestionGenerationInput(
+                targetWeaknessTag,
+                targetDimension,
+                evaluations.stream().map(this::origin).toList()
+        );
+    }
+
     private WeaknessQuestionGenerationInput.OriginEvaluation origin(WeaknessTagLog log) {
-        AnswerEvaluation evaluation = log.getEvaluation();
+        return origin(log.getEvaluation());
+    }
+
+    private WeaknessQuestionGenerationInput.OriginEvaluation origin(AnswerEvaluation evaluation) {
         InterviewSessionQuestion sessionQuestion = evaluation.getSessionQuestion();
         InterviewMessage answerMessage = evaluation.getAnswerMessage();
         String question = sessionQuestion == null

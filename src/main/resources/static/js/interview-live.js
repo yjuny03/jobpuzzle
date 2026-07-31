@@ -28,6 +28,7 @@
   var preparedAnalysisSection;
   var preparedQuestionSets = [];
   var preparedAnalyses = [];
+  var weaknessTagDetails = [];
   var completing = false;
   var speechRecognition = null;
   var speechListening = false;
@@ -53,21 +54,20 @@
   var sectionOrderEditing = false;
   var sectionOrderBeforeEdit = null;
   var draggedSectionSlot = null;
+  var sectionOrderPageAction = null;
 
   function createSectionBoard() {
     if (sectionBoard || analysisCaseId || !root) return;
     sectionBoard = document.createElement('div');
     sectionBoard.className = 'interview-section-board';
     sectionBoard.innerHTML =
-      '<div class="interview-section-order-tools">' +
-      '<button type="button" class="btn btn--outline" data-section-order-edit>섹션 순서 설정</button>' +
       '<div class="interview-section-order-actions" hidden>' +
       '<button type="button" class="btn btn--ghost" data-section-order-reset>초기화</button>' +
       '<button type="button" class="btn btn--ghost" data-section-order-cancel>취소</button>' +
       '<button type="button" class="btn btn--primary" data-section-order-save>순서 저장</button>' +
-      '</div></div><div class="interview-section-slots"></div>';
+      '</div><div class="interview-section-slots"></div>';
     root.insertAdjacentElement('afterend', sectionBoard);
-    sectionBoard.querySelector('[data-section-order-edit]').addEventListener('click', beginSectionOrderEdit);
+    createSectionOrderPageAction();
     sectionBoard.querySelector('[data-section-order-reset]').addEventListener('click', function () {
       sectionOrder = ['ACTIVE_ANALYSIS', 'ACTIVE_INTERVIEW', 'PREPARED_QUESTION', 'REVIEW_INTERVIEW'];
       applySectionOrder();
@@ -112,7 +112,7 @@
   }
 
   function loadSectionOrder() {
-    return api(window.JobPuzzleRoutes.path('/interview-view-preference')).then(function (preference) {
+    return api(window.JobPuzzleRoutes.path('/api/interview-view-preference')).then(function (preference) {
       if (preference && Array.isArray(preference.sectionOrder) && preference.sectionOrder.length === 4) {
         sectionOrder = preference.sectionOrder.slice();
         applySectionOrder();
@@ -121,7 +121,7 @@
   }
 
   function saveSectionOrder(order) {
-    return api(window.JobPuzzleRoutes.path('/interview-view-preference'), {
+    return api(window.JobPuzzleRoutes.path('/api/interview-view-preference'), {
       method: 'PUT',
       json: { sectionOrder: order }
     }).then(function (preference) {
@@ -143,10 +143,13 @@
     sectionOrderEditing = true;
     sectionOrderBeforeEdit = sectionOrder.slice();
     sectionBoard.classList.add('is-order-editing');
-    sectionBoard.querySelector('[data-section-order-edit]').hidden = true;
+    if (sectionOrderPageAction) sectionOrderPageAction.hidden = true;
     sectionBoard.querySelector('.interview-section-order-actions').hidden = false;
     sectionBoard.querySelectorAll('.interview-section-slot').forEach(function (slot) {
       slot.draggable = true;
+    });
+    window.requestAnimationFrame(function () {
+      sectionBoard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -154,11 +157,23 @@
     sectionOrderEditing = false;
     sectionOrderBeforeEdit = null;
     sectionBoard.classList.remove('is-order-editing');
-    sectionBoard.querySelector('[data-section-order-edit]').hidden = false;
+    if (sectionOrderPageAction) sectionOrderPageAction.hidden = false;
     sectionBoard.querySelector('.interview-section-order-actions').hidden = true;
     sectionBoard.querySelectorAll('.interview-section-slot').forEach(function (slot) {
       slot.draggable = false;
     });
+  }
+
+  function createSectionOrderPageAction() {
+    if (sectionOrderPageAction || !root) return;
+    sectionOrderPageAction = document.createElement('div');
+    sectionOrderPageAction.className = 'interview-section-order-page-action';
+    sectionOrderPageAction.innerHTML =
+      '<button type="button" class="btn btn--outline" data-section-order-edit>섹션 순서 설정</button>';
+    var subtitle = document.querySelector('.page-subtitle');
+    if (subtitle) subtitle.insertAdjacentElement('afterend', sectionOrderPageAction);
+    else root.parentNode.insertBefore(sectionOrderPageAction, root);
+    sectionOrderPageAction.querySelector('[data-section-order-edit]').addEventListener('click', beginSectionOrderEdit);
   }
 
   function cancelSectionOrderEdit() {
@@ -234,6 +249,37 @@
     return element.innerHTML;
   }
 
+  function koreanizeEvaluationTerms(value) {
+    var labels = {
+      intentMatch: '질문 의도 이해',
+      specificity: '경험 구체성',
+      ownRole: '본인 역할',
+      problemSolving: '문제 해결 과정',
+      resultExpression: '성과 및 결과 표현',
+      requirementConnection: '공고 요구사항 연결',
+      guideAlignment: '직무 기준 연결',
+      deliveryClarity: '답변 전달력'
+    };
+    var text = value == null ? '' : String(value);
+    Object.keys(labels).forEach(function (key) {
+      text = text.replace(new RegExp(key, 'gi'), labels[key]);
+    });
+    return text;
+  }
+
+  function weaknessOriginHtml(question) {
+    if (!question.originSessionId) return '';
+    var mode = question.originMode === 'WEAKNESS_REVIEW' ? '약점 보완' : '맞춤 면접';
+    var diagnostics = Array.isArray(question.originDiagnostics)
+      ? question.originDiagnostics.map(function (item) {
+          return '<i>' + esc(koreanizeEvaluationTerms(weaknessLabel(item))) + '</i>';
+        }).join('')
+      : '';
+    return '<small class="q-gen-item__origin"><b>질문 출처</b>' +
+      '<span>' + mode + ' · ' + (question.originScore == null ? '미평가' : question.originScore + '점') +
+      '</span>' + diagnostics + '</small>';
+  }
+
   function api(path, options) {
     options = options || {};
     var fetchOptions = {
@@ -269,6 +315,12 @@
 
   function weaknessLabel(tag) {
     var value = String(tag || '').toLowerCase();
+    var compact = value.replace(/[_\-\s]/g, '');
+    if (compact.indexOf('lackofspecificdetail') >= 0) return '구체성 부족';
+    if (compact.indexOf('lackoftechnicaldepth') >= 0) return '기술적 깊이 부족';
+    if (compact.indexOf('insufficientcloudexperience') >= 0) return '클라우드 경험 부족';
+    if (compact.indexOf('vaguerole') >= 0) return '역할 설명 부족';
+    if (compact.indexOf('limitedownership') >= 0) return '주도성 부족';
     if (value.indexOf('requirementconnection') >= 0) return '공고 요구사항 연결 부족';
     if (value.indexOf('specificity') >= 0) return '답변의 구체성 부족';
     if (value.indexOf('ownrole') >= 0) return '본인 역할 설명 부족';
@@ -448,10 +500,13 @@
         '<input type="checkbox" name="question" value="' + question.questionId + '" checked>' +
         '<span class="q-gen-item__num">' + question.displayOrder + '</span>' +
         '<span class="q-gen-item__content"><strong class="q-gen-item__text">' +
-        esc(question.question) + '</strong><small><b>이 질문의 의도</b>' +
-        esc(question.intent || '답변의 구체적인 근거와 본인 역할을 확인합니다.') +
+        esc(question.question) + '</strong><button type="button" class="question-hint-toggle" ' +
+        'aria-expanded="false"><span>질문 힌트 보기</span><span class="question-hint-chevron" aria-hidden="true"></span></button>' +
+        '<span class="question-hint-panel" hidden><small><b>이 질문의 의도</b>' +
+        esc(koreanizeEvaluationTerms(question.intent || '답변의 구체적인 근거와 본인 역할을 확인합니다.')) +
         '</small><small><b>집중 평가 기준</b>' +
-        esc(focusLabels(question.evaluationFocus)) + '</small></span></label>';
+        esc(koreanizeEvaluationTerms(focusLabels(question.evaluationFocus))) + '</small>' +
+        weaknessOriginHtml(question) + '</span></span></label>';
     }).join('');
     if (window.InterviewPage && window.InterviewPage.showModes) window.InterviewPage.showModes();
     if (activeSection) activeSection.hidden = false;
@@ -462,7 +517,10 @@
       '<div class="question-selection-backdrop" data-close-selection></div>' +
       '<section class="question-selection-dialog" role="dialog" aria-modal="true" aria-labelledby="question-selection-title">' +
       '<header><div><span class="question-selection-mode">' + esc(modeLabel(questionSet.mode)) +
-      '</span><h2 id="question-selection-title">연습할 질문을 골라주세요</h2>' +
+      '</span>' + (questionSet.mode === 'WEAKNESS_REVIEW'
+        ? '<span class="question-selection-weakness">#' +
+          esc(questionSet.targetWeaknessDisplayName || weaknessLabel(questionSet.targetWeaknessTag) || '선택한 약점') + '</span>'
+        : '') + '<h2 id="question-selection-title">연습할 질문을 골라주세요</h2>' +
       '<p>선택한 순서가 아니라, 아래 표시 순서대로 면접이 진행됩니다.</p></div>' +
       '<button type="button" class="question-selection-close" data-close-selection aria-label="질문 선택 닫기">×</button></header>' +
       '<div class="q-gen-list">' + rows + '</div>' +
@@ -475,6 +533,17 @@
     selectionModal.querySelectorAll('[data-close-selection]').forEach(function (button) {
       button.addEventListener('click', function () {
         requestCloseSelection();
+      });
+    });
+    if (selectionModal) selectionModal.querySelectorAll('.question-hint-toggle').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var panel = button.parentElement.querySelector('.question-hint-panel');
+        var expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('span').textContent = expanded ? '질문 힌트 보기' : '질문 힌트 숨기기';
+        panel.hidden = expanded;
       });
     });
     document.getElementById('create-live-session').addEventListener('click', createSession);
@@ -593,9 +662,8 @@
     var followUpCount = question.followUpCount || 0;
     var hasAnyAnswer = questions.some(function (item) { return item.answerSubmitted; });
     var actionLabel = hasAnyAnswer ? '선택한 질문 답변 마치기' : '답변 전 세션 취소';
-    var skipQuestionButton = !question.answerSubmitted
-      ? '<button id="skip-current-question" class="btn btn--ghost">이 질문 건너뛰기</button>'
-      : '';
+    var skipQuestionButton =
+      '<button id="skip-current-question" class="btn btn--ghost">이 질문 잠시 미루기</button>';
     var currentResultButton = hasAnyAnswer
       ? '<button id="view-current-result" class="btn btn--outline">현재 결과 확인</button>'
       : '';
@@ -621,7 +689,8 @@
         }).join('') + '</div>'
       : '';
     root.innerHTML = '<div class="card card--pad-lg live-interview-card">' +
-      '<div class="live-question-heading"><span>' + (currentIndex + 1) + ' / ' + questions.length +
+      '<div class="live-question-heading"><span>질문 ' + esc(question.displayOrder || currentIndex + 1) +
+      ' · 선택 질문 ' + (currentIndex + 1) + ' / ' + questions.length +
       '</span><strong>' + esc(modeLabel(session.mode)) + '</strong></div>' +
       '<p class="live-question-label">첫 질문</p>' +
       '<p class="live-original-question">' + esc(question.questionText) + '</p>' +
@@ -638,8 +707,8 @@
       '<p id="voice-input-status" aria-live="polite">버튼을 누르면 한국어 음성을 텍스트로 변환합니다.</p></div>' +
       '<div style="display:flex;justify-content:space-between;margin-top:14px;">' +
       '<div class="live-session-secondary-actions">' +
-      (session.analysisCaseId ? '<a class="btn btn--outline live-analysis-link" href="/analysis-results/' +
-        encodeURIComponent(session.analysisCaseId) + '">분석 결과 보기</a>' : '') +
+      (session.analysisCaseId ? '<a class="btn btn--outline live-analysis-link" href="' +
+        window.JobPuzzleRoutes.path('/analysis-results/' + encodeURIComponent(session.analysisCaseId)) + '">분석 결과 보기</a>' : '') +
       skipQuestionButton +
       currentResultButton +
       '<button id="finish-live-session" class="btn btn--ghost">' + actionLabel + '</button></div>' +
@@ -655,20 +724,27 @@
 
   function skipCurrentQuestion() {
     var question = questions[currentIndex];
-    if (!question || question.answerSubmitted) return;
+    if (!question) return;
     if (!window.confirm(
-      '이 질문을 이번에는 건너뛸까요?\n\n' +
-      '질문은 미응답 상태로 남으며, 면접을 이어서 진행할 때 다시 답변할 수 있습니다.'
+      '이 질문을 잠시 미뤄둘까요?\n\n' +
+      '지금까지의 답변 기록은 유지되고, 리포트를 확정하기 전 다시 이어서 답변할 수 있습니다.'
     )) return;
     stopSpeechInput();
-    for (var i = currentIndex + 1; i < questions.length; i += 1) {
-      if (questions[i].status === 'PENDING' || questions[i].status === 'IN_PROGRESS') {
-        currentIndex = i;
-        renderQuestion();
-        return;
+    api(window.JobPuzzleRoutes.path('/interview-session-questions/' +
+      question.sessionQuestionId + '/defer'), { method: 'POST' }).then(function () {
+      question.status = 'PENDING';
+      for (var offset = 1; offset < questions.length; offset += 1) {
+        var index = (currentIndex + offset) % questions.length;
+        if (questions[index].status === 'PENDING' || questions[index].status === 'IN_PROGRESS') {
+          currentIndex = index;
+          renderQuestion();
+          return;
+        }
       }
-    }
-    renderFinish();
+      renderFinish();
+    }).catch(function (error) {
+      notify('error', error.message);
+    });
   }
 
   function submitAnswer() {
@@ -787,7 +863,7 @@
     var hasAnyAnswer = questions.some(function (item) { return item.answerSubmitted; });
     if (hasAnyAnswer) {
       if (!window.confirm(
-        '선택한 질문 답변을 여기서 마칠까요?\n\n아직 답변하지 않은 선택 질문은 미응답 처리됩니다.'
+        '답변한 질문만 여기서 마칠까요?\n\n아직 답변하지 않은 선택 질문은 미응답 상태로 남아 나중에 다시 진행할 수 있습니다.'
       )) return;
       api(window.JobPuzzleRoutes.path(
         '/interview-sessions/' + session.sessionId + '/questions/finish-selected'
@@ -811,16 +887,18 @@
 
   function viewCurrentResult() {
     if (!session) return;
-    if (!followUpMessageId) {
+    var question = questions[currentIndex];
+    if (!question || !question.answerSubmitted) {
       renderFinish();
       return;
     }
     if (!window.confirm(
-      '현재 꼬리질문이 아직 끝나지 않았습니다.\n\n' +
-      '이 질문은 지금까지의 답변만으로 평가하고 현재 결과를 확인할까요?'
+      (followUpMessageId ? '현재 꼬리질문이 아직 끝나지 않았습니다.\n\n' : '') +
+      '이 질문은 지금까지의 답변만으로 마치고 현재 결과를 확인할까요?\n' +
+      '다른 미응답 질문은 그대로 남습니다.'
     )) return;
     api(window.JobPuzzleRoutes.path('/interview-session-questions/' +
-      questions[currentIndex].sessionQuestionId + '/finish-current'), {
+      question.sessionQuestionId + '/finish-current'), {
       method: 'POST'
     }).then(function () {
       questions[currentIndex].status = 'COMPLETED';
@@ -866,8 +944,8 @@
           '<h3>' + esc(item.questionCount) + '개 질문으로 진행 중</h3>' +
           '<p>' + esc(created) + (item.targetWeaknessTag ? ' · #' + esc(weaknessLabel(item.targetWeaknessTag)) : '') + '</p></div>' +
           '<div class="active-session-actions">' +
-          (item.analysisCaseId ? '<a class="btn btn--outline" href="/analysis-results/' +
-          encodeURIComponent(item.analysisCaseId) + '">분석 결과 보기</a>' : '') +
+          (item.analysisCaseId ? '<a class="btn btn--outline" href="' +
+          window.JobPuzzleRoutes.path('/analysis-results/' + encodeURIComponent(item.analysisCaseId)) + '">분석 결과 보기</a>' : '') +
           '<button class="btn btn--primary" data-resume-session="' +
           item.sessionId + '">이어서 진행</button>' +
           (item.answerSubmitted ? '' : '<button class="btn btn--ghost" data-cancel-session="' +
@@ -936,6 +1014,17 @@
     mountSection('REVIEW_INTERVIEW', reviewSection);
     bindPagination(reviewSection, 'reviewSessions', function () {
       renderReviewReadySessions(items);
+    });
+    selectionModal.querySelectorAll('.question-hint-toggle').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var panel = button.nextElementSibling;
+        var expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('span').textContent = expanded ? '질문 힌트 보기' : '질문 힌트 접기';
+        panel.hidden = expanded;
+      });
     });
   }
 
@@ -1041,6 +1130,59 @@
     });
   }
 
+  function preparedWeaknessHistory(detail) {
+    function date(value) {
+      if (!value) return '';
+      var parsed = new Date(value);
+      return String(parsed.getMonth() + 1).padStart(2, '0') + '.' +
+        String(parsed.getDate()).padStart(2, '0');
+    }
+    function diagnostics(values) {
+      return values && values.length
+        ? '<div class="weak-history-diagnostics"><em>세부 진단</em><div>' +
+          values.map(function (value) {
+            return '<span>' + esc(koreanizeEvaluationTerms(weaknessLabel(value))) + '</span>';
+          }).join('') + '</div></div>'
+        : '';
+    }
+    function report(sessionId, label) {
+      return sessionId
+        ? '<a class="weak-history-report" href="' +
+          window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(sessionId)) +
+          '">' + esc(label) + '</a>'
+        : '';
+    }
+    var occurrences = detail.recentOccurrences || [];
+    return '<div class="weak-pick-history prepared-question-history"><header><span>보완 기록</span>' +
+      '<strong>' + esc(detail.displayName) + ' 보완 이력</strong>' +
+      '<p>면접별 진단과 보완 결과를 한 흐름으로 확인하세요.</p></header>' +
+      '<section class="weak-history-group"><h4>현재 보완이 필요한 면접 <b>' +
+      esc(detail.unresolvedCount || occurrences.length) + '</b></h4>' +
+      occurrences.map(function (occurrence) {
+        var mode = occurrence.mode === 'WEAKNESS_REVIEW' ? '약점 보완' :
+          occurrence.mode === 'BASIC' ? '기본 면접' : '맞춤 면접';
+        var attempts = (occurrence.attempts || []).map(function (attempt) {
+          return '<div class="weak-history-attempt"><div class="weak-history-branch">└</div>' +
+            '<div class="weak-history-content"><div class="weak-history-summary"><b>' +
+            esc(date(attempt.occurredAt)) + '</b><span>약점 보완</span>' +
+            (attempt.score == null ? '' : '<strong>' + esc(attempt.score) + '점</strong>') +
+            '<i class="' + (attempt.status === 'RESOLVED' ? 'is-resolved' : 'is-unresolved') +
+            '">' + (attempt.status === 'RESOLVED' ? '해결' : '미해결') + '</i></div>' +
+            diagnostics(attempt.diagnostics) +
+            report(attempt.sessionId, attempt.resultLabel || '약점 보완 리포트 보기') +
+            '</div></div>';
+        }).join('');
+        return '<article class="weak-history-origin"><div class="weak-history-content">' +
+          '<div class="weak-history-summary"><b>' + esc(date(occurrence.occurredAt)) +
+          '</b><span>' + esc(mode) + '</span>' +
+          (occurrence.score == null ? '' : '<strong>' + esc(occurrence.score) + '점</strong>') +
+          '<i class="is-pending">' + (attempts ? '보완 중' : '보완 전') + '</i></div>' +
+          diagnostics(occurrence.diagnostics) +
+          report(occurrence.sessionId, occurrence.resultLabel || mode + ' 리포트 보기') +
+          '</div>' + attempts + '</article>';
+      }).join('') + '</section></div>';
+  }
+
   function renderPreparedQuestionItems() {
     var items = preparedQuestionSets.map(function (item) {
       return {
@@ -1083,23 +1225,20 @@
             ? item.targetWeaknessDisplayName
             : [item.mainCategory, item.subCategory, item.careerLevel].filter(Boolean).join(' · '));
           var generated = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
-          var recentHistory = isWeakness && item.recentOccurrences.length
-            ? '<div class="prepared-weakness-history"><strong>최근 확인 기록</strong>' +
-            item.recentOccurrences.map(function (occurrence) {
-              var occurredAt = occurrence.occurredAt
-                ? new Date(occurrence.occurredAt).toLocaleString('ko-KR') : '';
-              return '<span>' + esc(occurredAt) +
-                (occurrence.mode ? ' · ' + esc(occurrence.mode) : '') +
-                (occurrence.score == null ? '' : ' · ' + esc(occurrence.score) + '점') +
-                '</span>';
-            }).join('') + '</div>' : '';
+          var detail = weaknessTagDetails.find(function (candidate) {
+            return candidate.tag === item.targetWeaknessTag ||
+              candidate.displayName === item.targetWeaknessDisplayName;
+          });
+          var recentHistory = isWeakness && detail
+            ? preparedWeaknessHistory(detail) : '';
           return '<article class="prepared-analysis-card prepared-analysis-card--' +
             (isWeakness ? 'weakness' : 'basic') + '"><div class="prepared-analysis-check">✓</div>' +
             '<div class="prepared-analysis-copy" tabindex="0"><span>' + mode + '</span><h3>' +
             esc(title) + '</h3><p>' + esc(generated) + ' · 질문 ' +
-            esc(item.questionCount) + '개</p>' + recentHistory + '</div>' +
+            esc(item.questionCount) + '개</p></div>' +
             '<div class="prepared-analysis-actions"><button type="button" class="btn btn--primary" ' +
-            'data-open-question-set="' + item.questionSetId + '">질문 보기</button></div></article>';
+            'data-open-question-set="' + item.questionSetId + '">질문 보기</button></div>' +
+            recentHistory + '</article>';
         }
         var label = [item.mainCategory, item.subCategory].filter(Boolean).join(' · ') || '회사 맞춤 면접';
         var created = item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '';
@@ -1191,8 +1330,12 @@
   }
 
   function loadPreparedQuestionItems() {
-    api(window.JobPuzzleRoutes.path('/question-sets/prepared')).then(function (items) {
-      preparedQuestionSets = items || [];
+    Promise.all([
+      api(window.JobPuzzleRoutes.path('/question-sets/prepared')),
+      api(window.JobPuzzleRoutes.path('/interview-weakness-tags/details')).catch(function () { return []; })
+    ]).then(function (result) {
+      preparedQuestionSets = result[0] || [];
+      weaknessTagDetails = result[1] || [];
       renderPreparedQuestionItems();
     }).catch(function () {});
   }

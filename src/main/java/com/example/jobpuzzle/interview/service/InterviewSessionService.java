@@ -12,6 +12,8 @@ import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
 import com.example.jobpuzzle.evaluation.entity.WeaknessTagResolveStatus;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagLogRepository;
+import com.example.jobpuzzle.evaluation.repository.WeaknessRemediationAttemptRepository;
+import com.example.jobpuzzle.evaluation.service.SessionScoreAggregationService;
 import com.example.jobpuzzle.evaluation.service.WeaknessTagNormalizer;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
@@ -47,7 +49,9 @@ public class InterviewSessionService {
     private final AnswerEvaluationRepository answerEvaluationRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
     private final WeaknessTagLogRepository weaknessTagLogRepository;
+    private final WeaknessRemediationAttemptRepository weaknessRemediationAttemptRepository;
     private final WeaknessTagNormalizer weaknessTagNormalizer;
+    private final SessionScoreAggregationService sessionScoreAggregationService;
 
     @Transactional(readOnly = true)
     public InterviewModeAvailabilityResponse getAvailableModes(Long userId) {
@@ -106,40 +110,185 @@ public class InterviewSessionService {
                         weakness -> weaknessTagNormalizer.canonicalTag(weakness.getTag())
                 ));
         var allLogs = weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(userId);
+        var allAttempts = weaknessRemediationAttemptRepository
+                .findByOriginTagLog_User_UserIdOrderByAttemptIdDesc(userId);
+        Map<Long, com.example.jobpuzzle.evaluation.dto.SessionScoreSummary> scoreCache = new HashMap<>();
         return statuses.entrySet().stream()
                 .map(entry -> {
                     String canonicalTag = entry.getKey();
-                    var logs = allLogs.stream()
+                    var dimensionLogs = allLogs.stream()
                             .filter(log -> weaknessTagNormalizer.sameDimension(log.getTag(), canonicalTag))
+                            .toList();
+                    Map<Long, List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog>> logsBySession =
+                            dimensionLogs.stream()
+                                    .filter(log -> log.getSession() != null)
+                                    .collect(Collectors.groupingBy(
+                                            log -> log.getSession().getSessionId(),
+                                            LinkedHashMap::new,
+                                            Collectors.toList()
+                                    ));
+                    List<WeaknessTagResponse.Occurrence> occurrences = logsBySession.values().stream()
+                            .map(originLogs -> buildWeaknessOccurrence(
+                                    userId, canonicalTag, originLogs, allAttempts, scoreCache))
+                            .filter(occurrence -> occurrence.getScore() == null
+                                    || occurrence.getScore() < 70)
+                            .sorted(Comparator.comparing(
+                                    WeaknessTagResponse.Occurrence::getOccurredAt,
+                                    Comparator.nullsLast(Comparator.reverseOrder())))
                             .limit(10)
                             .toList();
+                    int unresolvedCount = (int) occurrences.stream()
+                            .filter(occurrence -> !"RESOLVED".equals(occurrence.getStatus()))
+                            .count();
                     return WeaknessTagResponse.builder()
                             .tag(canonicalTag)
                             .displayName(weaknessTagNormalizer.displayName(canonicalTag))
                             .description(weaknessTagNormalizer.displayName(canonicalTag)
                                     + "이 반복해서 확인되었습니다. 최근 평가를 바탕으로 집중 연습합니다.")
-                            .occurrenceCount(logs.size())
-                            .recentOccurrences(logs.stream()
-                                    .map(log -> WeaknessTagResponse.Occurrence.builder()
-                                            .sessionId(log.getSession() == null
-                                                    ? null : log.getSession().getSessionId())
-                                            .evaluationId(log.getEvaluation() == null
-                                                    ? null : log.getEvaluation().getEvaluationId())
-                                            .mode(log.getSession() == null || log.getSession().getMode() == null
-                                                    ? null : log.getSession().getMode().name())
-                                            .score(log.getEvaluation() == null
-                                                    ? null : log.getEvaluation().getScore())
-                                            .occurredAt(log.getCreatedAt())
-                                            .build())
-                                    .toList())
+                            .occurrenceCount(occurrences.size())
+                            .unresolvedCount(unresolvedCount)
+                            .recentAttemptCount(occurrences.stream()
+                                    .mapToInt(occurrence -> occurrence.getAttempts().size())
+                                    .sum())
+                            .recentOccurrences(occurrences)
                             .build();
                 })
+                .filter(item -> item.getUnresolvedCount() > 0)
                 .sorted(Comparator.comparing(
                         item -> item.getRecentOccurrences().isEmpty()
                                 ? null : item.getRecentOccurrences().get(0).getOccurredAt(),
                         Comparator.nullsLast(Comparator.reverseOrder())
                 ))
                 .toList();
+    }
+
+    private WeaknessTagResponse.Occurrence buildWeaknessOccurrence(
+            Long userId,
+            String canonicalTag,
+            List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog> originLogs,
+            List<com.example.jobpuzzle.evaluation.entity.WeaknessRemediationAttempt> allAttempts,
+            Map<Long, com.example.jobpuzzle.evaluation.dto.SessionScoreSummary> scoreCache
+    ) {
+        var representative = originLogs.get(0);
+        Set<Long> originLogIds = originLogs.stream()
+                .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getTagLogId)
+                .collect(Collectors.toSet());
+        Map<Long, List<com.example.jobpuzzle.evaluation.entity.WeaknessRemediationAttempt>> attemptsBySession =
+                allAttempts.stream()
+                        .filter(attempt -> originLogIds.contains(attempt.getOriginTagLog().getTagLogId()))
+                        .filter(attempt -> attempt.getSession() != null)
+                        .collect(Collectors.groupingBy(
+                                attempt -> attempt.getSession().getSessionId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+        List<WeaknessTagResponse.Attempt> attempts = attemptsBySession.values().stream()
+                .map(sessionAttempts -> buildWeaknessAttempt(
+                        userId, canonicalTag, sessionAttempts, scoreCache))
+                .sorted(Comparator.comparing(
+                        WeaknessTagResponse.Attempt::getOccurredAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        String status = attempts.isEmpty()
+                ? "PENDING"
+                : attempts.get(attempts.size() - 1).getStatus();
+        Long sessionId = representative.getSession().getSessionId();
+        return WeaknessTagResponse.Occurrence.builder()
+                .sessionId(sessionId)
+                .evaluationId(representative.getEvaluation() == null
+                        ? null : representative.getEvaluation().getEvaluationId())
+                .mode(representative.getSession().getMode() == null
+                        ? null : representative.getSession().getMode().name())
+                .score(dimensionScore(userId, sessionId, canonicalTag, scoreCache,
+                        representative.getEvaluation() == null ? null : representative.getEvaluation().getScore()))
+                .occurredAt(originLogs.stream()
+                        .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getCreatedAt)
+                        .filter(Objects::nonNull)
+                        .min(Comparator.naturalOrder())
+                        .orElse(null))
+                .status(status)
+                .resultLabel(resultLabel(representative.getSession()))
+                .diagnostics(diagnostics(originLogs.stream()
+                        .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getTag)
+                        .toList(), canonicalTag))
+                .attempts(attempts)
+                .build();
+    }
+
+    private WeaknessTagResponse.Attempt buildWeaknessAttempt(
+            Long userId,
+            String canonicalTag,
+            List<com.example.jobpuzzle.evaluation.entity.WeaknessRemediationAttempt> sessionAttempts,
+            Map<Long, com.example.jobpuzzle.evaluation.dto.SessionScoreSummary> scoreCache
+    ) {
+        var representative = sessionAttempts.get(0);
+        Long sessionId = representative.getSession().getSessionId();
+        Integer score = dimensionScore(userId, sessionId, canonicalTag, scoreCache,
+                sessionAttempts.stream()
+                        .map(attempt -> attempt.getEvaluation().getScore())
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .average()
+                        .stream()
+                        .mapToObj(value -> (int) Math.round(value))
+                        .findFirst()
+                        .orElse(null));
+        return WeaknessTagResponse.Attempt.builder()
+                .sessionId(sessionId)
+                .evaluationId(representative.getEvaluation().getEvaluationId())
+                .score(score)
+                .occurredAt(sessionAttempts.stream()
+                        .map(com.example.jobpuzzle.evaluation.entity.WeaknessRemediationAttempt::getCreatedAt)
+                        .filter(Objects::nonNull)
+                        .max(Comparator.naturalOrder())
+                        .orElse(null))
+                .status(score != null && score >= 70 ? "RESOLVED" : "UNRESOLVED")
+                .resultLabel(resultLabel(representative.getSession()))
+                .diagnostics(diagnostics(sessionAttempts.stream()
+                        .flatMap(attempt -> attempt.getEvaluation().getWeaknessTags() == null
+                                ? java.util.stream.Stream.<String>empty()
+                                : attempt.getEvaluation().getWeaknessTags().stream())
+                        .toList(), canonicalTag))
+                .build();
+    }
+
+    private Integer dimensionScore(
+            Long userId,
+            Long sessionId,
+            String canonicalTag,
+            Map<Long, com.example.jobpuzzle.evaluation.dto.SessionScoreSummary> scoreCache,
+            Integer fallback
+    ) {
+        try {
+            var summary = scoreCache.computeIfAbsent(
+                    sessionId,
+                    ignored -> sessionScoreAggregationService.aggregate(userId, sessionId));
+            return summary.getCategoryScores().getOrDefault(
+                    weaknessTagNormalizer.dimension(canonicalTag), fallback);
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private List<String> diagnostics(List<String> rawTags, String canonicalTag) {
+        return rawTags.stream()
+                .filter(tag -> weaknessTagNormalizer.sameDimension(tag, canonicalTag))
+                .map(weaknessTagNormalizer::diagnosticDisplayName)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .limit(4)
+                .toList();
+    }
+
+    private String resultLabel(InterviewSession session) {
+        if (session == null) {
+            return "결과 보기";
+        }
+        String mode = session.getMode() == InterviewSessionMode.WEAKNESS_REVIEW
+                ? "약점 보완" : "맞춤 면접";
+        return session.getStatus() == InterviewSessionStatus.COMPLETED
+                ? mode + " 리포트 보기"
+                : mode + " 중간 결과 보기";
     }
 
     @Transactional(readOnly = true)
@@ -527,10 +676,26 @@ public class InterviewSessionService {
             if (hasOriginalAnswer(question.getSessionQuestionId())) {
                 question.complete();
             } else {
-                question.skip();
+                question.defer();
             }
         });
         return SessionResponse.from(session, questions.size(), hasAnyAnswer(sessionId));
+    }
+
+    public SessionQuestionResponse deferCurrentQuestion(
+            Long userId,
+            Long sessionQuestionId
+    ) {
+        InterviewSessionQuestion question = sessionQuestionRepository
+                .findBySessionQuestionIdAndSession_User_UserId(sessionQuestionId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_QUESTION_NOT_FOUND));
+        validateEditable(question.getSession());
+        if (question.getStatus() == InterviewSessionQuestionStatus.COMPLETED
+                || question.getStatus() == InterviewSessionQuestionStatus.SKIPPED) {
+            throw new CustomException(ErrorCode.SESSION_QUESTION_NOT_FOUND);
+        }
+        question.defer();
+        return toSessionQuestionResponse(question);
     }
 
     public SessionQuestionResponse finishCurrentQuestion(
@@ -557,17 +722,20 @@ public class InterviewSessionService {
                 || session.getTargetDimension() == null) {
             return;
         }
-        long generatedQuestionCount = interviewQuestionRepository
-                .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
-                        session.getQuestionSet().getQuestionSetId())
-                .stream()
-                .filter(question -> question.getReviewStatus() == InterviewQuestionReviewStatus.PASS)
-                .count();
-        if (generatedQuestionCount != sessionQuestions.size()
-                || sessionQuestions.stream().anyMatch(question ->
-                question.getStatus() != InterviewSessionQuestionStatus.COMPLETED)
-                || sessionQuestions.stream().anyMatch(question ->
-                !passesTargetDimension(question, session.getTargetDimension()))) {
+        List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog> origins =
+                weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(
+                                session.getUser().getUserId())
+                        .stream()
+                        .filter(origin -> weaknessTagNormalizer.sameDimension(
+                                origin.getTag(), session.getTargetWeaknessTag()))
+                        .toList();
+        boolean allOriginsResolved = !origins.isEmpty() && origins.stream().allMatch(origin ->
+                weaknessRemediationAttemptRepository
+                        .findFirstByOriginTagLog_TagLogIdOrderByAttemptIdDesc(origin.getTagLogId())
+                        .map(attempt -> attempt.getStatus()
+                                == com.example.jobpuzzle.evaluation.entity.WeaknessRemediationStatus.RESOLVED)
+                        .orElse(false));
+        if (!allOriginsResolved) {
             return;
         }
         weaknessTagStatusRepository

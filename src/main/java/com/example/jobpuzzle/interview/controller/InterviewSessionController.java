@@ -141,6 +141,16 @@ public class InterviewSessionController {
         ));
     }
 
+    @PostMapping("/interview-session-questions/{sessionQuestionId}/defer")
+    public ResponseEntity<ApiResponse<SessionQuestionResponse>> deferCurrentQuestion(
+            @AuthenticationPrincipal(expression = "user") User user,
+            @PathVariable Long sessionQuestionId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                interviewSessionService.deferCurrentQuestion(user.getUserId(), sessionQuestionId)
+        ));
+    }
+
     @GetMapping("/interview-sessions/{sessionId}/questions/remaining")
     public ResponseEntity<ApiResponse<List<RemainingQuestionResponse>>> getRemainingQuestions(
             @AuthenticationPrincipal(expression = "user") User user,

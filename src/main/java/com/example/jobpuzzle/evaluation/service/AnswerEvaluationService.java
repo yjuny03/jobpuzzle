@@ -13,6 +13,7 @@ import com.example.jobpuzzle.ai.validation.AiProcessingException;
 import com.example.jobpuzzle.evaluation.entity.*;
 import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagLogRepository;
+import com.example.jobpuzzle.evaluation.repository.WeaknessRemediationAttemptRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
 import com.example.jobpuzzle.global.error.CustomException;
 import com.example.jobpuzzle.global.error.ErrorCode;
@@ -42,7 +43,9 @@ public class AnswerEvaluationService {
     private final InterviewMessageRepository interviewMessageRepository;
     private final FollowUpQuestionRepository followUpQuestionRepository;
     private final WeaknessTagLogRepository weaknessTagLogRepository;
+    private final WeaknessRemediationAttemptRepository weaknessRemediationAttemptRepository;
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
+    private final WeaknessTagNormalizer weaknessTagNormalizer;
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiCallLogRepository aiCallLogRepository;
     private final AiClientService aiClientService;
@@ -162,6 +165,7 @@ public class AnswerEvaluationService {
                 callLog
         );
         answerEvaluationRepository.save(evaluation);
+        registerWeaknessRemediationAttempt(evaluation);
         registerWeaknessTags(evaluation);
 
         InterviewMessage followUpMessage = createFollowUpIfNeeded(
@@ -284,6 +288,54 @@ public class AnswerEvaluationService {
 
     private int mockScore(String answer) {
         return Math.min(90, 40 + Math.max(0, answer.trim().length() / 4));
+    }
+
+    private void registerWeaknessRemediationAttempt(AnswerEvaluation evaluation) {
+        if (evaluation.getEvaluationMode() != InterviewSessionMode.WEAKNESS_REVIEW
+                || weaknessRemediationAttemptRepository
+                .existsByEvaluation_EvaluationId(evaluation.getEvaluationId())) {
+            return;
+        }
+        InterviewQuestion sourceQuestion = evaluation.getSessionQuestion().getQuestion();
+        if (sourceQuestion == null || sourceQuestion.getOriginEvaluation() == null) {
+            log.warn(
+                    "weakness_remediation_origin_missing evaluationId={} sessionQuestionId={}",
+                    evaluation.getEvaluationId(),
+                    evaluation.getSessionQuestion().getSessionQuestionId()
+            );
+            return;
+        }
+        String targetTag = evaluation.getTargetWeaknessTag();
+        WeaknessTagLog origin = weaknessRemediationAttemptRepository
+                .findByOriginTagLog_User_UserIdOrderByAttemptIdDesc(
+                        evaluation.getSessionQuestion().getSession().getUser().getUserId())
+                .stream()
+                .filter(attempt -> attempt.getEvaluation().getEvaluationId()
+                        .equals(sourceQuestion.getOriginEvaluation().getEvaluationId()))
+                .map(WeaknessRemediationAttempt::getOriginTagLog)
+                .findFirst()
+                .orElseGet(() -> weaknessTagLogRepository
+                .findByUser_UserIdOrderByTagLogIdDesc(
+                        evaluation.getSessionQuestion().getSession().getUser().getUserId())
+                .stream()
+                .filter(logEntry -> logEntry.getEvaluation() != null
+                        && logEntry.getEvaluation().getEvaluationId()
+                        .equals(sourceQuestion.getOriginEvaluation().getEvaluationId()))
+                .filter(logEntry -> weaknessTagNormalizer.sameDimension(logEntry.getTag(), targetTag))
+                .findFirst()
+                .orElse(null));
+        if (origin == null) {
+            log.warn(
+                    "weakness_remediation_tag_log_missing evaluationId={} originEvaluationId={} targetTag={}",
+                    evaluation.getEvaluationId(),
+                    sourceQuestion.getOriginEvaluation().getEvaluationId(),
+                    targetTag
+            );
+            return;
+        }
+        weaknessRemediationAttemptRepository.save(
+                WeaknessRemediationAttempt.create(origin, evaluation)
+        );
     }
 
     private EvaluationPayload mockPayload(

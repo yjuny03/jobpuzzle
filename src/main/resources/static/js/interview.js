@@ -151,26 +151,80 @@
           ? '이전 평가에서 확인된 관점을 집중적으로 보완합니다.'
           : item.description;
         var occurrences = typeof item === 'string' ? [] : (item.recentOccurrences || []);
+        var historyTitle = (displayName || '약점').replace(/\s*부족\s*$/, '') + ' 보완 이력';
+        function historyDate(value) {
+          if (!value) return '';
+          var date = new Date(value);
+          return String(date.getMonth() + 1).padStart(2, '0') + '.' +
+            String(date.getDate()).padStart(2, '0');
+        }
+        function diagnosticChips(values) {
+          if (!values || !values.length) return '';
+          return '<div class="weak-history-diagnostics"><em>세부 진단</em><div>' +
+            values.map(function (value) {
+              return '<span>' + esc(value) + '</span>';
+            }).join('') + '</div></div>';
+        }
+        function historyLink(sessionId, label) {
+          if (!sessionId) return '';
+          return '<a class="weak-history-report" href="' +
+            window.JobPuzzleRoutes.path('/interview-results?sessionId=' +
+              encodeURIComponent(sessionId)) + '">' + esc(label || '결과 보기') + '</a>';
+        }
+        function renderOccurrence(occurrence) {
+          var occurrenceMode = {
+            BASIC: '기본 면접',
+            COMPANY_FIT: '맞춤 면접',
+            WEAKNESS_REVIEW: '약점 보완'
+          }[occurrence.mode] || occurrence.mode || '';
+          var attempts = (occurrence.attempts || []).map(function (attempt) {
+            var attemptStatus = attempt.status === 'RESOLVED' ? '해결' : '미해결';
+            return '<div class="weak-history-attempt"><div class="weak-history-branch">└</div>' +
+              '<div class="weak-history-content"><div class="weak-history-summary"><b>' +
+              esc(historyDate(attempt.occurredAt)) + '</b><span>약점 보완</span>' +
+              (attempt.score == null ? '' : '<strong>' + esc(attempt.score) + '점</strong>') +
+              '<i class="' + (attempt.status === 'RESOLVED' ? 'is-resolved' : 'is-unresolved') +
+              '">' + attemptStatus + '</i></div>' +
+              diagnosticChips(attempt.diagnostics) +
+              historyLink(attempt.sessionId, attempt.resultLabel || '약점 보완 리포트 보기') +
+              '</div></div>';
+          }).join('');
+          return '<article class="weak-history-origin"><div class="weak-history-content">' +
+            '<div class="weak-history-summary"><b>' + esc(historyDate(occurrence.occurredAt)) +
+            '</b><span>' + esc(occurrenceMode) + '</span>' +
+            (occurrence.score == null ? '' : '<strong>' + esc(occurrence.score) + '점</strong>') +
+            '<i class="' + (occurrence.status === 'RESOLVED' ? 'is-resolved' : 'is-pending') +
+            '">' + (occurrence.status === 'RESOLVED' ? '해결' :
+              (occurrence.attempts || []).length ? '보완 중' : '보완 전') + '</i></div>' +
+            diagnosticChips(occurrence.diagnostics) +
+            historyLink(occurrence.sessionId, occurrence.resultLabel || '맞춤 면접 리포트 보기') +
+            '</div>' + attempts + '</article>';
+        }
+        var activeOccurrences = occurrences.filter(function (occurrence) {
+          return occurrence.status !== 'RESOLVED';
+        });
+        var resolvedOccurrences = occurrences.filter(function (occurrence) {
+          return occurrence.status === 'RESOLVED';
+        });
         var history = occurrences.length
-          ? '<div class="weak-pick-history"><strong>최근 확인 기록</strong>' +
-            occurrences.map(function (occurrence) {
-              var occurredAt = occurrence.occurredAt
-                ? new Date(occurrence.occurredAt).toLocaleString('ko-KR')
-                : '';
-              var occurrenceMode = {
-                BASIC: '기본 질문',
-                COMPANY_FIT: '회사 맞춤',
-                WEAKNESS_REVIEW: '약점 보완'
-              }[occurrence.mode] || occurrence.mode || '';
-              return '<span>' + esc(occurredAt) + ' · ' + esc(occurrenceMode) +
-                (occurrence.score == null ? '' : ' · ' + esc(occurrence.score) + '점') + '</span>';
-            }).join('') + '</div>'
+          ? '<div class="weak-pick-history"><header><span>보완 기록</span><strong>' +
+            esc(historyTitle) + '</strong><p>면접별 진단과 보완 결과를 한 흐름으로 확인하세요.</p></header>' +
+            (activeOccurrences.length
+              ? '<section class="weak-history-group"><h4>현재 보완이 필요한 면접 <b>' +
+                activeOccurrences.length + '</b></h4>' +
+                activeOccurrences.map(renderOccurrence).join('') + '</section>' : '') +
+            (resolvedOccurrences.length
+              ? '<section class="weak-history-group weak-history-group--resolved"><h4>최근 해결 이력 <b>' +
+                resolvedOccurrences.length + '</b></h4>' +
+                resolvedOccurrences.map(renderOccurrence).join('') + '</section>' : '') +
+            '</div>'
           : '';
         return '<div class="weak-pick-row" tabindex="0" data-weak-tag="' + esc(tag) + '">' +
           '<div><span class="weak-pick-name">#' + esc(displayName) + '</span><p>' +
           esc(description) + '</p>' + history + '</div>' +
-          '<span class="badge-pill">미해결 · ' + esc((item.occurrenceCount || occurrences.length || 1)) +
-          '회</span></div>';
+          '<span class="badge-pill">보완 필요 ' +
+          esc((item.unresolvedCount || item.occurrenceCount || occurrences.length || 1)) +
+          '건</span></div>';
       }).join('') + '</div></div>';
   }
 
@@ -670,7 +724,8 @@
     });
 
     document.querySelectorAll('[data-weak-tag]').forEach(function (el) {
-      el.addEventListener('click', function () {
+      el.addEventListener('click', function (event) {
+        if (event.target.closest('.weak-pick-history a')) return;
         state.selectedWeaknessTag = el.dataset.weakTag;
         if (window.InterviewLive) window.InterviewLive.startWeakness(state.selectedWeaknessTag);
       });

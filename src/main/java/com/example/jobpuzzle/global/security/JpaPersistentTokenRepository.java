@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.web.authentication.rememberme.PersistentRememberMeToken;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -51,6 +52,7 @@ public class JpaPersistentTokenRepository implements PersistentTokenRepository {
 
     // 로그아웃 시 해당 회원의 자동로그인 토큰 전체 삭제
     @Override
+    @Transactional
     public void removeUserTokens(String username) {
         refreshTokenRepository.deleteByUsername(username);
     }

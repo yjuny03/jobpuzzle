@@ -13,6 +13,8 @@ public class WeaknessTagResponse {
     private String displayName;
     private String description;
     private int occurrenceCount;
+    private int unresolvedCount;
+    private int recentAttemptCount;
     private List<Occurrence> recentOccurrences;
 
     @Getter
@@ -23,5 +25,21 @@ public class WeaknessTagResponse {
         private String mode;
         private Integer score;
         private LocalDateTime occurredAt;
+        private String status;
+        private String resultLabel;
+        private List<String> diagnostics;
+        private List<Attempt> attempts;
+    }
+
+    @Getter
+    @Builder
+    public static class Attempt {
+        private Long sessionId;
+        private Long evaluationId;
+        private Integer score;
+        private LocalDateTime occurredAt;
+        private String status;
+        private String resultLabel;
+        private List<String> diagnostics;
     }
 }

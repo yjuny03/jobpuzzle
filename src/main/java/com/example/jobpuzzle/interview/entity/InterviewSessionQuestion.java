@@ -136,9 +136,18 @@ public class InterviewSessionQuestion extends BaseTimeEntity {
         status = InterviewSessionQuestionStatus.COMPLETED;
     }
 
+    // 최종 종료가 아니라 잠시 미뤄 둔 질문은 다시 선택할 수 있도록 대기 상태로 돌린다.
+    public void defer() {
+        if (status == InterviewSessionQuestionStatus.PENDING
+                || status == InterviewSessionQuestionStatus.IN_PROGRESS) {
+            status = InterviewSessionQuestionStatus.PENDING;
+        }
+    }
+
     // 세션 완료 시 원 질문 답변을 제출하지 않은 질문만 SKIPPED 처리
     public void skip() {
-        if (status == InterviewSessionQuestionStatus.PENDING) {
+        if (status == InterviewSessionQuestionStatus.PENDING
+                || status == InterviewSessionQuestionStatus.IN_PROGRESS) {
             status = InterviewSessionQuestionStatus.SKIPPED;
         }
     }
