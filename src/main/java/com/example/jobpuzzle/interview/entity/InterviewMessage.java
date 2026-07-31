@@ -130,4 +130,20 @@ public class InterviewMessage extends BaseTimeEntity {
             confirmedAt = LocalDateTime.now();
         }
     }
+
+    public void rejectAnswer() {
+        if (sender == InterviewMessageSender.USER
+                && (messageType == InterviewMessageType.ORIGINAL_ANSWER
+                || messageType == InterviewMessageType.FOLLOW_UP_ANSWER)) {
+            messageType = InterviewMessageType.REJECTED_ANSWER;
+        }
+    }
+
+    public void markEvaluationFailed() {
+        if (sender == InterviewMessageSender.USER
+                && (messageType == InterviewMessageType.ORIGINAL_ANSWER
+                || messageType == InterviewMessageType.FOLLOW_UP_ANSWER)) {
+            messageType = InterviewMessageType.EVALUATION_FAILED_ANSWER;
+        }
+    }
 }

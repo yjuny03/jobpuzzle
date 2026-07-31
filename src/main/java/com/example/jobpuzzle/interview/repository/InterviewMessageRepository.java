@@ -38,9 +38,10 @@ public interface InterviewMessageRepository
     );
 
     // 동일 질문 메시지에 이미 사용자 답변이 제출됐는지 확인
-    boolean existsByParentMessage_MessageIdAndSender(
+    boolean existsByParentMessage_MessageIdAndSenderAndMessageTypeIn(
             Long parentMessageId,
-            InterviewMessageSender sender
+            InterviewMessageSender sender,
+            Collection<InterviewMessageType> messageTypes
     );
 
     // 최종 리포트에서 원 답변 메시지를 조회할 때 사용하는 실제 JPA 경로

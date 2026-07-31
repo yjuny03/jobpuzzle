@@ -436,11 +436,31 @@
         });
         card.appendChild(list);
         var actions = el('div', 'report-actions');
-        var interviewLink = el('a', 'btn btn--primary', '질문을 선택하고 면접 시작');
-        interviewLink.href = window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId));
-        interviewLink.style.textDecoration = 'none';
-        actions.appendChild(interviewLink);
-        card.appendChild(actions);
+        if (result.interviewStartAllowed) {
+            var interviewLink = el('a', 'btn btn--primary', '질문을 선택하고 면접 시작');
+            interviewLink.href = window.JobPuzzleRoutes.path(
+                '/interview?analysisCaseId=' + encodeURIComponent(caseId)
+            );
+            interviewLink.style.textDecoration = 'none';
+            actions.appendChild(interviewLink);
+        } else if (result.linkedSessionId) {
+            var destination = result.linkedSessionStatus === 'COMPLETED'
+                ? window.JobPuzzleRoutes.path(
+                    '/interview-results?sessionId=' + encodeURIComponent(result.linkedSessionId)
+                )
+                : window.JobPuzzleRoutes.path(
+                    '/interview?resumeSessionId=' + encodeURIComponent(result.linkedSessionId)
+                );
+            var returnLink = el(
+                'a',
+                'btn btn--secondary',
+                result.linkedSessionStatus === 'COMPLETED' ? '완료한 면접 결과 보기' : '진행 중인 면접으로 돌아가기'
+            );
+            returnLink.href = destination;
+            returnLink.style.textDecoration = 'none';
+            actions.appendChild(returnLink);
+        }
+        if (actions.childNodes.length) card.appendChild(actions);
         return card;
     }
 

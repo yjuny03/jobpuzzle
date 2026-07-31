@@ -133,14 +133,14 @@
     var targets=[[-PIECE_W,PIECE_H/2,0],[0,PIECE_H/2,0],[PIECE_W,PIECE_H/2,0],[-PIECE_W,-PIECE_H/2,0],[0,-PIECE_H/2,0],[PIECE_W,-PIECE_H/2,0]];
     //  조립 전 화면 밖/주변에 흩어진 각 조각의 시작 좌표
     var starts=[[-3.45,2.35,-1.4],[3.2,2.5,-1.8],[3.65,.25,-1.2],[-3.55,-2.15,-1.5],[.1,-2.75,-1.8],[3.4,-2.1,-1.25]];
-    //  각 조각의 RGB 색상: 시안·블루·라벤더·민트·스카이블루·바이올렛
+    //  각 조각의 RGB 색상: 시안·블루·라벤더·민트·바나나·핑크
     var colors = [
         [0.26, 0.78, 0.95], // refined cyan
         [0.31, 0.58, 0.93], // clear blue
         [0.62, 0.54, 0.91], // lavender
         [0.29, 0.77, 0.68], // mint: kept luminous under top lighting
-        [0.34, 0.67, 0.94], // sky blue
-        [0.70, 0.57, 0.93]  // soft violet
+        [1.00, 0.93, 0.55], // pastel banana
+        [0.98, 0.68, 0.84]  // pastel pink
     ];
     //  실제 퍼즐 객체 생성: mesh, 목표/시작 위치, 보간 진행률, 목표 상태, 초기 회전값 보관
     var pieces=targets.map(function(t,i){return{mesh:puzzleMesh(edgeSets[i]),t:t,s:starts[i],p:0,goal:0,spin:[-.6+i*.11,i%2?-.95:.92,i*.22]};});

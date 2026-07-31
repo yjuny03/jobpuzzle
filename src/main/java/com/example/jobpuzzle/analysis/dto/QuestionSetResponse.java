@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -17,11 +18,29 @@ public class QuestionSetResponse {
     private String careerLevel;
     private String generationSource;
     private String targetWeaknessTag;
+    private String targetWeaknessDisplayName;
     private String targetDimension;
     private String status;
     private List<Question> questions;
 
     public static QuestionSetResponse from(QuestionSet set, List<InterviewQuestion> questions) {
+        return from(set, questions, Map.of(), null);
+    }
+
+    public static QuestionSetResponse from(
+            QuestionSet set,
+            List<InterviewQuestion> questions,
+            Map<Long, Integer> originScores
+    ) {
+        return from(set, questions, originScores, null);
+    }
+
+    public static QuestionSetResponse from(
+            QuestionSet set,
+            List<InterviewQuestion> questions,
+            Map<Long, Integer> originScores,
+            String targetWeaknessDisplayName
+    ) {
         return QuestionSetResponse.builder()
                 .questionSetId(set.getQuestionSetId())
                 .mode(set.getInterviewMode().name())
@@ -30,9 +49,12 @@ public class QuestionSetResponse {
                 .careerLevel(set.getCareerLevel().name())
                 .generationSource(set.getGenerationSource().name())
                 .targetWeaknessTag(set.getTargetWeaknessTag())
+                .targetWeaknessDisplayName(targetWeaknessDisplayName)
                 .targetDimension(set.getTargetDimension())
                 .status(set.getStatus().name())
-                .questions(questions.stream().map(Question::from).toList())
+                .questions(questions.stream()
+                        .map(question -> Question.from(question, originScores))
+                        .toList())
                 .build();
     }
 
@@ -45,8 +67,18 @@ public class QuestionSetResponse {
         private String intent;
         private Object evaluationFocus;
         private int displayOrder;
+        private Long originSessionId;
+        private String originMode;
+        private Integer originScore;
+        private Object originDiagnostics;
 
-        private static Question from(InterviewQuestion value) {
+        private static Question from(
+                InterviewQuestion value,
+                Map<Long, Integer> originScores
+        ) {
+            Long originEvaluationId = value.getOriginEvaluation() == null
+                    ? null
+                    : value.getOriginEvaluation().getEvaluationId();
             return Question.builder()
                     .questionId(value.getQuestionId())
                     .questionType(value.getQuestionType().name())
@@ -54,6 +86,20 @@ public class QuestionSetResponse {
                     .intent(value.getIntent())
                     .evaluationFocus(value.getEvaluationFocus())
                     .displayOrder(value.getDisplayOrder())
+                    .originSessionId(value.getOriginEvaluation() == null
+                            ? null
+                            : value.getOriginEvaluation().getSessionQuestion().getSession().getSessionId())
+                    .originMode(value.getOriginEvaluation() == null
+                            ? null
+                            : value.getOriginEvaluation().getEvaluationMode().name())
+                    .originScore(originEvaluationId == null
+                            ? null
+                            : originScores.getOrDefault(
+                                    originEvaluationId,
+                                    value.getOriginEvaluation().getScore()))
+                    .originDiagnostics(value.getOriginEvaluation() == null
+                            ? List.of()
+                            : value.getOriginEvaluation().getWeaknessTags())
                     .build();
         }
     }

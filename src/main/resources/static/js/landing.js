@@ -464,7 +464,9 @@
 
         media.add('(min-width: 761px)', function () {
             var maximumTravel = function () {
-                return Math.max(0, cards[cards.length - 1].offsetLeft);
+                var lastCard = cards[cards.length - 1];
+                var centeredOffset = Math.max(0, (viewport.clientWidth - lastCard.offsetWidth) / 2);
+                return Math.max(0, lastCard.offsetLeft - centeredOffset);
             };
             gsap.set(track, { x: 0, yPercent: -50 });
             gsap.set(progressBar, { scaleX: 1 / cards.length });

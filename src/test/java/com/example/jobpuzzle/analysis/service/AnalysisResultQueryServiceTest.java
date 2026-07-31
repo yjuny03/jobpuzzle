@@ -11,10 +11,16 @@ import com.example.jobpuzzle.guide.repository.GuideContextChunkRepository;
 import com.example.jobpuzzle.guide.repository.GuideContextResultRepository;
 import com.example.jobpuzzle.interview.entity.InterviewQuestion;
 import com.example.jobpuzzle.interview.entity.InterviewQuestionReviewStatus;
+import com.example.jobpuzzle.interview.entity.InterviewQuestionType;
+import com.example.jobpuzzle.interview.entity.InterviewSession;
 import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
+import com.example.jobpuzzle.interview.entity.InterviewSessionStatus;
 import com.example.jobpuzzle.interview.entity.QuestionSet;
 import com.example.jobpuzzle.interview.repository.InterviewQuestionRepository;
+import com.example.jobpuzzle.interview.repository.InterviewSessionRepository;
 import com.example.jobpuzzle.interview.repository.QuestionSetRepository;
+import com.example.jobpuzzle.jobcategory.entity.JobCategory;
+import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +33,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,6 +60,7 @@ class AnalysisResultQueryServiceTest {
     @Mock private ActionPlanRepository actions;
     @Mock private QuestionSetRepository sets;
     @Mock private InterviewQuestionRepository questions;
+    @Mock private InterviewSessionRepository sessions;
     @Mock private CustomizedAnalysisInputMapper mapper;
     @InjectMocks private AnalysisResultQueryService service;
 
@@ -115,17 +124,48 @@ class AnalysisResultQueryServiceTest {
         assertError(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
     }
 
+    @Test
+    void marksAnalysisReadOnlyWhenItsQuestionSetAlreadyHasASession() {
+        prerequisites(true);
+        QuestionSet questionSet = mock(QuestionSet.class);
+        when(questionSet.getQuestionSetId()).thenReturn(50L);
+        when(sets.findBySnapshot_SnapshotIdAndInterviewMode(
+                SNAPSHOT_ID, InterviewSessionMode.COMPANY_FIT
+        )).thenReturn(Optional.of(questionSet));
+        InterviewQuestion question = mock(InterviewQuestion.class);
+        when(question.getReviewStatus()).thenReturn(InterviewQuestionReviewStatus.PASS);
+        when(question.getQuestionType()).thenReturn(InterviewQuestionType.EXPERIENCE);
+        when(questions.findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(50L))
+                .thenReturn(List.of(question));
+        InterviewSession linkedSession = mock(InterviewSession.class);
+        when(linkedSession.getSessionId()).thenReturn(70L);
+        when(linkedSession.getStatus()).thenReturn(InterviewSessionStatus.IN_PROGRESS);
+        when(sessions.findFirstByQuestionSet_QuestionSetIdOrderByCreatedAtDesc(50L))
+                .thenReturn(Optional.of(linkedSession));
+
+        var result = service.getResult(USER_ID, CASE_ID);
+
+        assertThat(result.isInterviewStartAllowed()).isFalse();
+        assertThat(result.getLinkedSessionId()).isEqualTo(70L);
+        assertThat(result.getLinkedSessionStatus()).isEqualTo("IN_PROGRESS");
+    }
+
     private void prerequisites(boolean canGenerateQuestions) {
         // JSON-01·02·04·05 저장 결과를 갖춘 completed case의 최소 무결성 fixture를 만든다.
         completedCase();
         snapshot();
         when(postings.findBySnapshot_SnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(mock(JobPostingAnalysis.class)));
         when(candidates.findBySnapshot_SnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(mock(CandidateMaterialAnalysis.class)));
+        GuideContextResult guide = mock(GuideContextResult.class);
+        JobCategory guideJobCategory = mock(JobCategory.class);
+        lenient().when(guide.getJobCategory()).thenReturn(guideJobCategory);
+        lenient().when(guide.getCareerLevel()).thenReturn(JobCategoryCareerLevel.NEW);
         when(guides.findByPurposeAndInputReferenceTypeAndInputReferenceId(
                 GuideContextPurpose.CUSTOMIZED_SYNTHESIS, GuideContextInputReferenceType.ANALYSIS_SNAPSHOT, String.valueOf(SNAPSHOT_ID)))
-                .thenReturn(Optional.of(mock(GuideContextResult.class)));
+                .thenReturn(Optional.of(guide));
         ReadinessResult result = mock(ReadinessResult.class);
         when(result.isCanGenerateQuestions()).thenReturn(canGenerateQuestions);
+        lenient().when(result.getStatus()).thenReturn(ReadinessResultStatus.SUFFICIENT);
         when(readiness.findBySnapshot_SnapshotId(SNAPSHOT_ID)).thenReturn(Optional.of(result));
         when(matches.findBySnapshot_SnapshotIdOrderByMatchIdAsc(SNAPSHOT_ID)).thenReturn(List.of());
         when(actions.findBySnapshot_SnapshotIdOrderByActionPlanIdAsc(SNAPSHOT_ID)).thenReturn(List.of());
@@ -140,6 +180,9 @@ class AnalysisResultQueryServiceTest {
         // 완료 결과가 참조할 snapshot ID를 repository 조회에 연결한다.
         AnalysisInputSnapshot snapshot = mock(AnalysisInputSnapshot.class);
         when(snapshot.getSnapshotId()).thenReturn(SNAPSHOT_ID);
+        JobCategory jobCategory = mock(JobCategory.class);
+        lenient().when(jobCategory.getCareerLevel()).thenReturn(JobCategoryCareerLevel.NEW);
+        lenient().when(snapshot.getJobCategory()).thenReturn(jobCategory);
         when(snapshots.findByAnalysisCase_AnalysisCaseIdAndUser_UserId(CASE_ID, USER_ID)).thenReturn(Optional.of(snapshot));
     }
 

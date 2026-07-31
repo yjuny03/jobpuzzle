@@ -348,11 +348,125 @@ public class AiResponseProcessor {
     }
 
     public AnswerEvaluationResult parseAnswerEvaluation(String rawJson) {
-        return parse(rawJson, AnswerEvaluationResult.class, "JSON-06");
+        return parse(normalizeAnswerEvaluation(rawJson), AnswerEvaluationResult.class, "JSON-06");
     }
 
     public WeaknessAnswerEvaluationResult parseWeaknessAnswerEvaluation(String rawJson) {
-        return parse(rawJson, WeaknessAnswerEvaluationResult.class, "JSON-10");
+        return parse(normalizeWeaknessAnswerEvaluation(rawJson), WeaknessAnswerEvaluationResult.class, "JSON-10");
+    }
+
+    private String normalizeWeaknessAnswerEvaluation(String rawJson) {
+        try {
+            ObjectNode root = (ObjectNode) strictObjectMapper.readTree(
+                    extractSingleObject(rawJson, "JSON-10")
+            );
+            JsonNode followUp = root.get("followUp");
+            if (followUp != null && followUp.isArray()) {
+                followUp = followUp.isEmpty() ? null : followUp.get(0);
+            }
+            if (followUp == null || followUp.isNull()
+                    || followUp.isTextual() && followUp.asText().isBlank()) {
+                root.putNull("followUp");
+            } else if (followUp.isTextual()) {
+                root.set("followUp", weaknessFollowUp(
+                        root.path("currentFollowUpDepth").asInt(0) + 1,
+                        followUp.asText()
+                ));
+            } else if (followUp instanceof ObjectNode value) {
+                if (!value.hasNonNull("depth")) {
+                    value.put("depth", root.path("currentFollowUpDepth").asInt(0) + 1);
+                }
+                if (!value.hasNonNull("type")) {
+                    value.put("type", "IMPROVEMENT_PLAN");
+                }
+                if (!value.hasNonNull("reason")) {
+                    value.put("reason", "약점 보완 경험을 구체적으로 확인하기 위한 질문");
+                }
+                root.set("followUp", value);
+            }
+            return strictObjectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException | ClassCastException exception) {
+            return rawJson;
+        }
+    }
+
+    private ObjectNode weaknessFollowUp(int depth, String question) {
+        ObjectNode value = strictObjectMapper.createObjectNode();
+        value.put("depth", depth);
+        value.put("question", question);
+        value.put("type", "IMPROVEMENT_PLAN");
+        value.put("reason", "약점 보완 경험을 구체적으로 확인하기 위한 질문");
+        return value;
+    }
+
+    private String normalizeAnswerEvaluation(String rawJson) {
+        try {
+            ObjectNode root = (ObjectNode) strictObjectMapper.readTree(
+                    extractSingleObject(rawJson, "JSON-06")
+            );
+            JsonNode improvement = root.get("improvementDirection");
+            if (improvement != null && improvement.isTextual()) {
+                ArrayNode values = strictObjectMapper.createArrayNode();
+                if (!improvement.asText().isBlank()) {
+                    values.add(improvement.asText());
+                }
+                root.set("improvementDirection", values);
+            } else if (improvement != null && improvement.isObject()) {
+                ArrayNode values = strictObjectMapper.createArrayNode();
+                improvement.elements().forEachRemaining(value -> {
+                    if (value.isTextual() && !value.asText().isBlank()) {
+                        values.add(value.asText());
+                    }
+                });
+                root.set("improvementDirection", values);
+            }
+            JsonNode weaknessTags = root.get("weaknessTags");
+            if (weaknessTags != null && weaknessTags.isTextual()) {
+                ArrayNode values = strictObjectMapper.createArrayNode();
+                if (!weaknessTags.asText().isBlank()) {
+                    values.add(weaknessTags.asText());
+                }
+                root.set("weaknessTags", values);
+            }
+            JsonNode evaluationDetail = root.get("evaluationDetail");
+            if (evaluationDetail instanceof ObjectNode detail) {
+                detail.fieldNames().forEachRemaining(field -> {
+                    JsonNode dimension = detail.get(field);
+                    if (dimension != null && (dimension.isNumber()
+                            || dimension.isTextual() && dimension.asText().matches("\\d{1,3}"))) {
+                        ObjectNode value = strictObjectMapper.createObjectNode();
+                        value.put("score", dimension.asInt());
+                        value.put("comment", "AI가 점수만 반환하여 상세 의견은 생략되었습니다.");
+                        detail.set(field, value);
+                    }
+                });
+            }
+            JsonNode followUp = root.get("followUp");
+            if (followUp != null && followUp.isArray()) {
+                followUp = followUp.isEmpty() ? null : followUp.get(0);
+                if (followUp == null) {
+                    root.putNull("followUp");
+                } else {
+                    root.set("followUp", followUp);
+                }
+            }
+            if (followUp != null && followUp.isTextual()) {
+                if (followUp.asText().isBlank()) {
+                    root.putNull("followUp");
+                } else {
+                    ObjectNode value = strictObjectMapper.createObjectNode();
+                    value.put("depth", root.path("currentFollowUpDepth").asInt(0) + 1);
+                    value.put("question", followUp.asText());
+                    value.putNull("type");
+                    value.putNull("targetWeakness");
+                    value.put("reason", "답변의 구체적인 근거를 추가로 확인하기 위한 질문");
+                    root.set("followUp", value);
+                }
+            }
+            return strictObjectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException | ClassCastException exception) {
+            return rawJson;
+        }
     }
 
     // 응답 전체가 json 코드 블록인 경우만 제거하고 그 밖의 복구는 하지 않는다.

@@ -829,6 +829,89 @@
   padding: 18px 28px 22px;
 }
 
+/* 중간 결과의 남은 질문 선택도 최초 질문 선택 모달과 같은 상세 카드 구조를 사용한다. */
+.remaining-question-dialog.question-selection-dialog {
+  border: 2px solid #1f4966;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #fffdf7 0%, #eef8fc 100%);
+}
+.remaining-question-dialog.question-selection-dialog > header {
+  border-bottom: 1px solid #8cbad6;
+}
+.remaining-question-dialog.question-selection-dialog .question-selection-mode {
+  display: inline-flex;
+  color: #1669a1;
+  font-weight: 800;
+}
+.remaining-question-dialog.question-selection-dialog .question-selection-close {
+  border: 2px solid #cf4545;
+  background: #fff8f7;
+  color: #bd2828;
+  font-weight: 900;
+  line-height: 1;
+}
+.remaining-question-dialog .remaining-question-list.q-gen-list {
+  gap: 12px;
+  border: 2px solid #2b506b;
+  background: rgba(224, 241, 250, .76);
+}
+.remaining-question-dialog .q-gen-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 2px solid #2a7faf;
+  border-radius: 14px;
+  background: #eaf7fe;
+}
+.remaining-question-dialog .q-gen-item input { margin-top: 5px; }
+.remaining-question-dialog .q-gen-item__num {
+  display: grid;
+  place-items: center;
+  min-width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  background: #62659b;
+  color: #fff;
+  font-weight: 800;
+}
+.remaining-question-dialog .q-gen-item__content { min-width: 0; }
+.remaining-question-dialog .q-gen-item__text { display: block; color: #17364c; font-size: 14px; line-height: 1.55; }
+.remaining-question-dialog .question-hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid #7eb4d7;
+  border-radius: 8px;
+  background: #fff;
+  color: #146697;
+  cursor: pointer;
+  font-weight: 800;
+}
+.remaining-question-dialog .question-hint-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+.remaining-question-dialog .question-hint-toggle[aria-expanded="true"] .question-hint-chevron {
+  transform: rotate(225deg) translateY(-2px);
+}
+.remaining-question-dialog .question-hint-panel { display: block; margin-top: 10px; }
+.remaining-question-dialog .question-hint-panel small {
+  display: block;
+  color: #526b7c;
+  font-size: 12px;
+  line-height: 1.55;
+  margin-top: 5px;
+}
+.remaining-question-dialog .question-hint-panel b { color: #176b9b; }
+
 .final-report-panel {
   padding: 26px;
   min-height: 430px;

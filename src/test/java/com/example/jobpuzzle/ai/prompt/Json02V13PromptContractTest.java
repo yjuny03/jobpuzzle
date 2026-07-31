@@ -15,6 +15,7 @@ class Json02V13PromptContractTest {
         String v11 = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.1.txt"));
         String v13 = Files.readString(Path.of("src/main/resources/prompts/before-json-02/json-02-v1.3.txt"));
 
+
         assertThat(normalizeNewlines(removePartitionBoundaryRules(v13)).stripTrailing())
                 .isEqualTo(normalizeNewlines(v11).stripTrailing());
         assertThat(v13)

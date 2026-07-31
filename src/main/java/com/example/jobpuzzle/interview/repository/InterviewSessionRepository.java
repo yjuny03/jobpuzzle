@@ -16,6 +16,11 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
             Long questionSetId,
             Collection<InterviewSessionStatus> statuses
     );
+    boolean existsByQuestionSet_QuestionSetId(Long questionSetId);
+
+    Optional<InterviewSession> findFirstByQuestionSet_QuestionSetIdOrderByCreatedAtDesc(
+            Long questionSetId
+    );
 
     Optional<InterviewSession> findFirstByUser_UserIdAndStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
             Long userId,

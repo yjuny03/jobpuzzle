@@ -3,6 +3,7 @@ package com.example.jobpuzzle.analysis.controller;
 import com.example.jobpuzzle.analysis.dto.BasicQuestionRequest;
 import com.example.jobpuzzle.analysis.dto.QuestionSetResponse;
 import com.example.jobpuzzle.analysis.dto.WeaknessQuestionRequest;
+import com.example.jobpuzzle.analysis.dto.PreparedQuestionSetResponse;
 import com.example.jobpuzzle.analysis.service.QuestionGenerationService;
 import com.example.jobpuzzle.global.common.ApiResponse;
 import com.example.jobpuzzle.user.entity.User;
@@ -59,6 +60,15 @@ public class QuestionSetController {
                         user.getUserId(),
                         questionSetId
                 )
+        ));
+    }
+
+    @GetMapping("/prepared")
+    public ResponseEntity<ApiResponse<List<PreparedQuestionSetResponse>>> getPreparedQuestionSets(
+            @AuthenticationPrincipal(expression = "user") User user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                questionGenerationService.getUnusedGeneratedQuestionSets(user.getUserId())
         ));
     }
 

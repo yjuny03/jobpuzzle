@@ -371,11 +371,6 @@
       list.appendChild(item);
     });
     card.appendChild(list);
-    var actions = node('div', 'result-question-actions');
-    var interviewLink = node('a', 'result-question-actions__button', '질문을 선택하고 면접 시작');
-    interviewLink.href = window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId));
-    actions.appendChild(interviewLink);
-    card.appendChild(actions);
     return card;
   }
 
@@ -409,6 +404,32 @@
     return card;
   }
 
+  function renderCta(result, questionCount) {
+    var card = node('section', 'result-cta');
+    var canStart = questionCount > 0 && result.interviewStartAllowed === true;
+    var linkedSessionId = result.linkedSessionId;
+    var completed = result.linkedSessionStatus === 'COMPLETED';
+    card.appendChild(node('h2', null, canStart
+      ? '분석을 연습으로 연결해 보세요'
+      : linkedSessionId ? '이 분석으로 진행한 면접이 있어요' : '분석 결과를 확인했어요'));
+    card.appendChild(node('p', null, canStart
+      ? '생성된 ' + questionCount + '개 질문으로 맞춤 면접을 시작할 수 있어요.'
+      : linkedSessionId
+        ? (completed ? '완료된 면접 결과에서 답변과 평가를 다시 확인할 수 있어요.'
+          : '분석 결과를 확인한 뒤 진행 중인 면접으로 돌아갈 수 있어요.')
+        : '자료를 보완한 뒤 새로운 맞춤 분석을 진행해 보세요.'));
+    var link = node('a', 'result-cta__button', canStart ? '맞춤 면접 시작'
+      : linkedSessionId ? (completed ? '완료한 면접 결과 보기' : '진행 중인 면접으로 돌아가기')
+        : '면접 준비로 이동');
+    link.href = canStart ? window.JobPuzzleRoutes.path('/interview?analysisCaseId=' + encodeURIComponent(caseId))
+      : linkedSessionId ? (completed
+        ? window.JobPuzzleRoutes.path('/interview-results?sessionId=' + encodeURIComponent(linkedSessionId))
+        : window.JobPuzzleRoutes.path('/interview?resumeSessionId=' + encodeURIComponent(linkedSessionId)))
+      : window.JobPuzzleRoutes.path('/interview');
+    card.appendChild(link);
+    return card;
+  }
+
   function render(result) {
     root.replaceChildren();
     root.setAttribute('aria-busy', 'false');
@@ -421,6 +442,7 @@
     main.appendChild(renderMatches(result));
     main.appendChild(renderQuestions(result));
     main.appendChild(renderPlans(result));
+    main.appendChild(renderCta(result, questions.length));
     layout.appendChild(main);
     root.appendChild(layout);
   }
