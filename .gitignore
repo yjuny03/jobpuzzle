@@ -38,6 +38,7 @@ out/
 
 ### api 관련 ###
 application-local.yaml
+application-prod.yaml
 
 ### 로컬 파일 저장소 ###
 /storage/

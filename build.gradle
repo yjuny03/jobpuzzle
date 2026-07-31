@@ -49,3 +49,8 @@ tasks.named('test') {
     environment 'AI_GENERATION_DEFAULT_PROVIDER', 'mock'
     environment 'RAG_MODE', 'fake'
 }
+
+tasks.named('bootJar') {
+    // 로컬 전용 비밀값이라 배포 아티팩트에는 절대 포함하지 않는다.
+    exclude 'application-local.yaml'
+}
