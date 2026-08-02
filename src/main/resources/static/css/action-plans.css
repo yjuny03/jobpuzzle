@@ -448,67 +448,6 @@
   color: var(--ap-ink);
 }
 
-.jp-action-plans-page .site-header[data-dynamic-header],
-.jp-action-plans-page .site-header[data-dynamic-header].header--light,
-.jp-action-plans-page .site-header[data-dynamic-header].header--light.is-header-compact {
-  top: 12px;
-  width: min(1360px, calc(100% - 36px));
-  height: 76px;
-  margin: 0 auto 12px;
-  padding: 0 clamp(24px, 4vw, 54px);
-  border: 2px solid var(--ap-line);
-  border-radius: 20px;
-  background: linear-gradient(110deg, rgba(201, 222, 237, .36), transparent 34%), var(--ap-paper);
-  box-shadow: var(--ap-shadow);
-  backdrop-filter: none;
-}
-
-.jp-action-plans-page .site-header__nav a {
-  padding: 10px 13px;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  color: var(--ap-ink);
-}
-
-.jp-action-plans-page .site-header__nav a:hover {
-  background: var(--ap-paper-blue);
-  color: var(--ap-blue-deep);
-}
-
-.jp-action-plans-page .site-header__nav a.is-active {
-  border-color: var(--ap-line-soft);
-  background: var(--ap-blue-soft);
-  color: var(--ap-blue-deep);
-}
-
-.jp-action-plans-page .user-chip {
-  border: 3px solid #54758b;
-  background: var(--ap-paper-soft);
-  box-shadow: var(--ap-shadow-small);
-}
-
-.jp-action-plans-page .user-chip:hover,
-.jp-action-plans-page .user-chip:focus-visible,
-.jp-action-plans-page .user-chip[aria-expanded="true"] {
-  border-color: var(--ap-blue-deep);
-  background: var(--ap-paper-blue);
-}
-
-.jp-action-plans-page .user-menu {
-  border: 2px solid var(--ap-line);
-  background: var(--ap-paper);
-  box-shadow: var(--ap-shadow);
-}
-
-.jp-action-plans-page .user-menu__item {
-  color: var(--ap-ink);
-  font-weight: 800;
-}
-
-.jp-action-plans-page .site-scroll-progress {
-  display: none;
-}
-
 .jp-action-plans-page .action-plans-shell {
   width: min(1320px, calc(100% - 40px));
   padding-top: 34px;

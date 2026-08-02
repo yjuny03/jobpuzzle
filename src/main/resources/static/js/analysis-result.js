@@ -10,11 +10,20 @@
     PROBLEM_SOLVING: '문제 해결', COMPANY_FIT: '직무 적합', GENERAL: '일반'
   };
   var readinessLabel = {
-    SUFFICIENT: '지원 근거가 충분히 연결됐어요',
-    PARTIAL: '보완하면 더 강해질 수 있어요',
+    PARTIAL: '일부 분석 기준을 보완해 주세요',
     CANDIDATE_LACK: '지원 경험을 조금 더 보완해 주세요',
     POSTING_LACK: '공고 요구사항을 충분히 확인하기 어려워요',
     GUIDE_LACK: '직무 기준을 충분히 적용하기 어려워요'
+  };
+  var evaluationFocusLabel = {
+    intentMatch: '질문 의도 이해',
+    specificity: '경험 구체성',
+    ownRole: '본인 역할',
+    problemSolving: '문제 해결 과정',
+    resultExpression: '성과 및 결과 표현',
+    requirementConnection: '공고 요구사항 연결',
+    guideAlignment: '직무 기준 적합성',
+    deliveryClarity: '답변 전달력'
   };
 
   function node(tag, className, text) {
@@ -95,15 +104,38 @@
 
   function appendTextLine(parent, label, value) {
     var line = node('p');
-    line.appendChild(node('strong', null, label + ' · '));
+    line.appendChild(node('strong', null, label + ': '));
     line.appendChild(document.createTextNode(value || '확인된 내용이 없습니다.'));
     parent.appendChild(line);
   }
 
+  // API의 평가 기준 식별자를 사용자에게 익숙한 표현으로 바꿉니다.
   function focusText(value) {
-    if (Array.isArray(value)) return value.join(' · ');
-    if (value && typeof value === 'object') return Object.keys(value).map(function (key) { return value[key]; }).join(' · ');
-    return value ? String(value) : '별도 평가 포인트 없음';
+    var values = Array.isArray(value) ? value
+      : value && typeof value === 'object' ? Object.keys(value).map(function (key) { return value[key]; })
+        : value ? [value] : [];
+    if (!values.length) return '질문의 핵심 경험과 답변 내용을 확인합니다.';
+    return values.map(function (focus) {
+      return evaluationFocusLabel[focus] || String(focus);
+    }).join(' · ');
+  }
+
+  // 자료 준비 상태와 실제 요구사항 연결 수준을 구분해 결과 제목을 정합니다.
+  function connectionTitle(result, percent, total) {
+    var readinessStatus = result.readiness && result.readiness.status;
+    if (!total && readinessLabel[readinessStatus]) return readinessLabel[readinessStatus];
+    if (percent >= 70) return '지원 경험이 공고 요구사항과 잘 연결돼 있어요';
+    if (percent >= 40) return '연결된 경험이 있지만 보완할 부분이 있어요';
+    return '지원 경험의 연결 근거를 더 보완해 주세요';
+  }
+
+  // AI의 평가 문장 대신 실제 충족도 개수로 일관된 결과 요약을 제공합니다.
+  function connectionSummary(counts, total) {
+    if (!total) return '채용공고와 지원 자료에서 확인된 연결 근거를 정리했습니다.';
+    var connected = counts.HIGH + counts.MEDIUM;
+    var needsWork = counts.LOW + counts.NONE + counts.INSUFFICIENT;
+    return '전체 요구사항 ' + total + '개 중 ' + connected + '개에서 비교적 분명한 근거를 확인했고, '
+      + needsWork + '개는 연결 근거를 더 보완하면 좋아요. 아래에서 세부 내용과 준비 과제를 확인해 보세요.';
   }
 
   function renderTop(result, counts, questions) {
@@ -119,9 +151,8 @@
     var hero = node('section', 'result-hero');
     var copy = node('div', 'result-hero__copy');
     copy.appendChild(node('p', 'result-eyebrow', 'YOUR JOB FIT REPORT'));
-    copy.appendChild(node('h1', null, readinessLabel[result.readiness && result.readiness.status] || '지원 분석 결과가 준비됐어요'));
-    copy.appendChild(node('p', 'result-hero__reason',
-      result.readiness && result.readiness.reason || '채용공고와 지원 자료에서 확인된 연결 근거를 정리했습니다.'));
+    copy.appendChild(node('h1', null, connectionTitle(result, percent, total)));
+    copy.appendChild(node('p', 'result-hero__reason', connectionSummary(counts, total)));
     var meta = node('div', 'result-hero__meta');
     [categoryText(result.jobCategory), '질문 ' + questions.length + '개']
       .forEach(function (text) { meta.appendChild(node('span', 'result-meta-chip', text)); });
@@ -325,6 +356,7 @@
 
   function renderQuestions(result) {
     var questions = result.questionSet && result.questionSet.questions || [];
+    var matches = result.requirementMatches || [];
     var card = section('예상 면접 질문', '분석 근거를 바탕으로 실제 면접에서 확인할 가능성이 높은 질문입니다.', questions.length);
     if (!questions.length) {
       card.appendChild(node('p', 'result-empty', '현재 자료에서는 생성된 질문이 없습니다.'));
@@ -361,10 +393,13 @@
       var details = node('details');
       details.appendChild(node('summary', null, '질문 의도와 평가 포인트'));
       var detail = node('div', 'result-question__detail');
-      appendTextLine(detail, '질문 의도', question.intent || '지원자의 경험을 구체적으로 확인합니다.');
+      appendTextLine(detail, '이 질문에서 확인하는 내용', question.intent || '지원자의 경험을 구체적으로 확인합니다.');
       appendTextLine(detail, '평가 포인트', focusText(question.evaluationFocus));
       if (question.relatedRequirementId) {
-        appendTextLine(detail, '관련 요구사항', question.relatedRequirementId);
+        var relatedMatch = matches.find(function (match) {
+          return match.requirementId === question.relatedRequirementId;
+        });
+        appendTextLine(detail, '관련 요구사항', relatedMatch && relatedMatch.requirement || '공고의 관련 요구사항');
       }
       details.appendChild(detail);
       item.appendChild(details);
