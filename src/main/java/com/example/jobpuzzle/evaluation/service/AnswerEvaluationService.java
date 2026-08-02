@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -160,6 +161,7 @@ public class AnswerEvaluationService {
                 session.getTargetWeaknessTag(),
                 session.getTargetDimension(),
                 payload.weaknessTags(),
+                payload.weaknessDiagnostics(),
                 payload.summary(),
                 payload.improvementDirection(),
                 callLog
@@ -252,7 +254,7 @@ public class AnswerEvaluationService {
         if (evaluation.getEvaluationMode() != InterviewSessionMode.COMPANY_FIT) {
             return;
         }
-        for (String tag : evaluation.getWeaknessTags()) {
+        for (String tag : failedDimensionTags(evaluation)) {
             if (weaknessTagLogRepository.existsByEvaluation_EvaluationIdAndTag(
                     evaluation.getEvaluationId(),
                     tag
@@ -288,6 +290,26 @@ public class AnswerEvaluationService {
 
     private int mockScore(String answer) {
         return Math.min(90, 40 + Math.max(0, answer.trim().length() / 4));
+    }
+
+    private List<String> failedDimensionTags(AnswerEvaluation evaluation) {
+        return evaluation.getEvaluationDetail().entrySet().stream()
+                .filter(entry -> entry.getValue() != null
+                        && entry.getValue().getScore() != null
+                        && entry.getValue().getScore() < evaluation.getPassThreshold())
+                .map(Map.Entry::getKey)
+                .map(this::canonicalDimensionTag)
+                .distinct()
+                .toList();
+    }
+
+    private String canonicalDimensionTag(String dimension) {
+        try {
+            return weaknessTagNormalizer.canonicalTag(
+                    InterviewQuestionEvaluationFocus.valueOf(dimension));
+        } catch (IllegalArgumentException exception) {
+            throw responseValidationFailure("unknown evaluation dimension: " + dimension);
+        }
     }
 
     private void registerWeaknessRemediationAttempt(AnswerEvaluation evaluation) {
@@ -347,6 +369,7 @@ public class AnswerEvaluationService {
         return new EvaluationPayload(
                 score, PASS_THRESHOLD, buildDetails(question, mode, score),
                 mockWeaknessTags(question, mode, score),
+                mockWeaknessDiagnostics(question, mode, score),
                 score >= PASS_THRESHOLD ? "핵심 근거가 확인되었습니다." : "구체적인 근거를 보완해야 합니다.",
                 score >= PASS_THRESHOLD ? List.of() : List.of("상황·본인 역할·행동·결과를 구체적으로 설명하세요."),
                 null, null, null,
@@ -380,6 +403,25 @@ public class AnswerEvaluationService {
             case "deliveryClarity" -> List.of("답변 구조 부족");
             default -> List.of("보완 근거 부족");
         };
+    }
+
+    private Map<String, List<String>> mockWeaknessDiagnostics(
+            InterviewSessionQuestion question,
+            InterviewSessionMode mode,
+            int score
+    ) {
+        if (score >= PASS_THRESHOLD || mode == InterviewSessionMode.BASIC) {
+            return Map.of();
+        }
+        if (mode == InterviewSessionMode.WEAKNESS_REVIEW) {
+            return Map.of(question.getSession().getTargetDimension(),
+                    mockWeaknessTags(question, mode, score));
+        }
+        return question.getEvaluationFocusSnapshot().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        InterviewQuestionEvaluationFocus::name,
+                        focus -> List.of(weaknessTagNormalizer.displayName(focus))
+                ));
     }
 
     private EvaluationPayload anthropicPayload(
@@ -417,6 +459,7 @@ public class AnswerEvaluationService {
                 return new EvaluationPayload(
                     averageScore(details), PASS_THRESHOLD, details,
                     normalizeWeaknessTags(value.getWeaknessTags()),
+                    weaknessDiagnostics(value.getTargetDimension(), value.getWeaknessTags(), value.getScore()),
                     value.getComment(), List.of(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getQuestion(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getType(),
@@ -438,7 +481,8 @@ public class AnswerEvaluationService {
             int averageScore = averageScore(details);
             return new EvaluationPayload(
                     averageScore, PASS_THRESHOLD, details,
-                    value.getWeaknessTags() == null ? List.of() : value.getWeaknessTags(),
+                    flattenedDiagnostics(value.getWeaknessDiagnostics(), details),
+                    normalizeWeaknessDiagnostics(value.getWeaknessDiagnostics(), details),
                     value.getSummary(),
                     value.getImprovementDirection() == null ? List.of() : value.getImprovementDirection(),
                     value.getFollowUp() == null ? null : value.getFollowUp().getQuestion(),
@@ -529,6 +573,7 @@ public class AnswerEvaluationService {
             );
         }
         validateScores(details);
+        validateWeaknessDiagnostics(value.getWeaknessDiagnostics(), details, mode);
     }
 
     private void validateWeaknessResult(
@@ -588,6 +633,7 @@ public class AnswerEvaluationService {
             int passThreshold,
             Map<String, AnswerEvaluation.DimensionEvaluation> details,
             List<String> weaknessTags,
+            Map<String, List<String>> weaknessDiagnostics,
             String summary,
             List<String> improvementDirection,
             String followUpQuestion,
@@ -644,6 +690,73 @@ public class AnswerEvaluationService {
                 .distinct()
                 .limit(3)
                 .toList();
+    }
+
+    private Map<String, List<String>> weaknessDiagnostics(
+            String dimension,
+            List<String> diagnostics,
+            int score
+    ) {
+        List<String> normalized = normalizeWeaknessTags(diagnostics);
+        return score < PASS_THRESHOLD && !normalized.isEmpty()
+                ? Map.of(dimension, normalized)
+                : Map.of();
+    }
+
+    private Map<String, List<String>> normalizeWeaknessDiagnostics(
+            Map<String, List<String>> diagnostics,
+            Map<String, AnswerEvaluation.DimensionEvaluation> details
+    ) {
+        if (diagnostics == null || diagnostics.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<String>> normalized = new LinkedHashMap<>();
+        diagnostics.forEach((dimension, values) -> {
+            AnswerEvaluation.DimensionEvaluation detail = details.get(dimension);
+            if (detail != null && detail.getScore() != null && detail.getScore() < PASS_THRESHOLD) {
+                List<String> keywords = normalizeWeaknessTags(values);
+                if (!keywords.isEmpty()) {
+                    normalized.put(dimension, keywords);
+                }
+            }
+        });
+        return Map.copyOf(normalized);
+    }
+
+    private List<String> flattenedDiagnostics(
+            Map<String, List<String>> diagnostics,
+            Map<String, AnswerEvaluation.DimensionEvaluation> details
+    ) {
+        return normalizeWeaknessDiagnostics(diagnostics, details).values().stream()
+                .flatMap(List::stream)
+                .distinct()
+                .toList();
+    }
+
+    private void validateWeaknessDiagnostics(
+            Map<String, List<String>> diagnostics,
+            Map<String, AnswerEvaluation.DimensionEvaluation> details,
+            InterviewSessionMode mode
+    ) {
+        Map<String, List<String>> values = diagnostics == null ? Map.of() : diagnostics;
+        Set<String> expectedDimensions = mode == InterviewSessionMode.COMPANY_FIT
+                ? details.entrySet().stream()
+                        .filter(entry -> entry.getValue().getScore() < PASS_THRESHOLD)
+                        .map(Map.Entry::getKey)
+                        .collect(java.util.stream.Collectors.toSet())
+                : Set.of();
+        boolean invalid = !values.keySet().equals(expectedDimensions)
+                || values.entrySet().stream().anyMatch(entry -> {
+            AnswerEvaluation.DimensionEvaluation detail = details.get(entry.getKey());
+            return detail == null
+                    || detail.getScore() == null
+                    || detail.getScore() >= PASS_THRESHOLD
+                    || normalizeWeaknessTags(entry.getValue()).isEmpty();
+        });
+        if (invalid) {
+            throw responseValidationFailure(
+                    "weakness diagnostics must belong to a failed evaluated dimension");
+        }
     }
 
     public record EvaluationOutcome(

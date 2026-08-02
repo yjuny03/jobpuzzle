@@ -70,7 +70,7 @@
     if (compact.indexOf('vaguerole') >= 0) return '역할 설명 부족';
     if (compact.indexOf('limitedownership') >= 0) return '주도성 부족';
     if (value.indexOf('requirementconnection') >= 0) return '공고 요구사항 연결 부족';
-    if (value.indexOf('specificity') >= 0) return '답변의 구체성 부족';
+    if (value.indexOf('specificity') >= 0) return '경험 구체성 부족';
     if (value.indexOf('ownrole') >= 0) return '본인 역할 설명 부족';
     if (value.indexOf('problemsolving') >= 0) return '문제 해결 과정 부족';
     if (value.indexOf('resultexpression') >= 0) return '성과·결과 표현 부족';
@@ -665,8 +665,9 @@
     modal.innerHTML =
       '<div class="remaining-question-backdrop question-selection-backdrop" data-close-remaining></div>' +
       '<section class="remaining-question-dialog question-selection-dialog" role="dialog" aria-modal="true">' +
-      '<header><div><span class="question-selection-mode">이어 연습하기</span><h2>남은 질문을 추가해 보세요</h2>' +
-      '<p>추가한 질문의 평가도 지금까지의 점수와 함께 집계됩니다.</p></div>' +
+      '<header><div><span class="question-selection-mode">' + esc(modeLabel(sessionInfo && sessionInfo.mode)) +
+      '</span><h2>연습할 질문을 골라주세요</h2>' +
+      '<p>선택한 순서가 아니라, 아래 표시 순서대로 면접이 진행됩니다.</p></div>' +
       '<button type="button" class="question-selection-close" data-close-remaining aria-label="닫기">×</button></header>' +
       '<div class="remaining-question-list q-gen-list">' + remainingQuestions.map(function (question, index) {
         return '<label class="q-gen-item q-gen-item--detailed"><input type="checkbox" value="' + question.questionId + '" checked>' +
@@ -678,7 +679,7 @@
           '</span></label>';
       }).join('') + '</div>' +
       '<footer><span>하나 이상 선택해 주세요.</span>' +
-      '<button id="add-remaining-questions" class="btn btn--primary">선택한 질문 이어서 연습</button></footer>' +
+      '<button id="add-remaining-questions" class="btn btn--primary">선택한 질문으로 시작</button></footer>' +
       '</section>';
     document.body.appendChild(modal);
     document.body.classList.add('has-result-modal');

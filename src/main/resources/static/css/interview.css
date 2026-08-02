@@ -60,8 +60,14 @@
   opacity: 0.55;
 }
 .weak-pick-row { position: relative; }
-.weak-pick-row:hover,
-.weak-pick-row:focus-within { z-index: auto; }
+.weak-pick-row:focus-visible {
+  outline: 3px solid rgba(24, 95, 145, .24);
+  outline-offset: 3px;
+}
+.weak-pick-row.is-expanded {
+  border-color: var(--color-primary);
+  background: var(--color-surface-tint);
+}
 .weak-pick-name {
   display: block;
   color: #164f7d;
@@ -96,8 +102,14 @@
   color: #18354d;
   box-shadow: 0 24px 60px rgba(16,47,73,.28), 0 3px 0 rgba(16,47,73,.14);
 }
-.weak-pick-row:hover .weak-pick-history,
-.weak-pick-row:focus-within .weak-pick-history { display: block; }
+.weak-pick-row.is-expanded .weak-pick-history { display: block; }
+.weak-pick-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+.weak-pick-actions .btn { min-height: 42px; }
 .weak-pick-history > header {
   position: sticky;
   top: 0;
@@ -981,23 +993,16 @@
 .prepared-analysis-card h3 { font-size: 15px; margin: 4px 0; }
 .prepared-analysis-card p { color: var(--color-text-muted); font-size: 11px; margin: 0; }
 .prepared-analysis-copy { position:relative; min-width:0; }
-.prepared-analysis-detail {
-  position:absolute;
-  z-index:10;
-  left:0;
-  top:calc(100% + 8px);
-  display:none;
-  width:min(560px,70vw);
-  padding:11px 13px;
-  border-radius:10px;
-  color:#eef7ff;
-  background:#123550;
-  box-shadow:0 14px 30px rgba(19,53,80,.22);
-  font-size:11px;
-  line-height:1.55;
+.prepared-analysis-card[data-prepared-expandable] { cursor: pointer; }
+.prepared-analysis-card[data-prepared-expandable]:focus-visible {
+  outline: 3px solid rgba(24, 95, 145, .24);
+  outline-offset: 3px;
 }
-.prepared-analysis-card:hover .prepared-analysis-detail,
-.prepared-analysis-copy:focus .prepared-analysis-detail { display:block; }
+.prepared-analysis-card.is-expanded {
+  border-color: var(--jp-blue, #4B83A8);
+  background: var(--jp-paper-blue, #EAF4FA);
+}
+.prepared-career-label { color: inherit; font: inherit; }
 .prepared-analysis-actions { display: flex; gap: 8px; }
 .prepared-analysis-card--basic { border-left-color: var(--jp-blue, #4B83A8); }
 .prepared-analysis-card--basic .prepared-analysis-check {
@@ -1143,12 +1148,6 @@
   position: relative;
 }
 
-.prepared-analysis-card--weakness .prepared-analysis-copy:hover .prepared-weakness-history,
-.prepared-analysis-card--weakness .prepared-analysis-copy:focus .prepared-weakness-history {
-  display: grid;
-  gap: 5px;
-}
-
 .prepared-weakness-history strong,
 .prepared-weakness-history span {
   color: #fff !important;
@@ -1175,9 +1174,90 @@
   z-index: auto;
 }
 
-.prepared-analysis-card--weakness:hover .prepared-question-history,
-.prepared-analysis-card--weakness:focus-within .prepared-question-history {
+.prepared-analysis-card--weakness.is-expanded .prepared-question-history {
   display: block;
+}
+
+.prepared-material-detail {
+  display: none;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border: 1px solid #AFCDE0;
+  border-radius: 14px;
+  background: #F8FCFE;
+  cursor: default;
+}
+
+.prepared-analysis-card.is-expanded .prepared-material-detail { display: block; }
+
+.prepared-material-detail > header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #BFD8E8;
+  background: #174D70;
+  color: #fff;
+}
+
+.prepared-material-detail > header span {
+  display: block;
+  color: #8EDAF2;
+  font-size: 11px;
+}
+
+.prepared-material-detail > header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.prepared-material-detail > header p {
+  margin-top: 5px;
+  color: #DCECF5;
+  font-size: 12px;
+}
+
+.prepared-material-detail > section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.prepared-material-group {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #CFE0EA;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.prepared-material-group > strong {
+  color: #285A7A;
+  font-size: 12px;
+}
+
+.prepared-material-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.prepared-material-group span {
+  padding: 4px 8px;
+  border: 1px solid #BFD8E8;
+  border-radius: 999px;
+  background: #EDF6FB;
+  color: #18354D;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.prepared-detail-empty {
+  grid-column: 1 / -1;
+  padding: 18px;
+  text-align: center;
 }
 
 @media (max-width: 640px) {
@@ -1218,6 +1298,7 @@
 @media (max-width: 700px) {
   .prepared-analysis-card { grid-template-columns: auto 1fr; }
   .prepared-analysis-actions { grid-column: 1 / -1; }
+  .prepared-material-detail > section { grid-template-columns: 1fr; }
   .evaluation-guide summary small { display: none; }
   .evaluation-guide__grid { grid-template-columns: 1fr; }
 }
@@ -1649,6 +1730,18 @@
 }
 
 /* Dashboard-derived interview preparation theme. */
+.jp-interview-page {
+  --jp-mode-basic: #4B83A8;
+  --jp-mode-basic-deep: #285A7A;
+  --jp-mode-basic-soft: #EAF4FA;
+  --jp-mode-company: #6B6FA8;
+  --jp-mode-company-deep: #51477A;
+  --jp-mode-company-soft: #F0EDF7;
+  --jp-mode-weakness: #A36F7B;
+  --jp-mode-weakness-deep: #744D58;
+  --jp-mode-weakness-soft: #F5EAED;
+}
+
 .jp-interview-page .page-subtitle {
   max-width: 720px;
   margin-bottom: 28px;
@@ -2016,10 +2109,7 @@
   line-height: 1.7;
 }
 
-.jp-interview-page .prepared-analysis-card {
-  border-left: 6px solid var(--jp-success);
-}
-
+.jp-interview-page .prepared-analysis-card,
 .jp-interview-page .active-analysis-card,
 .jp-interview-page .review-ready-card {
   border-left: 6px solid var(--jp-blue);
@@ -2063,7 +2153,7 @@
 }
 
 .jp-interview-page .active-session-card {
-  border-left: 6px solid var(--jp-blue);
+  border-left: 6px solid var(--jp-mode-basic);
 }
 
 .jp-interview-page .active-session-section,
@@ -2109,12 +2199,12 @@
   display: inline-flex;
   width: fit-content;
   padding: 5px 8px;
-  border: 2px solid #6B6FA8;
+  border: 2px solid var(--jp-mode-basic);
   border-radius: 7px;
-  background: #D9D9EA;
-  color: #464B82;
+  background: var(--jp-mode-basic-soft);
+  color: var(--jp-mode-basic-deep);
   font-weight: 800;
-  box-shadow: 2px 3px 0 rgba(70, 75, 130, .16);
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .16);
 }
 
 .jp-interview-page .active-session-section .active-session-actions .btn {
@@ -2122,11 +2212,25 @@
 }
 
 .jp-interview-page .active-session-card.mode-weakness-review {
-  border-left-color: var(--jp-warning);
+  border-left-color: var(--jp-mode-weakness);
 }
 
 .jp-interview-page .active-session-card.mode-company-fit {
-  border-left-color: #6B6FA8;
+  border-left-color: var(--jp-mode-company);
+}
+
+.jp-interview-page .active-session-card.mode-company-fit .active-session-mode {
+  border-color: var(--jp-mode-company);
+  background: var(--jp-mode-company-soft);
+  color: var(--jp-mode-company-deep);
+  box-shadow: 2px 3px 0 rgba(81, 71, 122, .16);
+}
+
+.jp-interview-page .active-session-card.mode-weakness-review .active-session-mode {
+  border-color: var(--jp-mode-weakness);
+  background: var(--jp-mode-weakness-soft);
+  color: var(--jp-mode-weakness-deep);
+  box-shadow: 2px 3px 0 rgba(116, 77, 88, .16);
 }
 
 .jp-interview-page .active-session-card:hover,
@@ -2135,6 +2239,138 @@
   border-color: var(--jp-blue);
   background: var(--jp-paper-blue);
   box-shadow: var(--jp-shadow);
+}
+
+/* 면접 모드는 상태색과 분리된 블루·인디고·더스티 로즈로 통일한다. */
+.jp-interview-page .prepared-analysis-card--basic,
+.jp-interview-page .review-ready-card.mode-basic,
+.jp-interview-page .active-session-card.mode-basic {
+  border-left-color: var(--jp-mode-basic);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit,
+.jp-interview-page .review-ready-card.mode-company-fit,
+.jp-interview-page .active-session-card.mode-company-fit {
+  border-left-color: var(--jp-mode-company);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness,
+.jp-interview-page .review-ready-card.mode-weakness-review,
+.jp-interview-page .active-session-card.mode-weakness-review {
+  border-left-color: var(--jp-mode-weakness);
+}
+
+.jp-interview-page .prepared-analysis-card--basic > .prepared-analysis-check {
+  border-color: var(--jp-mode-basic);
+  background: var(--jp-mode-basic-soft);
+  color: var(--jp-mode-basic-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit > .prepared-analysis-check {
+  border-color: var(--jp-mode-company);
+  background: var(--jp-mode-company-soft);
+  color: var(--jp-mode-company-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness > .prepared-analysis-check {
+  border-color: var(--jp-mode-weakness);
+  background: var(--jp-mode-weakness-soft);
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--basic .prepared-analysis-copy > span,
+.jp-interview-page .review-ready-card.mode-basic > div > span {
+  color: var(--jp-mode-basic-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-analysis-copy > span,
+.jp-interview-page .review-ready-card.mode-company-fit > div > span {
+  color: var(--jp-mode-company-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .prepared-analysis-copy > span,
+.jp-interview-page .review-ready-card.mode-weakness-review > div > span {
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-detail {
+  border-color: #C9C3DD;
+  background: #FAF8FC;
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-detail > header {
+  border-bottom-color: #C9C3DD;
+  background: linear-gradient(135deg, var(--jp-mode-company-deep), #6B6FA8);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-detail > header span {
+  color: #DDD7EF;
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-detail > header p {
+  color: #E9E5F4;
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-group {
+  border-color: #D8D3E7;
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-group > strong {
+  color: var(--jp-mode-company-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--company-fit .prepared-material-group span {
+  border-color: #C9C3DD;
+  background: var(--jp-mode-company-soft);
+  color: var(--jp-mode-company-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .prepared-question-history {
+  border-color: #D8B9C1;
+  background: #FCF8F9;
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .prepared-question-history > header {
+  border-bottom-color: #D8B9C1;
+  background: linear-gradient(135deg, var(--jp-mode-weakness-deep), #A36F7B);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .prepared-question-history > header > span {
+  color: #F0CDD5;
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .prepared-question-history > header p {
+  color: #F2DDE2;
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-group h4 {
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-group h4 b,
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-summary > span {
+  background: var(--jp-mode-weakness-soft);
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-origin,
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-diagnostics span {
+  border-color: #D8B9C1;
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-diagnostics span {
+  background: #FAF3F5;
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-report {
+  border-color: var(--jp-mode-weakness);
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .prepared-analysis-card--weakness .weak-history-report:hover {
+  border-color: var(--jp-mode-weakness-deep);
+  background: var(--jp-mode-weakness-soft);
 }
 
 .jp-interview-page .question-selection-dialog {

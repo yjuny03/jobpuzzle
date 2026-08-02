@@ -1,7 +1,7 @@
 package com.example.jobpuzzle.analysis.dto;
 
 import com.example.jobpuzzle.interview.entity.QuestionSet;
-import com.example.jobpuzzle.evaluation.entity.WeaknessTagLog;
+import com.example.jobpuzzle.evaluation.entity.AnswerEvaluation;
 import com.example.jobpuzzle.evaluation.service.WeaknessTagNormalizer;
 import com.example.jobpuzzle.interview.entity.InterviewSessionMode;
 import com.example.jobpuzzle.jobcategory.entity.JobCategoryCareerLevel;
@@ -10,6 +10,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -30,7 +31,8 @@ public class PreparedQuestionSetResponse {
             QuestionSet set,
             int questionCount,
             WeaknessTagNormalizer normalizer,
-            List<WeaknessTagLog> weaknessLogs
+            List<AnswerEvaluation> basisEvaluations,
+            Map<Long, Integer> basisScores
     ) {
         boolean weakness = set.getInterviewMode() == InterviewSessionMode.WEAKNESS_REVIEW;
         String weaknessName = weakness
@@ -56,20 +58,68 @@ public class PreparedQuestionSetResponse {
                 .careerLevel(careerLevel)
                 .questionCount(questionCount)
                 .createdAt(set.getCreatedAt())
-                .recentOccurrences((weaknessLogs == null ? List.<WeaknessTagLog>of() : weaknessLogs)
+                .recentOccurrences((basisEvaluations == null ? List.<AnswerEvaluation>of() : basisEvaluations)
                         .stream()
-                        .limit(5)
-                        .map(log -> Occurrence.builder()
-                                .occurredAt(log.getCreatedAt())
-                                .mode(modeLabel(log.getSession() == null
-                                        ? null : log.getSession().getMode()))
-                                .score(log.getEvaluation() == null
-                                        ? null : log.getEvaluation().getScore())
-                                .build())
+                        .limit(10)
+                        .map(evaluation -> occurrence(
+                                evaluation,
+                                set.getTargetDimension(),
+                                basisScores == null
+                                        ? null : basisScores.get(evaluation.getEvaluationId())
+                        ))
+                        .filter(java.util.Objects::nonNull)
                         .toList())
                 .build();
     }
 
+    private static Occurrence occurrence(
+            AnswerEvaluation evaluation,
+            String targetDimension,
+            Integer aggregateScore
+    ) {
+        if (evaluation == null || evaluation.getSessionQuestion() == null
+                || evaluation.getSessionQuestion().getSession() == null) {
+            return null;
+        }
+        var session = evaluation.getSessionQuestion().getSession();
+        Integer score = aggregateScore == null
+                ? dimensionScore(evaluation, targetDimension)
+                : aggregateScore;
+        List<String> diagnostics = evaluation.getWeaknessDiagnostics() == null
+                ? List.of()
+                : evaluation.getWeaknessDiagnostics()
+                        .getOrDefault(targetDimension, List.of())
+                        .stream()
+                        .filter(value -> value != null && !value.isBlank())
+                        .distinct()
+                        .limit(4)
+                        .toList();
+        return Occurrence.builder()
+                .sessionId(session.getSessionId())
+                .evaluationId(evaluation.getEvaluationId())
+                .occurredAt(evaluation.getCreatedAt())
+                .mode(session.getMode() == null ? null : session.getMode().name())
+                .score(score)
+                .status(score != null && score >= evaluation.getPassThreshold()
+                        ? "RESOLVED" : "UNRESOLVED")
+                .resultLabel(modeLabel(session.getMode()) + " 리포트 보기")
+                .diagnostics(diagnostics)
+                .build();
+    }
+
+    private static Integer dimensionScore(
+            AnswerEvaluation evaluation,
+            String targetDimension
+    ) {
+        if (targetDimension != null && evaluation.getEvaluationDetail() != null) {
+            AnswerEvaluation.DimensionEvaluation detail =
+                    evaluation.getEvaluationDetail().get(targetDimension);
+            if (detail != null && detail.getScore() != null) {
+                return detail.getScore();
+            }
+        }
+        return evaluation.getScore();
+    }
     private static String careerLevelLabel(JobCategoryCareerLevel careerLevel) {
         if (careerLevel == null) return null;
         return switch (careerLevel) {
@@ -91,8 +141,13 @@ public class PreparedQuestionSetResponse {
     @Getter
     @Builder
     public static class Occurrence {
+        private Long sessionId;
+        private Long evaluationId;
         private LocalDateTime occurredAt;
         private String mode;
         private Integer score;
+        private String status;
+        private String resultLabel;
+        private List<String> diagnostics;
     }
 }

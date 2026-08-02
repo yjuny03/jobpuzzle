@@ -142,7 +142,7 @@
     return '<div class="card card--pad-lg">' +
       backBtn('backToMode', '모드 다시 선택') +
       '<p style="font-size:14px; font-weight:700; margin:0 0 4px;">보완할 약점 태그를 선택하세요</p>' +
-      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">태그를 선택하면 그 약점에 맞춘 질문을 생성해요 · 해결된 약점은 표시되지 않아요</p>' +
+      '<p style="font-size:12.5px; color:#8A93A3; margin:0 0 20px;">카드를 누르면 보완 이력을 확인할 수 있어요 · 질문 생성은 이력 아래 버튼으로 시작합니다.</p>' +
       '<div style="display:flex; flex-direction:column; gap:10px;">' +
       state.weaknessTags.map(function (item) {
         var tag = typeof item === 'string' ? item : item.tag;
@@ -219,12 +219,17 @@
                 resolvedOccurrences.map(renderOccurrence).join('') + '</section>' : '') +
             '</div>'
           : '';
-        return '<div class="weak-pick-row" tabindex="0" data-weak-tag="' + esc(tag) + '">' +
+        var expanded = state.selectedWeaknessTag === tag;
+        return '<div class="weak-pick-row' + (expanded ? ' is-expanded' : '') +
+          '" tabindex="0" role="button" aria-expanded="' + expanded + '" data-weak-tag="' + esc(tag) + '">' +
           '<div><span class="weak-pick-name">#' + esc(displayName) + '</span><p>' +
-          esc(description) + '</p>' + history + '</div>' +
+          esc(description) + '</p></div>' +
           '<span class="badge-pill">보완 필요 ' +
           esc((item.unresolvedCount || item.occurrenceCount || occurrences.length || 1)) +
-          '건</span></div>';
+          '건</span>' + history +
+          (expanded ? '<div class="weak-pick-actions"><button type="button" class="btn btn--primary" ' +
+            'data-generate-weakness="' + esc(tag) + '">이 약점으로 질문 생성</button></div>' : '') +
+          '</div>';
       }).join('') + '</div></div>';
   }
 
@@ -720,8 +725,25 @@
 
     document.querySelectorAll('[data-weak-tag]').forEach(function (el) {
       el.addEventListener('click', function (event) {
-        if (event.target.closest('.weak-pick-history a')) return;
-        state.selectedWeaknessTag = el.dataset.weakTag;
+        if (event.target.closest('a, button')) return;
+        state.selectedWeaknessTag = state.selectedWeaknessTag === el.dataset.weakTag
+          ? null : el.dataset.weakTag;
+        render();
+      });
+      el.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.target.closest('a, button')) return;
+        event.preventDefault();
+        state.selectedWeaknessTag = state.selectedWeaknessTag === el.dataset.weakTag
+          ? null : el.dataset.weakTag;
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-generate-weakness]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.stopPropagation();
+        state.selectedWeaknessTag = button.dataset.generateWeakness;
         if (window.InterviewLive) window.InterviewLive.startWeakness(state.selectedWeaknessTag);
       });
     });

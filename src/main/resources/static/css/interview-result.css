@@ -747,8 +747,9 @@
   inset: 0;
   z-index: 1300;
   display: grid;
-  place-items: center;
-  padding: 22px;
+  place-items: start center;
+  overflow-y: auto;
+  padding: 124px 24px 24px;
 }
 .remaining-question-backdrop {
   position: absolute;
@@ -759,7 +760,7 @@
 .remaining-question-dialog {
   position: relative;
   width: min(1040px, 100%);
-  max-height: calc(100vh - 44px);
+  max-height: calc(100dvh - 148px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -831,17 +832,37 @@
 
 /* 중간 결과의 남은 질문 선택도 최초 질문 선택 모달과 같은 상세 카드 구조를 사용한다. */
 .remaining-question-dialog.question-selection-dialog {
-  border: 2px solid #1f4966;
+  border: 3px solid #203e54;
   border-radius: 22px;
-  background: linear-gradient(135deg, #fffdf7 0%, #eef8fc 100%);
+  background: linear-gradient(145deg, rgba(218, 232, 240, .34), transparent 42%), #faf7ef;
+  color: #142f43;
+  box-shadow: 8px 10px 0 rgba(23, 40, 58, .24), 0 28px 72px rgba(15, 39, 58, .32);
 }
 .remaining-question-dialog.question-selection-dialog > header {
-  border-bottom: 1px solid #8cbad6;
+  padding: 26px 36px 22px;
+  border-bottom: 2px solid #8aa9bc;
+  background: linear-gradient(135deg, #faf5e9 0%, #e7f0f4 100%);
 }
 .remaining-question-dialog.question-selection-dialog .question-selection-mode {
   display: inline-flex;
-  color: #1669a1;
-  font-weight: 800;
+  padding: 5px 9px;
+  border: 2px solid #447da4;
+  border-radius: 8px;
+  background: #e8f4fb;
+  color: #155e8b;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(31, 87, 124, .18);
+}
+.remaining-question-dialog.question-selection-dialog h2 {
+  color: #122b3e;
+  font-size: 24px;
+  font-weight: 950;
+}
+.remaining-question-dialog.question-selection-dialog header p {
+  color: #344f63;
+  font-size: 13px;
+  font-weight: 750;
 }
 .remaining-question-dialog.question-selection-dialog .question-selection-close {
   border: 2px solid #cf4545;
@@ -852,7 +873,11 @@
 }
 .remaining-question-dialog .remaining-question-list.q-gen-list {
   gap: 12px;
+  margin: 22px 36px;
+  padding: 16px;
+  overflow-y: auto;
   border: 2px solid #2b506b;
+  border-radius: 18px;
   background: rgba(224, 241, 250, .76);
 }
 .remaining-question-dialog .q-gen-item {
@@ -903,6 +928,7 @@
   transform: rotate(225deg) translateY(-2px);
 }
 .remaining-question-dialog .question-hint-panel { display: block; margin-top: 10px; }
+.remaining-question-dialog .question-hint-panel[hidden] { display: none; }
 .remaining-question-dialog .question-hint-panel small {
   display: block;
   color: #526b7c;
@@ -911,6 +937,36 @@
   margin-top: 5px;
 }
 .remaining-question-dialog .question-hint-panel b { color: #176b9b; }
+.remaining-question-dialog.question-selection-dialog > footer {
+  gap: 24px;
+  padding: 24px 36px 28px;
+  border-top: 3px solid #789aae;
+  background: linear-gradient(145deg, #f5f2e9 0%, #e6eef1 100%);
+}
+.remaining-question-dialog.question-selection-dialog > footer span {
+  color: #b32931;
+  font-size: 14px;
+  font-weight: 900;
+}
+.remaining-question-dialog.question-selection-dialog > footer .btn {
+  min-height: 48px;
+  padding-inline: 24px;
+  border: 2px solid #173d58;
+  box-shadow: 3px 5px 0 rgba(20, 57, 83, .22);
+}
+@media (max-width: 640px) {
+  .remaining-question-modal { padding: 82px 10px 10px; }
+  .remaining-question-dialog { max-height: calc(100dvh - 92px); border-radius: 16px; }
+  .remaining-question-dialog.question-selection-dialog > header { padding: 20px 18px 16px; }
+  .remaining-question-dialog .remaining-question-list.q-gen-list { margin: 12px; padding: 10px; }
+  .remaining-question-dialog.question-selection-dialog > footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px;
+  }
+  .remaining-question-dialog.question-selection-dialog > footer .btn { width: 100%; }
+}
 
 .final-report-panel {
   padding: 26px;

@@ -89,6 +89,7 @@ public class InterviewSessionService {
 
     @Transactional(readOnly = true)
     public List<String> getUnresolvedWeaknessTags(Long userId) {
+        var allLogs = weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(userId);
         return weaknessTagStatusRepository
                 .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
                 .stream()
@@ -96,20 +97,20 @@ public class InterviewSessionService {
                         weakness -> weakness.getLastOccurredAt(),
                         Comparator.nullsLast(Comparator.reverseOrder())
                 ))
-                .map(weakness -> weaknessTagNormalizer.canonicalTag(weakness.getTag()))
+                .map(weakness -> canonicalStatusTag(weakness.getTag(), allLogs))
                 .distinct()
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<WeaknessTagResponse> getUnresolvedWeaknessTagDetails(Long userId) {
+        var allLogs = weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(userId);
         var statuses = weaknessTagStatusRepository
                 .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
                 .stream()
                 .collect(Collectors.groupingBy(
-                        weakness -> weaknessTagNormalizer.canonicalTag(weakness.getTag())
+                        weakness -> canonicalStatusTag(weakness.getTag(), allLogs)
                 ));
-        var allLogs = weaknessTagLogRepository.findByUser_UserIdOrderByTagLogIdDesc(userId);
         var allAttempts = weaknessRemediationAttemptRepository
                 .findByOriginTagLog_User_UserIdOrderByAttemptIdDesc(userId);
         Map<Long, com.example.jobpuzzle.evaluation.dto.SessionScoreSummary> scoreCache = new HashMap<>();
@@ -117,7 +118,7 @@ public class InterviewSessionService {
                 .map(entry -> {
                     String canonicalTag = entry.getKey();
                     var dimensionLogs = allLogs.stream()
-                            .filter(log -> weaknessTagNormalizer.sameDimension(log.getTag(), canonicalTag))
+                            .filter(log -> logBelongsToDimension(log, canonicalTag))
                             .toList();
                     Map<Long, List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog>> logsBySession =
                             dimensionLogs.stream()
@@ -160,6 +161,51 @@ public class InterviewSessionService {
                         Comparator.nullsLast(Comparator.reverseOrder())
                 ))
                 .toList();
+    }
+
+    private String canonicalStatusTag(
+            String storedTag,
+            List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog> allLogs
+    ) {
+        return allLogs.stream()
+                .filter(log -> Objects.equals(log.getTag(), storedTag))
+                .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getEvaluation)
+                .filter(Objects::nonNull)
+                .map(this::singleFailedDimension)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(dimension -> dimension + "_weak")
+                .orElseGet(() -> weaknessTagNormalizer.canonicalTag(storedTag));
+    }
+
+    private boolean logBelongsToDimension(
+            com.example.jobpuzzle.evaluation.entity.WeaknessTagLog log,
+            String canonicalTag
+    ) {
+        String targetDimension = weaknessTagNormalizer.dimension(canonicalTag);
+        AnswerEvaluation evaluation = log.getEvaluation();
+        if (evaluation != null && evaluation.getEvaluationDetail() != null) {
+            AnswerEvaluation.DimensionEvaluation detail =
+                    evaluation.getEvaluationDetail().get(targetDimension);
+            if (detail != null && detail.getScore() != null
+                    && detail.getScore() < evaluation.getPassThreshold()) {
+                return true;
+            }
+        }
+        return weaknessTagNormalizer.sameDimension(log.getTag(), canonicalTag);
+    }
+
+    private String singleFailedDimension(AnswerEvaluation evaluation) {
+        if (evaluation.getEvaluationDetail() == null) {
+            return null;
+        }
+        List<String> failed = evaluation.getEvaluationDetail().entrySet().stream()
+                .filter(entry -> entry.getValue() != null
+                        && entry.getValue().getScore() != null
+                        && entry.getValue().getScore() < evaluation.getPassThreshold())
+                .map(Map.Entry::getKey)
+                .toList();
+        return failed.size() == 1 ? failed.get(0) : null;
     }
 
     private WeaknessTagResponse.Occurrence buildWeaknessOccurrence(
@@ -208,9 +254,7 @@ public class InterviewSessionService {
                         .orElse(null))
                 .status(status)
                 .resultLabel(resultLabel(representative.getSession()))
-                .diagnostics(diagnostics(originLogs.stream()
-                        .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getTag)
-                        .toList(), canonicalTag))
+                .diagnostics(diagnosticsForLogs(originLogs, canonicalTag))
                 .attempts(attempts)
                 .build();
     }
@@ -244,10 +288,8 @@ public class InterviewSessionService {
                         .orElse(null))
                 .status(score != null && score >= 70 ? "RESOLVED" : "UNRESOLVED")
                 .resultLabel(resultLabel(representative.getSession()))
-                .diagnostics(diagnostics(sessionAttempts.stream()
-                        .flatMap(attempt -> attempt.getEvaluation().getWeaknessTags() == null
-                                ? java.util.stream.Stream.<String>empty()
-                                : attempt.getEvaluation().getWeaknessTags().stream())
+                .diagnostics(diagnosticsForEvaluations(sessionAttempts.stream()
+                        .map(com.example.jobpuzzle.evaluation.entity.WeaknessRemediationAttempt::getEvaluation)
                         .toList(), canonicalTag))
                 .build();
     }
@@ -270,10 +312,42 @@ public class InterviewSessionService {
         }
     }
 
-    private List<String> diagnostics(List<String> rawTags, String canonicalTag) {
-        return rawTags.stream()
-                .filter(tag -> weaknessTagNormalizer.sameDimension(tag, canonicalTag))
+    private List<String> diagnosticsForLogs(
+            List<com.example.jobpuzzle.evaluation.entity.WeaknessTagLog> logs,
+            String canonicalTag
+    ) {
+        List<AnswerEvaluation> evaluations = logs.stream()
+                .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getEvaluation)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<String> diagnostics = diagnosticsForEvaluations(evaluations, canonicalTag);
+        if (!diagnostics.isEmpty()) {
+            return diagnostics;
+        }
+        // 구형 데이터는 관점별 진단 컬럼이 없으므로 기존 태그를 표시용으로만 해석한다.
+        return logs.stream()
+                .map(com.example.jobpuzzle.evaluation.entity.WeaknessTagLog::getTag)
                 .map(weaknessTagNormalizer::diagnosticDisplayName)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .limit(4)
+                .toList();
+    }
+
+    private List<String> diagnosticsForEvaluations(
+            List<AnswerEvaluation> evaluations,
+            String canonicalTag
+    ) {
+        String dimension = weaknessTagNormalizer.dimension(canonicalTag);
+        return evaluations.stream()
+                .flatMap(evaluation -> {
+                    Map<String, List<String>> values = evaluation.getWeaknessDiagnostics();
+                    if (values == null) {
+                        return java.util.stream.Stream.<String>empty();
+                    }
+                    return values.getOrDefault(dimension, List.of()).stream();
+                })
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .limit(4)
@@ -915,7 +989,7 @@ public class InterviewSessionService {
             case "requirementConnection_weak", "requirementConnection_insufficient", "요구사항 연결부족" ->
                     "공고 요구사항 연결 부족";
             case "specificity_weak", "specificity_insufficient", "구체성 부족" ->
-                    "답변의 구체성 부족";
+                    "경험 구체성 부족";
             case "ownRole_weak", "ownRole_insufficient" -> "본인 역할 설명 부족";
             case "problemSolving_weak", "problemSolving_insufficient" -> "문제 해결 과정 부족";
             case "resultExpression_weak", "resultExpression_insufficient" -> "성과·결과 표현 부족";

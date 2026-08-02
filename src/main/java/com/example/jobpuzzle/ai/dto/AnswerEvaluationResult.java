@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -30,6 +31,14 @@ public class AnswerEvaluationResult {
     private EvaluationDetail evaluationDetail;
 
     private List<String> weaknessTags;
+
+    /**
+     * 평가 관점별 자유 형식 세부 진단 키워드입니다.
+     * 상위 약점 관점은 서버가 evaluationDetail의 점수로 결정하며,
+     * 이 값은 상위 태그를 추론하는 용도로 사용하지 않습니다.
+     */
+    @Builder.Default
+    private Map<String, List<String>> weaknessDiagnostics = Map.of();
 
     private String summary;
 

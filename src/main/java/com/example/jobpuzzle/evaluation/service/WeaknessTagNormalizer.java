@@ -1,11 +1,11 @@
-package com.example.jobpuzzle.evaluation.service;
+    package com.example.jobpuzzle.evaluation.service;
 
-import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
-import org.springframework.stereotype.Component;
+    import com.example.jobpuzzle.interview.entity.InterviewQuestionEvaluationFocus;
+    import org.springframework.stereotype.Component;
 
-import java.util.Locale;
+    import java.util.Locale;
 
-/**
+    /**
  * AI가 생성한 세부 진단 키워드와 과거 태그를 8개 평가 관점으로 정규화한다.
  */
 @Component
@@ -13,6 +13,10 @@ public class WeaknessTagNormalizer {
 
     public String canonicalTag(String tag) {
         return dimension(tag) + "_weak";
+    }
+
+    public String canonicalTag(InterviewQuestionEvaluationFocus focus) {
+        return focus.name() + "_weak";
     }
 
     public String dimension(String tag) {
@@ -53,7 +57,7 @@ public class WeaknessTagNormalizer {
     public String displayName(String tag) {
         return switch (dimension(tag)) {
             case "requirementConnection" -> "공고 요구사항 연결 부족";
-            case "specificity" -> "답변의 구체성 부족";
+            case "specificity" -> "경험 구체성 부족";
             case "ownRole" -> "본인 역할 설명 부족";
             case "problemSolving" -> "문제 해결 과정 부족";
             case "resultExpression" -> "성과 및 결과 표현 부족";
@@ -61,6 +65,10 @@ public class WeaknessTagNormalizer {
             case "deliveryClarity" -> "답변 전달력 부족";
             default -> "질문 의도 파악 부족";
         };
+    }
+
+    public String displayName(InterviewQuestionEvaluationFocus focus) {
+        return displayName(canonicalTag(focus));
     }
 
     public boolean sameDimension(String left, String right) {

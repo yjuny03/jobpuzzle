@@ -21,6 +21,7 @@ import com.example.jobpuzzle.evaluation.entity.WeaknessTagResolveStatus;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagLogRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessRemediationAttemptRepository;
 import com.example.jobpuzzle.evaluation.repository.WeaknessTagStatusRepository;
+import com.example.jobpuzzle.evaluation.repository.AnswerEvaluationRepository;
 import com.example.jobpuzzle.evaluation.service.WeaknessTagNormalizer;
 import com.example.jobpuzzle.evaluation.service.SessionScoreAggregationService;
 import com.example.jobpuzzle.global.error.CustomException;
@@ -62,6 +63,7 @@ public class QuestionGenerationService {
     private final WeaknessTagStatusRepository weaknessTagStatusRepository;
     private final WeaknessTagLogRepository weaknessTagLogRepository;
     private final WeaknessRemediationAttemptRepository weaknessRemediationAttemptRepository;
+    private final AnswerEvaluationRepository answerEvaluationRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final AiCallLogRepository aiCallLogRepository;
     private final AiClientService aiClientService;
@@ -126,18 +128,20 @@ public class QuestionGenerationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         String canonicalTag = weaknessTagNormalizer.canonicalTag(request.getTargetWeaknessTag());
+        List<WeaknessTagLog> allLogs = weaknessTagLogRepository
+                .findByUser_UserIdOrderByTagLogIdDesc(userId);
         boolean unresolved = weaknessTagStatusRepository
                 .findByUser_UserIdAndStatus(userId, WeaknessTagResolveStatus.UNRESOLVED)
                 .stream()
-                .anyMatch(status -> weaknessTagNormalizer.sameDimension(status.getTag(), canonicalTag));
+                .anyMatch(status -> allLogs.stream()
+                        .filter(logEntry -> java.util.Objects.equals(logEntry.getTag(), status.getTag()))
+                        .anyMatch(logEntry -> logMatchesDimension(logEntry, canonicalTag)));
         if (!unresolved) {
             throw new CustomException(ErrorCode.WEAKNESS_NOT_AVAILABLE);
         }
 
-        List<WeaknessTagLog> origins = weaknessTagLogRepository
-                .findByUser_UserIdOrderByTagLogIdDesc(userId)
-                .stream()
-                .filter(logEntry -> weaknessTagNormalizer.sameDimension(logEntry.getTag(), canonicalTag))
+        List<WeaknessTagLog> origins = allLogs.stream()
+                .filter(logEntry -> logMatchesDimension(logEntry, canonicalTag))
                 .filter(logEntry -> logEntry.getEvaluation() != null)
                 .toList();
         Map<Long, List<WeaknessTagLog>> originsBySession = origins.stream()
@@ -337,6 +341,19 @@ public class QuestionGenerationService {
         );
     }
 
+    private boolean logMatchesDimension(WeaknessTagLog logEntry, String canonicalTag) {
+        String dimension = weaknessTagNormalizer.dimension(canonicalTag);
+        AnswerEvaluation evaluation = logEntry.getEvaluation();
+        if (evaluation != null && evaluation.getEvaluationDetail() != null) {
+            AnswerEvaluation.DimensionEvaluation detail = evaluation.getEvaluationDetail().get(dimension);
+            if (detail != null && detail.getScore() != null
+                    && detail.getScore() < evaluation.getPassThreshold()) {
+                return true;
+            }
+        }
+        return weaknessTagNormalizer.sameDimension(logEntry.getTag(), canonicalTag);
+    }
+
     private Integer aggregateDimensionScore(
             Long userId,
             AnswerEvaluation source,
@@ -473,25 +490,79 @@ public class QuestionGenerationService {
                         .stream())
                 .filter(set -> !interviewSessionRepository
                         .existsByQuestionSet_QuestionSetId(set.getQuestionSetId()))
-                .map(set -> PreparedQuestionSetResponse.from(
-                        set,
-                        interviewQuestionRepository
-                                .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
-                                        set.getQuestionSetId()
-                                )
-                                .size(),
-                        weaknessTagNormalizer,
-                        set.getInterviewMode() == InterviewSessionMode.WEAKNESS_REVIEW
-                                ? weaknessLogs.stream()
-                                .filter(log -> weaknessTagNormalizer.sameDimension(
-                                        log.getTag(), set.getTargetWeaknessTag()
-                                ))
-                                .toList()
-                                : List.of()
-                ))
+                .map(set -> {
+                    List<AnswerEvaluation> basisEvaluations =
+                            preparedBasisEvaluations(set, weaknessLogs);
+                    Map<Long, Integer> basisScores = new LinkedHashMap<>();
+                    basisEvaluations.forEach(evaluation -> {
+                        Integer score = aggregateDimensionScore(
+                                userId,
+                                evaluation,
+                                set.getTargetDimension()
+                        );
+                        if (score != null) {
+                            basisScores.put(evaluation.getEvaluationId(), score);
+                        }
+                    });
+                    return PreparedQuestionSetResponse.from(
+                            set,
+                            interviewQuestionRepository
+                                    .findByQuestionSet_QuestionSetIdOrderByDisplayOrderAsc(
+                                            set.getQuestionSetId()
+                                    )
+                                    .size(),
+                            weaknessTagNormalizer,
+                            basisEvaluations,
+                            basisScores
+                    );
+                })
                 .sorted(java.util.Comparator.comparing(
                         PreparedQuestionSetResponse::getQuestionSetId
                 ).reversed())
+                .toList();
+    }
+
+    private List<AnswerEvaluation> preparedBasisEvaluations(
+            QuestionSet set,
+            List<WeaknessTagLog> weaknessLogs
+    ) {
+        if (set.getInterviewMode() != InterviewSessionMode.WEAKNESS_REVIEW) {
+            return List.of();
+        }
+        List<Long> basisIds = set.getBasisEvaluationIds() == null
+                ? List.of()
+                : set.getBasisEvaluationIds();
+        if (!basisIds.isEmpty()) {
+            Map<Long, AnswerEvaluation> evaluationsById = answerEvaluationRepository
+                    .findAllById(basisIds)
+                    .stream()
+                    .filter(evaluation -> evaluation.getSessionQuestion() != null
+                            && evaluation.getSessionQuestion().getSession() != null
+                            && evaluation.getSessionQuestion().getSession().getUser() != null
+                            && java.util.Objects.equals(
+                                    evaluation.getSessionQuestion().getSession().getUser().getUserId(),
+                                    set.getUser().getUserId()
+                            ))
+                    .collect(java.util.stream.Collectors.toMap(
+                            AnswerEvaluation::getEvaluationId,
+                            java.util.function.Function.identity()
+                    ));
+            return basisIds.stream()
+                    .map(evaluationsById::get)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .limit(10)
+                    .toList();
+        }
+        // basis_evaluation_ids가 없던 구형 질문 세트만 생성 시각 기준으로 복원한다.
+        return weaknessLogs.stream()
+                .filter(log -> log.getEvaluation() != null)
+                .filter(log -> logMatchesDimension(log, set.getTargetWeaknessTag()))
+                .filter(log -> set.getCreatedAt() == null || log.getCreatedAt() == null
+                        || !log.getCreatedAt().isAfter(set.getCreatedAt()))
+                .map(WeaknessTagLog::getEvaluation)
+                .distinct()
+                .limit(10)
                 .toList();
     }
 

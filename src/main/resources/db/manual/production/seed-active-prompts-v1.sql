@@ -6,7 +6,6 @@
 
 -- JSON-01 ~ JSON-11 최신본을 아래 순서대로 추가한다.
 -- JSON-01 v1.2 | 채용공고 분석
--- 기존 v1.0/v1.1을 참조하지 않고 최종 본문을 직접 적재한다.
 START TRANSACTION;
 UPDATE prompt_template
 SET is_active = FALSE, updated_at = NOW()
@@ -235,7 +234,7 @@ UPDATE prompt_template SET is_active = TRUE WHERE target_json = 'JSON-05' AND ve
 COMMIT;
 
 
--- JSON-06 v1.1 | 면접 답변 평가
+-- JSON-06 v1.2 | 면접 답변 평가
 -- 이 블록은 해당 JSON의 현재 활성 최신본이다.
 -- JSON-06 답변 품질 판정 및 엄격한 반환 자료형 보강.
 SELECT prompt_template_id, version, is_active
@@ -246,7 +245,7 @@ START TRANSACTION;
 SET @target_exists = (
     SELECT COUNT(*)
     FROM prompt_template
-    WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.1'
+    WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.2'
 );
 UPDATE prompt_template
 SET is_active = FALSE
@@ -259,7 +258,7 @@ INSERT INTO prompt_template (
 SELECT
     'PT-ANSWER-001',
     '일반 면접 답변 평가',
-    'v1.1',
+    'v1.2',
     'JSON-06',
     '일반 면접 답변 평가기입니다.
 INPUT의 evaluationFocus 관점만 0~100점으로 평가하고 비대상 관점은 반드시 {"score":null,"comment":null} 객체로 반환하세요.
@@ -270,12 +269,16 @@ passThreshold는 70이며 답변에 없는 사실을 만들지 마세요.
 - RETRY_ANSWER: 숫자 나열, 마이크 테스트, 질문과 전혀 무관한 문장처럼 평가 자체가 불가능
 짧거나 욕설이 포함됐다는 이유만으로 RETRY_ANSWER를 선택하지 마세요. 질문에 관련된 내용이 있으면 낮은 점수의 EVALUATE 또는 FOLLOW_UP으로 처리하세요.
 RETRY_ANSWER이면 followUp은 null입니다. FOLLOW_UP이면 currentFollowUpDepth가 2 미만일 때만 followUp 객체를 반환하세요.
-BASIC의 weaknessTags는 빈 배열이고 COMPANY_FIT만 기준 미달 관점의 약점 태그를 반환하세요.
+BASIC의 weaknessTags는 빈 배열이고 weaknessDiagnostics는 빈 객체({})입니다.
+COMPANY_FIT의 weaknessDiagnostics는 evaluationFocus에 포함되고 점수가 70점 미만인 관점만 키로 사용하세요.
+각 값은 해당 관점에서 답변에 부족했던 내용을 나타내는 짧은 한국어 세부 진단 키워드 1~3개입니다.
+세부 진단 키워드는 자유롭게 작성하되 상위 약점 태그를 만들거나 다른 관점을 추측하지 마세요.
+weaknessTags는 weaknessDiagnostics의 모든 세부 진단 키워드를 중복 없이 펼친 배열로 반환하세요.
 improvementDirection은 항상 문자열 배열입니다.
 followUp은 반드시 null 또는 {"depth":1,"question":"string","type":"ROLE_CHECK|RESULT_CHECK","targetWeakness":null,"reason":"string"} 객체입니다.
 JSON 외 설명, 코드 블록, 사과문은 출력하지 마세요.
 반환 형식:
-{"interviewMode":"BASIC|COMPANY_FIT","currentFollowUpDepth":0,"score":75,"scoreLabel":"string","passThreshold":70,"evaluationDetail":{"intentMatch":{"score":75,"comment":"string"},"specificity":{"score":null,"comment":null},"ownRole":{"score":null,"comment":null},"problemSolving":{"score":null,"comment":null},"resultExpression":{"score":null,"comment":null},"requirementConnection":{"score":null,"comment":null},"guideAlignment":{"score":null,"comment":null},"deliveryClarity":{"score":null,"comment":null}},"weaknessTags":[],"summary":"string","improvementDirection":[],"answerDisposition":"EVALUATE|FOLLOW_UP|RETRY_ANSWER","followUp":null}',
+{"interviewMode":"BASIC|COMPANY_FIT","currentFollowUpDepth":0,"score":75,"scoreLabel":"string","passThreshold":70,"evaluationDetail":{"intentMatch":{"score":75,"comment":"string"},"specificity":{"score":null,"comment":null},"ownRole":{"score":null,"comment":null},"problemSolving":{"score":null,"comment":null},"resultExpression":{"score":null,"comment":null},"requirementConnection":{"score":null,"comment":null},"guideAlignment":{"score":null,"comment":null},"deliveryClarity":{"score":null,"comment":null}},"weaknessTags":[],"weaknessDiagnostics":{"specificity":["구체성 부족","기술적 근거 부족"]},"summary":"string","improvementDirection":[],"answerDisposition":"EVALUATE|FOLLOW_UP|RETRY_ANSWER","followUp":null}',
     '["JSON 외 텍스트 출력 금지","improvementDirection 문자열 반환 금지","followUp 문자열·배열 반환 금지","질문 관련 답변을 RETRY_ANSWER로 판정 금지","꼬리질문 깊이 2 초과 금지"]',
     TRUE,
     CURRENT_TIMESTAMP
@@ -283,7 +286,7 @@ WHERE @target_exists = 0;
 
 UPDATE prompt_template
 SET is_active = TRUE
-WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.1';
+WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.2';
 COMMIT;
 
 
@@ -554,7 +557,7 @@ WHERE target_json IN ('JSON-01','JSON-02','JSON-05','JSON-06','JSON-07','JSON-09
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-JOB-001' AND version = 'v1.2';
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-CAND-001' AND version = 'v1.6';
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-JSON05-001' AND version = 'v1.10';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.1';
+UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.2';
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-REPORT-001' AND version = 'v1.9';
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-WEAK-Q-001' AND version = 'v1.0';
 UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-WEAK-A-001' AND version = 'v1.2';

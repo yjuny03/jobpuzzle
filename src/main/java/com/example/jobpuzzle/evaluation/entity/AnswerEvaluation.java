@@ -65,6 +65,10 @@ public class AnswerEvaluation extends BaseTimeEntity {
     @Column(name = "weakness_tags", columnDefinition = "json")
     private List<String> weaknessTags;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "weakness_diagnostics", columnDefinition = "json")
+    private Map<String, List<String>> weaknessDiagnostics;
+
     @Lob
     @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
@@ -92,6 +96,7 @@ public class AnswerEvaluation extends BaseTimeEntity {
             String targetWeaknessTag,
             String targetDimension,
             List<String> weaknessTags,
+            Map<String, List<String>> weaknessDiagnostics,
             String summary,
             List<String> improvementDirection,
             AiCallLog aiCallLog
@@ -112,6 +117,12 @@ public class AnswerEvaluation extends BaseTimeEntity {
         evaluation.weaknessTags = weaknessTags == null
                 ? List.of()
                 : List.copyOf(weaknessTags);
+        evaluation.weaknessDiagnostics = weaknessDiagnostics == null
+                ? Map.of()
+                : weaknessDiagnostics.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey,
+                        entry -> List.copyOf(entry.getValue())
+                ));
         evaluation.summary = summary;
         evaluation.improvementDirection = improvementDirection == null
                 ? List.of()
