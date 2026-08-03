@@ -54,9 +54,9 @@
   }
 
   function modeLabel(mode) {
-    if (mode === 'BASIC') return '기본 모의면접';
-    if (mode === 'COMPANY_FIT') return '회사 맞춤 면접';
-    return '약점 보완 면접';
+    if (mode === 'BASIC') return '기본 질문';
+    if (mode === 'COMPANY_FIT') return '맞춤 면접';
+    return '약점 보완';
   }
 
   function weaknessLabel(tag) {
@@ -537,22 +537,30 @@
       '<span>답변 과정</span><small>점수에 반영된 실제 면접 대화</small></div>' +
       '<div class="result-conversation-list">' + messages.map(function (message, index) {
         var isUser = message.sender === 'USER';
+        var evaluationFailed = message.messageType === 'EVALUATION_FAILED_ANSWER' ||
+          message.messageType === 'REJECTED_ANSWER';
         var label = message.messageType === 'ORIGINAL_ANSWER'
           ? '첫 답변'
           : message.messageType === 'FOLLOW_UP_QUESTION'
-            ? 'AI 심화 질문'
-            : '심화 답변';
+            ? 'AI 추가 질문'
+            : evaluationFailed
+              ? '평가 처리 실패 답변'
+              : '추가 답변';
         var unanswered = message.messageType === 'FOLLOW_UP_QUESTION' &&
           (!messages[index + 1] || messages[index + 1].messageType !== 'FOLLOW_UP_ANSWER');
-        return '<article class="result-conversation-item ' + (isUser ? 'is-user' : 'is-ai') + '">' +
+        return '<article class="result-conversation-item ' + (isUser ? 'is-user' : 'is-ai') +
+          (evaluationFailed ? ' is-evaluation-failed' : '') + '">' +
           '<div><strong>' + label + '</strong>' +
-          (unanswered ? '<em>미응답 · 점수 제외</em>' : '') + '</div>' +
+          (evaluationFailed
+            ? '<em class="evaluation-failed-label">평가 처리 실패 · 점수 제외</em>'
+            : unanswered ? '<em>미응답 · 점수 제외</em>' : '') + '</div>' +
           '<p>' + esc(message.messageText) + '</p></article>';
       }).join('') + '</div></section>';
   }
 
   function unevaluatedLabel(question, questionScore) {
-    if (questionScore && questionScore.finalScore != null) {
+    var finalized = question.status === 'COMPLETED';
+    if (finalized && questionScore && questionScore.finalScore != null) {
       return questionScore.finalScore + '점';
     }
     var hasUserAnswer = (question.conversation || []).some(function (message) {
@@ -562,6 +570,12 @@
           message.messageType === 'REJECTED_ANSWER' ||
           message.messageType === 'EVALUATION_FAILED_ANSWER');
     });
+    var hasEvaluationFailure = (question.conversation || []).some(function (message) {
+      return message.messageType === 'EVALUATION_FAILED_ANSWER' ||
+        message.messageType === 'REJECTED_ANSWER';
+    });
+    if (hasEvaluationFailure) return '미평가';
+    if (!finalized && hasUserAnswer) return '진행 중';
     return hasUserAnswer ? '미평가' : '미응답';
   }
 
@@ -570,11 +584,12 @@
     var displayOrder = Number(question.displayOrder) > 0
       ? question.displayOrder
       : (questions.indexOf(question) + 1);
-    var finalScore = questionScore && questionScore.finalScore != null
+    var finalized = question.status === 'COMPLETED';
+    var finalScore = finalized && questionScore && questionScore.finalScore != null
       ? questionScore.finalScore
       : null;
-    var dimensionScores = questionScore ? questionScore.dimensionScores : {};
-    var dimensionCounts = questionScore ? questionScore.dimensionEvaluationCounts : {};
+    var dimensionScores = finalized && questionScore ? questionScore.dimensionScores : {};
+    var dimensionCounts = finalized && questionScore ? questionScore.dimensionEvaluationCounts : {};
     var dimensionCount = Object.keys(dimensionScores || {}).length;
     var answerEvaluationCount = Object.keys(dimensionCounts || {}).reduce(function (max, key) {
       return Math.max(max, dimensionCounts[key] || 0);
@@ -732,6 +747,18 @@
       return;
     }
     area.hidden = false;
+    var scoreByQuestion = {};
+    (sessionScoreByQuestion ? Object.keys(sessionScoreByQuestion) : []).forEach(function (key) {
+      scoreByQuestion[key] = sessionScoreByQuestion[key];
+    });
+    var selectedQuestions = sessionQuestions || [];
+    var canFinalize = selectedQuestions.length > 0 && selectedQuestions.every(function (question) {
+      var questionScore = scoreByQuestion[question.sessionQuestionId];
+      return question.status === 'COMPLETED' && questionScore && questionScore.finalScore != null;
+    });
+    var finalizeControl = canFinalize
+      ? '<button id="finalize-session" class="btn btn--primary">면접 끝내고 리포트 확정</button>'
+      : '<span class="interim-actions__blocked">모든 선택 질문의 답변과 평가가 완료되면 리포트를 확정할 수 있습니다.</span>';
     area.innerHTML =
       '<div><span>중간 결과</span><h2>지금까지의 답변을 확인하고 다음 단계를 선택하세요</h2>' +
       '<p>아직 리포트가 확정되지 않았습니다. 선택해 둔 질문을 이어서 답하거나 남은 질문을 추가할 수 있습니다.</p></div>' +
@@ -746,7 +773,7 @@
         : (pendingSelectedQuestions.length
           ? ''
           : '<span class="interim-actions__done">준비된 질문을 모두 답변했습니다</span>')) +
-      '<button id="finalize-session" class="btn btn--primary">면접 끝내고 리포트 확정</button></div>';
+      finalizeControl + '</div>';
     var resumeButton = document.getElementById('resume-selected-questions');
     if (resumeButton) {
       resumeButton.addEventListener('click', function () {
@@ -757,7 +784,8 @@
     }
     var addButton = document.getElementById('open-remaining-questions');
     if (addButton) addButton.addEventListener('click', openRemainingModal);
-    document.getElementById('finalize-session').addEventListener('click', finalizeSession);
+    var finalizeButton = document.getElementById('finalize-session');
+    if (finalizeButton) finalizeButton.addEventListener('click', finalizeSession);
   }
 
   function formatDate(value) {

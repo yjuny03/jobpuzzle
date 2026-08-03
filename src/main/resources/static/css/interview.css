@@ -1309,6 +1309,28 @@
   max-width: 980px;
   margin: 0 auto;
 }
+.live-interview-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  max-width: 980px;
+  margin: 0 auto 12px;
+}
+.live-session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .live-session-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .live-session-secondary-actions { flex-wrap: wrap; }
+  .live-session-actions > #submit-live-answer { align-self: flex-end; }
+}
 .live-question-heading {
   display: flex;
   justify-content: space-between;
@@ -1322,6 +1344,26 @@
   background: var(--color-primary-tint);
   border-radius: 8px;
   padding: 6px 10px;
+}
+
+/* 평가 처리 실패 답변은 일반 사용자 말풍선과 명확히 구분한다. */
+.jp-interview-page .live-conversation-turn.is-evaluation-failed {
+  width: fit-content;
+  max-width: 82%;
+  justify-self: end;
+}
+
+.jp-interview-page .live-conversation-turn.is-evaluation-failed p {
+  width: fit-content;
+  max-width: 100%;
+  border: 2px solid #D95B68;
+  background: #FFF0F2;
+  box-shadow: 4px 5px 0 rgba(146, 45, 57, .14);
+}
+
+.jp-interview-page .live-conversation-turn.is-evaluation-failed span {
+  color: #9B2637;
+  font-size: 11px;
 }
 .live-question-position {
   display: inline-flex;
@@ -2373,6 +2415,100 @@
   background: var(--jp-mode-weakness-soft);
 }
 
+.jp-interview-page .session-mode-icon,
+.jp-interview-page .prepared-analysis-check {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--jp-mode-basic);
+  border-radius: 12px;
+  background: var(--jp-mode-basic-soft);
+  color: var(--jp-mode-basic-deep);
+  box-shadow: var(--jp-shadow-small);
+}
+
+.jp-interview-page .mode-company-fit .session-mode-icon,
+.jp-interview-page .prepared-analysis-card--company-fit > .prepared-analysis-check {
+  border-color: var(--jp-mode-company);
+  background: var(--jp-mode-company-soft);
+  color: var(--jp-mode-company-deep);
+}
+
+.jp-interview-page .mode-weakness-review .session-mode-icon,
+.jp-interview-page .prepared-analysis-card--weakness > .prepared-analysis-check {
+  border-color: var(--jp-mode-weakness);
+  background: var(--jp-mode-weakness-soft);
+  color: var(--jp-mode-weakness-deep);
+}
+
+.jp-interview-page .session-mode-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 2px solid var(--jp-mode-basic);
+  border-radius: 7px;
+  background: var(--jp-mode-basic-soft);
+  color: var(--jp-mode-basic-deep) !important;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 2px 3px 0 rgba(40, 90, 122, .16);
+}
+
+.jp-interview-page .mode-company-fit .session-mode-badge,
+.jp-interview-page .prepared-analysis-card--company-fit .session-mode-badge {
+  border-color: var(--jp-mode-company);
+  background: var(--jp-mode-company-soft);
+  color: var(--jp-mode-company-deep) !important;
+  box-shadow: 2px 3px 0 rgba(81, 71, 122, .16);
+}
+
+.jp-interview-page .mode-weakness-review .session-mode-badge,
+.jp-interview-page .prepared-analysis-card--weakness .session-mode-badge {
+  border-color: var(--jp-mode-weakness);
+  background: var(--jp-mode-weakness-soft);
+  color: var(--jp-mode-weakness-deep) !important;
+  box-shadow: 2px 3px 0 rgba(116, 77, 88, .16);
+}
+
+.jp-interview-page .active-session-card,
+.jp-interview-page .review-ready-card { align-items: center; }
+.jp-interview-page .active-session-card .session-mode-icon,
+.jp-interview-page .review-ready-card .session-mode-icon { margin-right: 2px; }
+.jp-interview-page .active-session-card .active-session-main { flex: 1; }
+.jp-interview-page .review-ready-card > div:nth-child(2) { flex: 1; }
+
+.jp-interview-page .active-session-weakness-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-left: 6px;
+  padding: 5px 8px;
+  border: 2px solid #C65A65;
+  border-radius: 7px;
+  background: #FFF0F1;
+  color: #A33743;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 2px 3px 0 rgba(137, 48, 59, .14);
+}
+
+.jp-interview-page .live-interview-card.is-evaluating #live-answer {
+  border-color: #2D9B62;
+  box-shadow: 0 0 0 2px rgba(45, 155, 98, .12);
+  animation: live-answer-evaluating 1.15s linear infinite;
+}
+
+@keyframes live-answer-evaluating {
+  0% { outline: 0 solid rgba(45, 155, 98, .04); }
+  50% { outline: 5px solid rgba(45, 155, 98, .22); }
+  100% { outline: 0 solid rgba(45, 155, 98, .04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jp-interview-page .live-interview-card.is-evaluating #live-answer { animation: none; }
+}
+
 .jp-interview-page .question-selection-dialog {
   border: 3px solid #203e54;
   background:
@@ -2914,6 +3050,105 @@
   border: 2px dashed var(--jp-blue);
   background: var(--jp-paper-blue);
   color: var(--jp-ink);
+}
+
+/* 라이브 면접의 대화 영역도 질문별 결과의 "답변 과정" 구조로 보이게 한다. */
+.jp-interview-page .live-answer-process {
+  margin: 18px 0;
+  padding: 16px;
+  border: 2px solid #A8C8DE;
+  border-radius: 15px;
+  background: #EDF6FB;
+  box-shadow: 5px 6px 0 rgba(46, 76, 98, .10);
+}
+
+.jp-interview-page .live-answer-process-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #8EB7D1;
+}
+
+.jp-interview-page .live-answer-process-title span {
+  color: var(--jp-ink);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.jp-interview-page .live-answer-process-title small {
+  color: #527187;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.jp-interview-page .live-answer-process .live-conversation {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.jp-interview-page .live-conversation-turn.is-evaluation-failed p {
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 2px solid #D95B68;
+  background: #FFF0F2;
+  box-shadow: 4px 5px 0 rgba(146, 45, 57, .14);
+}
+
+.jp-interview-page .live-conversation-turn.is-evaluation-failed span {
+  color: #9A3748;
+}
+
+.jp-interview-page .live-conversation-turn.is-evaluation-failed span em {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #FBE4E7;
+  color: #A73345;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.jp-interview-page .live-follow-up {
+  border: 2px solid #A8C8DE;
+  border-left: 0;
+  background: #EDF6FB;
+  box-shadow: 5px 6px 0 rgba(46, 76, 98, .10);
+}
+
+.jp-interview-page .live-follow-up-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.jp-interview-page .live-follow-up-heading span,
+.jp-interview-page .live-follow-up-heading b {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.jp-interview-page .live-follow-up-heading span {
+  border: 2px solid var(--jp-blue);
+  background: var(--jp-paper-blue);
+  color: var(--jp-blue-deep);
+}
+
+.jp-interview-page .live-follow-up-heading b {
+  border: 1px solid #A8C8DE;
+  background: #FFFFFF;
+  color: #527187;
 }
 
 @media (max-width: 700px) {

@@ -31,6 +31,8 @@ public class SessionResponse {
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
     private LocalDateTime canceledAt;
+    private LocalDateTime lastActivityAt;
+    private LocalDateTime lastEvaluatedAt;
 
     public static SessionResponse from(InterviewSession session, int questionCount) {
         return from(session, questionCount, false);
@@ -73,6 +75,8 @@ public class SessionResponse {
                 .startedAt(session.getStartedAt())
                 .completedAt(session.getCompletedAt())
                 .canceledAt(session.getCanceledAt())
+                .lastActivityAt(session.getLastActivityAt())
+                .lastEvaluatedAt(null)
                 .build();
     }
 
@@ -86,6 +90,11 @@ public class SessionResponse {
 
     public SessionResponse withReviewReady(boolean value) {
         this.reviewReady = value;
+        return this;
+    }
+
+    public SessionResponse withLastEvaluatedAt(LocalDateTime value) {
+        this.lastEvaluatedAt = value;
         return this;
     }
 }

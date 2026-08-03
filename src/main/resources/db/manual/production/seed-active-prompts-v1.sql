@@ -8,11 +8,11 @@
 -- JSON-01 v1.2 | 채용공고 분석
 START TRANSACTION;
 UPDATE prompt_template
-SET is_active = FALSE, updated_at = NOW()
+SET is_active = FALSE
 WHERE prompt_code = 'PT-JOB-001' AND is_active = TRUE;
 
 INSERT INTO prompt_template (
-    prompt_code, name, version, target_json, template_text, forbidden_rules, is_active, created_at, updated_at
+    prompt_code, name, version, target_json, template_text, forbidden_rules, is_active, created_at
 ) VALUES (
     'PT-JOB-001',
     '채용공고 분석 프롬프트',
@@ -66,7 +66,7 @@ missingEvidence의 각 항목은 item과 reason을 가지며 두 문자열은 �
 )
 ON DUPLICATE KEY UPDATE
     name = VALUES(name), target_json = VALUES(target_json), template_text = VALUES(template_text),
-    forbidden_rules = VALUES(forbidden_rules), is_active = TRUE, updated_at = NOW();
+    forbidden_rules = VALUES(forbidden_rules), is_active = TRUE;
 COMMIT;
 
 -- JSON-02 v1.6 | 지원자 자료 분석
@@ -554,14 +554,14 @@ START TRANSACTION;
 UPDATE prompt_template SET is_active = FALSE
 WHERE target_json IN ('JSON-01','JSON-02','JSON-05','JSON-06','JSON-07','JSON-09','JSON-10','JSON-11');
 
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-JOB-001' AND version = 'v1.2';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-CAND-001' AND version = 'v1.6';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-JSON05-001' AND version = 'v1.10';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.2';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-REPORT-001' AND version = 'v1.9';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-WEAK-Q-001' AND version = 'v1.0';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-WEAK-A-001' AND version = 'v1.2';
-UPDATE prompt_template SET is_active = TRUE, updated_at = NOW() WHERE prompt_code = 'PT-BASIC-Q-001' AND version = 'v1.0';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-JOB-001' AND version = 'v1.2';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-CAND-001' AND version = 'v1.6';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-JSON05-001' AND version = 'v1.10';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-ANSWER-001' AND version = 'v1.2';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-REPORT-001' AND version = 'v1.9';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-WEAK-Q-001' AND version = 'v1.0';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-WEAK-A-001' AND version = 'v1.2';
+UPDATE prompt_template SET is_active = TRUE WHERE prompt_code = 'PT-BASIC-Q-001' AND version = 'v1.0';
 COMMIT;
 
 -- 실행 후 확인: 각 JSON별 active 행은 정확히 1개여야 한다.

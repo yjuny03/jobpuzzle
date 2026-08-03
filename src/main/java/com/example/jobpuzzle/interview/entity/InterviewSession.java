@@ -109,6 +109,10 @@ public class InterviewSession extends BaseTimeEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    // 진행 중 면접 목록의 최신 활동 정렬 기준
+    @Column(name = "last_activity_at")
+    private LocalDateTime lastActivityAt;
+
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
@@ -158,6 +162,7 @@ public class InterviewSession extends BaseTimeEntity {
                         : List.copyOf(questionSet.getBasisEvaluationIds());
 
         session.status = InterviewSessionStatus.CREATED;
+        session.lastActivityAt = LocalDateTime.now();
 
         return session;
     }
@@ -173,11 +178,17 @@ public class InterviewSession extends BaseTimeEntity {
             status = InterviewSessionStatus.IN_PROGRESS;
             startedAt = LocalDateTime.now();
         }
+        touch();
+    }
+
+    public void touch() {
+        lastActivityAt = LocalDateTime.now();
     }
 
     public void complete() {
         status = InterviewSessionStatus.COMPLETED;
         completedAt = LocalDateTime.now();
+        lastActivityAt = completedAt;
     }
 
     public void cancel() {

@@ -16,6 +16,7 @@ public class AnswerSubmitResponse {
     private boolean evaluationRetryRequired;
     private String evaluationRetryMessage;
     private boolean retryAnswerRequired;
+    private boolean answerAttemptsExhausted;
     private int remainingAnswerRetries;
     private String retryAnswerMessage;
     private Long followUpQuestionMessageId;

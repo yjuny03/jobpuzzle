@@ -31,6 +31,12 @@ public interface InterviewMessageRepository
             Collection<InterviewMessageType> messageTypes
     );
 
+    // 현재 질문을 명시적으로 마칠 수 있는지 확인한다. 평가 실패 답변도 제출 이력으로 본다.
+    boolean existsBySessionQuestion_SessionQuestionIdAndMessageTypeIn(
+            Long sessionQuestionId,
+            Collection<InterviewMessageType> messageTypes
+    );
+
     // 특정 세션 질문에서 생성된 꼬리질문 개수 확인
     long countBySessionQuestion_SessionQuestionIdAndMessageType(
             Long sessionQuestionId,
@@ -39,6 +45,12 @@ public interface InterviewMessageRepository
 
     // 동일 질문 메시지에 이미 사용자 답변이 제출됐는지 확인
     boolean existsByParentMessage_MessageIdAndSenderAndMessageTypeIn(
+            Long parentMessageId,
+            InterviewMessageSender sender,
+            Collection<InterviewMessageType> messageTypes
+    );
+
+    long countByParentMessage_MessageIdAndSenderAndMessageTypeIn(
             Long parentMessageId,
             InterviewMessageSender sender,
             Collection<InterviewMessageType> messageTypes

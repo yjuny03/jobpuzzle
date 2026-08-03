@@ -93,7 +93,8 @@ public class AnswerEvaluationService {
             String failureTraceId = EvaluationFailureDiagnostics.newTraceId();
             AiCallLogErrorType errorType = EvaluationFailureDiagnostics.errorType(exception);
             String failureDetail = EvaluationFailureDiagnostics.failureDetail(exception);
-            callLog.fail(errorType, failureTraceId + " | " + errorType);
+            // 화면에는 재제출 안내만 보이고, 원인 추적은 AI 호출 이력에 남긴다.
+            callLog.fail(errorType, failureTraceId + " | " + errorType + " | " + failureDetail);
             log.error(
                     "ai_evaluation_failed traceId={} aiCallLogId={} sessionId={} sessionQuestionId={} "
                             + "answerMessageId={} answerType={} parentMessageId={} mode={} stage={} "
