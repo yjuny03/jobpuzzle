@@ -1356,6 +1356,7 @@
 .jp-interview-page .live-conversation-turn.is-evaluation-failed p {
   width: fit-content;
   max-width: 100%;
+  margin-left: auto;
   border: 2px solid #D95B68;
   background: #FFF0F2;
   box-shadow: 4px 5px 0 rgba(146, 45, 57, .14);
@@ -3093,6 +3094,7 @@
 .jp-interview-page .live-conversation-turn.is-evaluation-failed p {
   width: fit-content;
   max-width: 100%;
+  margin-left: auto;
   box-sizing: border-box;
   border: 2px solid #D95B68;
   background: #FFF0F2;

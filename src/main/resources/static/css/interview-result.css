@@ -2210,6 +2210,7 @@
 .jp-interview-result-page .result-conversation-item.is-evaluation-failed.is-user p {
   width: fit-content;
   max-width: 100%;
+  margin-left: auto;
   box-sizing: border-box;
   border: 2px solid #D95B68;
   background: #FFF0F2;
