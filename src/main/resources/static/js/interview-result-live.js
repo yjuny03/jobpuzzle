@@ -752,13 +752,13 @@
       scoreByQuestion[key] = sessionScoreByQuestion[key];
     });
     var selectedQuestions = sessionQuestions || [];
-    var canFinalize = selectedQuestions.length > 0 && selectedQuestions.every(function (question) {
+    var canFinalize = selectedQuestions.some(function (question) {
       var questionScore = scoreByQuestion[question.sessionQuestionId];
       return question.status === 'COMPLETED' && questionScore && questionScore.finalScore != null;
     });
     var finalizeControl = canFinalize
       ? '<button id="finalize-session" class="btn btn--primary">면접 끝내고 리포트 확정</button>'
-      : '<span class="interim-actions__blocked">모든 선택 질문의 답변과 평가가 완료되면 리포트를 확정할 수 있습니다.</span>';
+      : '<span class="interim-actions__blocked">점수가 산출된 완료 질문이 1개 이상 있어야 리포트를 확정할 수 있습니다.</span>';
     area.innerHTML =
       '<div><span>중간 결과</span><h2>지금까지의 답변을 확인하고 다음 단계를 선택하세요</h2>' +
       '<p>아직 리포트가 확정되지 않았습니다. 선택해 둔 질문을 이어서 답하거나 남은 질문을 추가할 수 있습니다.</p></div>' +

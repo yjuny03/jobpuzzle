@@ -774,15 +774,9 @@ public class InterviewSessionService {
         InterviewSession session = getOwnedSession(userId, sessionId);
         validateEditable(session);
 
-        boolean hasAnswer = interviewMessageRepository
-                .existsBySessionQuestion_Session_SessionIdAndMessageTypeIn(
-                        sessionId,
-                        List.of(
-                                InterviewMessageType.ORIGINAL_ANSWER,
-                                InterviewMessageType.FOLLOW_UP_ANSWER
-                        )
-                );
-        if (!hasAnswer) {
+        boolean hasSuccessfulEvaluation = answerEvaluationRepository
+                .existsBySessionQuestion_Session_SessionId(sessionId);
+        if (!hasSuccessfulEvaluation) {
             throw new CustomException(ErrorCode.SESSION_CANNOT_BE_COMPLETED);
         }
 

@@ -30,6 +30,8 @@ public interface AnswerEvaluationRepository
             Long sessionId
     );
 
+    boolean existsBySessionQuestion_Session_SessionId(Long sessionId);
+
     // 최종 리포트 팀 코드가 기존 이름으로 호출할 수 있도록 만든 호환 메서드
     default Optional<AnswerEvaluation> findByAnswerMessageId(
             Long answerMessageId
