@@ -299,10 +299,16 @@
     });
   }
 
-  function message(text, error) {
+  function message(text, error, generationMode) {
     hideActiveSection();
+    var loadingContent = generationMode
+      ? '<div class="question-generation-loading" role="status" aria-live="polite">' +
+          '<canvas class="question-generation-loading__puzzle" data-job-puzzle-scene aria-hidden="true"></canvas>' +
+          '<p class="question-generation-loading__message">' + esc(text) + '</p>' +
+        '</div>'
+      : '<p style="font-size:14px;color:' + (error ? '#B5433D' : '#5B6370') + ';">' + esc(text) + '</p>';
     root.innerHTML = '<div class="card card--pad-lg" style="text-align:center;padding:48px 20px;">' +
-      '<p style="font-size:14px;color:' + (error ? '#B5433D' : '#5B6370') + ';">' + esc(text) + '</p>' +
+      loadingContent +
       (error ? '<a class="btn btn--primary" href="' + window.JobPuzzleRoutes.path('/interview') + '" style="text-decoration:none;">면접 준비로 돌아가기</a>' : '') +
       '</div>';
   }
@@ -472,7 +478,7 @@
   }
 
   function startBasic() {
-    message('직무 기준에 맞는 기본 질문을 생성하고 있습니다.');
+    message('직무 기준에 맞는 기본 질문을 생성하고 있습니다.', false, 'BASIC');
     Promise.all([api(window.JobPuzzleRoutes.path('/user/me')), api(window.JobPuzzleRoutes.path('/job-category'))]).then(function (values) {
       var user = values[0];
       var categories = values[1] || [];
@@ -492,7 +498,7 @@
   }
 
   function startWeakness(tag) {
-    message('선택한 약점의 최근 평가를 바탕으로 질문을 생성하고 있습니다.');
+    message('선택한 약점에 맞는 보완 질문을 생성하고 있습니다.', false, 'WEAKNESS_REVIEW');
     api(window.JobPuzzleRoutes.path('/question-sets/weakness'), {
       method: 'POST',
       json: { targetWeaknessTag: tag }
@@ -680,7 +686,11 @@
     followUpMessageId = question.pendingFollowUpMessageId || null;
     var hasAnyAnswer = questions.some(function (item) { return item.answerSubmitted; });
     var actionLabel = hasAnyAnswer ? '선택한 질문 답변 마치기' : '답변 전 세션 취소';
-    var skipQuestionButton = questions.length > 1
+    var hasAnotherPendingQuestion = questions.some(function (item, index) {
+      return index !== currentIndex &&
+        (item.status === 'PENDING' || item.status === 'IN_PROGRESS');
+    });
+    var skipQuestionButton = hasAnotherPendingQuestion
       ? '<button id="skip-current-question" class="btn btn--ghost">건너뛰기</button>'
       : '';
     var currentResultButton = '<button id="view-current-result" class="btn btn--outline">현재 결과 확인</button>';

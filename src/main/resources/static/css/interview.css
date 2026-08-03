@@ -1812,6 +1812,59 @@
   box-shadow: var(--jp-shadow);
 }
 
+/* Question generation keeps the existing card footprint and only replaces its message line. */
+.jp-interview-page .question-generation-loading {
+  position: relative;
+  display: flex;
+  height: 122px;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.jp-interview-page .question-generation-loading__puzzle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 420px;
+  height: 190px;
+  max-width: 100%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.jp-interview-page .question-generation-loading__message {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  margin: 0 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 252, 244, .84);
+  color: #38536B;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .jp-interview-page .question-generation-loading {
+    height: 112px;
+  }
+
+  .jp-interview-page .question-generation-loading__puzzle {
+    width: 300px;
+    height: 158px;
+  }
+
+  .jp-interview-page .question-generation-loading__message {
+    font-size: 13px;
+  }
+}
+
 .jp-interview-page .mode-card,
 .jp-interview-page .weak-pick-row,
 .jp-interview-page .material-doc-row,
