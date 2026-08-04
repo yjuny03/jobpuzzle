@@ -90,6 +90,17 @@
     return types;
   }
 
+  // 분석 생성 당시 선택한 자료명과 버전을 상단에 읽기 쉬운 한 줄로 표시합니다.
+  function analysisSourceText(analysisCase) {
+    var sources = analysisCase && Array.isArray(analysisCase.sources) ? analysisCase.sources : [];
+    if (!sources.length) return '사용 자료를 확인할 수 없음';
+    return sources.map(function (source) {
+      var version = source.majorVersion != null && source.minorVersion != null
+        ? ' v' + source.majorVersion + '.' + source.minorVersion : '';
+      return sourceTypeLabel(source.documentType) + ': ' + (source.displayName || '이름 없는 자료') + version;
+    }).join(' · ');
+  }
+
   function section(title, description, count) {
     var card = node('section', 'result-card');
     var head = node('header', 'result-card__head');
@@ -138,12 +149,15 @@
       + needsWork + '개는 연결 근거를 더 보완하면 좋아요. 아래에서 세부 내용과 준비 과제를 확인해 보세요.';
   }
 
-  function renderTop(result, counts, questions) {
+  function renderTop(result, analysisCase, counts, questions) {
     var topbar = node('div', 'result-topbar');
     var back = node('a', 'result-breadcrumb', '면접 준비로 돌아가기');
     back.href = window.JobPuzzleRoutes.path('/interview');
     topbar.appendChild(back);
-    topbar.appendChild(node('span', 'result-date', '분석 #' + result.analysisCaseId + ' · 저장된 결과'));
+    var resultInfo = node('span', 'result-date',
+      '분석 #' + result.analysisCaseId + ' · 사용 자료: ' + analysisSourceText(analysisCase));
+    resultInfo.title = resultInfo.textContent;
+    topbar.appendChild(resultInfo);
     root.appendChild(topbar);
 
     var total = (result.requirementMatches || []).length;
@@ -465,13 +479,13 @@
     return card;
   }
 
-  function render(result) {
+  function render(result, analysisCase) {
     root.replaceChildren();
     root.setAttribute('aria-busy', 'false');
     var matches = result.requirementMatches || [];
     var questions = result.questionSet && result.questionSet.questions || [];
     var counts = countByLevel(matches);
-    renderTop(result, counts, questions);
+    renderTop(result, analysisCase, counts, questions);
     var layout = node('div', 'result-layout');
     var main = node('div', 'result-main');
     main.appendChild(renderMatches(result));
@@ -507,9 +521,13 @@
           window.JobPuzzleRoutes.path('/analysis/' + encodeURIComponent(caseId)), '분석 상태 확인');
         return null;
       }
-      return api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + '/result'));
+      return Promise.all([
+        api(window.JobPuzzleRoutes.path('/analysis/cases/' + caseId + '/result')),
+        // 자료 정보 조회 실패가 기존 분석 결과 화면까지 막지 않도록 보조 정보만 선택적으로 사용합니다.
+        api(window.JobPuzzleRoutes.path('/analysis-cases/' + caseId)).catch(function () { return null; })
+      ]);
     })
-    .then(function (result) { if (result) render(result); })
+    .then(function (values) { if (values) render(values[0], values[1]); })
     .catch(function (error) {
       var message = error.status === 403
         ? '이 분석 결과를 볼 권한이 없습니다.'
