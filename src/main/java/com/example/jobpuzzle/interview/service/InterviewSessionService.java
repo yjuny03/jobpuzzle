@@ -658,8 +658,7 @@ public class InterviewSessionService {
                         List.of(
                                 InterviewMessageType.ORIGINAL_ANSWER,
                                 InterviewMessageType.FOLLOW_UP_ANSWER,
-                                InterviewMessageType.REJECTED_ANSWER,
-                                InterviewMessageType.EVALUATION_FAILED_ANSWER
+                                InterviewMessageType.REJECTED_ANSWER
                         )
                 );
         boolean attemptsExhausted = previousAnswerAttempts >= MAX_ADDITIONAL_ANSWER_RETRIES;
@@ -686,6 +685,32 @@ public class InterviewSessionService {
                 request.getAnswerType(),
                 request.getMessageText().trim()
         ));
+        if (AnswerTextValidity.isUnusable(answer.getMessageText())) {
+            answer.rejectAnswer();
+            if (attemptsExhausted) {
+                sessionQuestion.complete();
+            }
+            return AnswerSubmitResponse.builder()
+                    .answerMessageId(answer.getMessageId())
+                    .summary(attemptsExhausted
+                            ? "답변을 평가할 수 없어 이 질문을 미평가로 종료합니다."
+                            : "질문과 관련된 경험이나 생각을 다시 답변해 주세요.")
+                    .evaluationFailed(attemptsExhausted)
+                    .retryAnswerRequired(!attemptsExhausted)
+                    .answerAttemptsExhausted(attemptsExhausted)
+                    .remainingAnswerRetries((int) Math.max(
+                            0,
+                            MAX_ADDITIONAL_ANSWER_RETRIES - previousAnswerAttempts
+                    ))
+                    .retryAnswerMessage(attemptsExhausted
+                            ? null
+                            : "질문과 관련된 경험이나 생각을 다시 답변해 주세요.")
+                    .sessionStatus(session.getStatus())
+                    .nextQuestion(attemptsExhausted
+                            ? getNextQuestion(userId, session.getSessionId())
+                            : SessionQuestionResponse.from(sessionQuestion))
+                    .build();
+        }
 
         AnswerEvaluationService.EvaluationOutcome outcome =
                 answerEvaluationService.evaluateAnswer(answer);

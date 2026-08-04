@@ -707,7 +707,7 @@
           var label = item.messageType === 'ORIGINAL_ANSWER'
             ? '첫 답변'
             : item.messageType === 'REJECTED_ANSWER'
-              ? '평가 처리 실패 답변'
+              ? '재답변 필요 답변'
             : item.messageType === 'EVALUATION_FAILED_ANSWER'
               ? '평가 처리 실패 답변'
             : item.messageType === 'FOLLOW_UP_QUESTION'
