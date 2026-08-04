@@ -13,17 +13,18 @@ class PromptTemplateDeploymentArtifactTest {
     private static final Path MANUAL_SQL = Path.of("src/main/resources/db/manual");
 
     @Test
-    void latestJson01ActivationSqlUsesTheV11ToV12EvidenceContractReplacement() throws IOException {
-        // JSON-01 최신 배포본만 읽어 v1.2 근거 인용 계약과 이전 활성본 비활성화를 확인한다.
-        String sql = Files.readString(MANUAL_SQL.resolve("activate-json-01-v1.2.sql"));
+    void latestJson01SqlTemplateTextMatchesCanonicalPromptFile() throws IOException {
+        // JSON-01 최신 v1.3 SQL 본문과 무관 조건 제외 계약이 현재 정본과 일치하는지 검증한다.
+        String sql = Files.readString(MANUAL_SQL.resolve("activate-json-01-v1.3.sql"));
 
         assertThat(sql).contains(
-                "'v1.2'",
-                "WHERE prompt_code = 'PT-JOB-001' AND version = 'v1.1'",
-                "20~160자의 연속 원문 문자열",
+                "'v1.3'",
+                "학력 무관, 경력 무관, 성별 무관, 연령 무관",
                 "UPDATE prompt_template",
                 "WHERE target_json = 'JSON-01' AND is_active = TRUE"
         );
+        assertThat(sqlLiteral("activate-json-01-v1.3.sql", "PT-JOB-001"))
+                .isEqualTo(prompt("json-01-v1.3.txt"));
     }
 
     @Test

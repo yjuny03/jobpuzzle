@@ -137,6 +137,26 @@ class AiResponseProcessorTest {
     }
 
     @Test
+    void removesOnlyNonEvaluativeRequirementsFromJson01() {
+        String sourceRef = "[{\"extractionId\":10,\"documentId\":20,\"documentType\":\"JOB_POSTING\","
+                + "\"pageNumber\":1,\"segmentId\":\"seg-001\",\"evidenceText\":\"검증 가능한 공고 근거\"}]";
+        String response = validJobJson("10", "20", "JOB_POSTING", "1", "seg-001", "검증 가능한 공고 근거")
+                .replace("\"requirements\":[]", "\"requirements\":["
+                        + "{\"requirementId\":\"req-1\",\"text\":\"학력 무관\",\"sourceRefs\":" + sourceRef + "},"
+                        + "{\"requirementId\":\"req-2\",\"text\":\"학사 이상\",\"sourceRefs\":" + sourceRef + "}]")
+                .replace("\"preferred\":[]", "\"preferred\":["
+                        + "{\"requirementId\":\"pref-1\",\"text\":\"경력 제한 없음\",\"sourceRefs\":" + sourceRef + "},"
+                        + "{\"requirementId\":\"pref-2\",\"text\":\"관련 전공 우대\",\"sourceRefs\":" + sourceRef + "}]");
+
+        JobPostingAnalysisResult result = processor.parseJobPosting(response, List.of(jobPosting));
+
+        assertThat(result.getRequirements()).extracting(JobPostingAnalysisResult.Requirement::getText)
+                .containsExactly("학사 이상");
+        assertThat(result.getPreferred()).extracting(JobPostingAnalysisResult.Requirement::getText)
+                .containsExactly("관련 전공 우대");
+    }
+
+    @Test
     void fillsMissingEvidenceTextFromSelectedMarkerForJson02() {
         String candidate = """
                 {"availableDocumentTypes":["RESUME"],"resume":{"experiences":[{"experienceId":"exp-1","title":"개발","period":"2024","summary":"서버 개발","sourceRefs":[{"extractionId":11,"documentId":21,"documentType":"RESUME","pageNumber":1,"segmentId":"seg-002"}]}],"skills":[],"roles":[],"results":[]},"coverLetter":null,"portfolio":null,"experienceNote":null,"missingEvidence":[]}

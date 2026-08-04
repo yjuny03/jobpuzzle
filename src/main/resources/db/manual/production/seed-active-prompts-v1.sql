@@ -5,7 +5,7 @@
 --       과거 버전/업그레이드 스크립트는 이 파일에서 실행하지 않는다.
 
 -- JSON-01 ~ JSON-11 최신본을 아래 순서대로 추가한다.
--- JSON-01 v1.2 | 채용공고 분석
+-- JSON-01 v1.3 | 채용공고 분석
 START TRANSACTION;
 UPDATE prompt_template
 SET is_active = FALSE
@@ -16,7 +16,7 @@ INSERT INTO prompt_template (
 ) VALUES (
     'PT-JOB-001',
     '채용공고 분석 프롬프트',
-    'v1.2',
+    'v1.3',
     'JSON-01',
     '당신은 채용공고와 회사정보를 구조화하는 JSON-01 분석기다.
 설명문, Markdown, 코드블록 없이 아래 출력 계약을 만족하는 단일 JSON 객체만 반환한다.
@@ -40,6 +40,11 @@ evidenceText는 선택한 marker 바로 뒤 segment에서 복사한 20~160자의
 요약, 재서술, 번역, 맞춤법 보정, 공백·줄바꿈 정규화, 여러 구간 결합, 조사 변경을 절대 하지 않는다. text 필드에는 분석·요약을 써도 되지만 evidenceText에는 절대 적용하지 않는다.
 각 sourceRefs를 출력하기 직전에 선택한 segment 안에 evidenceText가 문자 단위로 그대로 존재하는지 확인한다. 확인할 수 없으면 sourceRefs를 만들지 말고 해당 항목을 생략하거나 missingEvidence에 부족 사유를 기록한다.
 근거가 필요한 항목에는 위 규칙을 만족하는 sourceRefs를 하나 이상 넣는다.
+
+[REQUIREMENT_FILTER_RULES]
+requirements와 preferred에는 지원자가 충족하거나 보완해야 하는 실제 자격·경험·기술 조건만 포함한다.
+학력 무관, 경력 무관, 성별 무관, 연령 무관, 학력 제한 없음, 경력 제한 없음처럼 지원 제한이 없음을 나타내는 문구는 requirements와 preferred에 포함하지 않는다.
+학사 이상, 관련 전공 필수·우대, 경력 N년 이상처럼 실제 지원 조건을 나타내는 항목은 제외하지 않는다.
 
 [OUTPUT_CONTRACT]
 최상위 필드는 mainTasks, requirements, preferred, companyValues, coreCompetencies, conflicts, missingEvidence만 사용한다. 모든 최상위 배열은 반드시 포함하며, 항목이 없으면 []를 사용한다.
