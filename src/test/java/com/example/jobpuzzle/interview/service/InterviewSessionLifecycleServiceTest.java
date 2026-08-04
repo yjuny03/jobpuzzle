@@ -71,9 +71,6 @@ class InterviewSessionLifecycleServiceTest {
                 7L, InterviewSessionMode.COMPANY_FIT, QuestionSetStatus.ACTIVE
         )).thenReturn(List.of(consumed));
         when(interviewSessionRepository.existsByQuestionSet_QuestionSetId(41L)).thenReturn(true);
-        when(weaknessTagStatusRepository.existsByUser_UserIdAndStatus(
-                7L, WeaknessTagResolveStatus.UNRESOLVED
-        )).thenReturn(false);
 
         var companyFit = service.getAvailableModes(7L).getModes().stream()
                 .filter(mode -> mode.getMode() == InterviewSessionMode.COMPANY_FIT)
