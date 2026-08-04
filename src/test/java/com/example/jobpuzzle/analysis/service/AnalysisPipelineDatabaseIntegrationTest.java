@@ -266,7 +266,7 @@ class AnalysisPipelineDatabaseIntegrationTest {
         saveSource(user, analysisCase, UserDocumentType.JOB_POSTING, "Java와 Spring Boot 기반 백엔드 개발자를 찾습니다.");
         saveSource(user, analysisCase, UserDocumentType.RESUME, "Java와 Spring Boot로 REST API를 구현한 백엔드 개발 경험이 있습니다.");
         JobGuideDocument guide = withActiveGuide ? saveActiveCategoryGuide(user, category, suffix) : null;
-        savePrompt("PT-JOB-" + suffix, "JSON-01", "prompts/json-01-v1.2.txt");
+        savePrompt("PT-JOB-" + suffix, "JSON-01", "prompts/json-01-v1.3.txt");
         savePrompt("PT-CAND-" + suffix, "JSON-02", "prompts/json-02-v1.6.txt");
         savePrompt("PT-SYN-" + suffix, "JSON-05", "prompts/json-05-v1.10.txt");
         return new Fixture(user, analysisCase, guide);

@@ -82,7 +82,25 @@ public class AiResponseProcessor {
                 .filter(conflict -> isVerifiableConflict(conflict, markers))
                 .toList());
         validateMissingEvidence(result.getMissingEvidence(), "missingEvidence");
+        // 지원 제한이 없다는 안내 문구는 충족도·질문·액션플랜의 평가 대상에서 제외한다.
+        result.setRequirements(filterNonEvaluativeRequirements(result.getRequirements()));
+        result.setPreferred(filterNonEvaluativeRequirements(result.getPreferred()));
         return result;
+    }
+
+    // 실제 학력·경력 조건과 혼동하지 않도록 명시적인 무관 문구만 제한적으로 제거한다.
+    private List<JobPostingAnalysisResult.Requirement> filterNonEvaluativeRequirements(
+            List<JobPostingAnalysisResult.Requirement> requirements
+    ) {
+        return requirements.stream()
+                .filter(requirement -> !isNonEvaluativeRequirement(requirement.getText()))
+                .toList();
+    }
+
+    private boolean isNonEvaluativeRequirement(String text) {
+        if (text == null) return false;
+        String normalized = text.replaceAll("[·•]", " ").replaceAll("\\s+", " ").trim();
+        return normalized.matches("^(학력|경력|성별|연령)\\s*[:：-]?\\s*(무관|제한 없음)$");
     }
 
     // JSON-02 응답은 실제 선택된 지원자 자료 유형과 marker를 모두 echo-only로 검증한다.
