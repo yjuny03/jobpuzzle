@@ -110,6 +110,11 @@ app:
     generation:
       # 운영 기본은 모든 생성 stage가 같은 provider를 사용한다. stage override는 ai-e2e profile에서만 둔다.
       default-provider: ${AI_GENERATION_DEFAULT_PROVIDER:mock}
+      # thinking 끄기 위한 설정
+      thinking-by-stage:
+        JOB_POSTING_ANALYSIS: disabled
+        CANDIDATE_MATERIAL_ANALYSIS: disabled
+        CUSTOMIZED_SYNTHESIS: disabled
       anthropic:
         api-key: ${ANTHROPIC_API_KEY:}
         model: ${ANTHROPIC_MODEL:}
