@@ -6,7 +6,7 @@ import com.example.jobpuzzle.analysis.dto.AnalysisStatusResponse;
 import com.example.jobpuzzle.analysis.entity.AnalysisCaseStatus;
 import com.example.jobpuzzle.analysis.service.AnalysisCaseService;
 import com.example.jobpuzzle.analysis.service.AnalysisResultQueryService;
-import com.example.jobpuzzle.analysis.service.AnalysisService;
+import com.example.jobpuzzle.analysis.service.AnalysisRunDispatcher;
 import com.example.jobpuzzle.analysis.service.AnalysisStatusQueryService;
 import com.example.jobpuzzle.analysis.service.CompanyFitQuestionSetQueryService;
 import com.example.jobpuzzle.global.error.CustomException;
@@ -40,15 +40,15 @@ class AnalysisControllerTest {
     private static final long CASE_ID = 31L;
 
     @Autowired private MockMvc mockMvc;
-    @MockBean private AnalysisService analysisService;
+    @MockBean private AnalysisRunDispatcher analysisRunDispatcher;
     @MockBean private AnalysisCaseService analysisCaseService;
     @MockBean private AnalysisResultQueryService resultQueryService;
     @MockBean private AnalysisStatusQueryService statusQueryService;
     @MockBean private CompanyFitQuestionSetQueryService questionSetQueryService;
 
     @Test
-    void runReturnsTheCurrentCaseStatusAfterSuccessfulExecution() throws Exception {
-        // 성공한 /run은 실행 뒤 다시 조회한 현재 case 상태를 ApiResponse로 반환한다.
+    void runAcceptsTheRequestAndReturnsTheCurrentCaseStatus() throws Exception {
+        // /run은 분석을 백그라운드에 넘긴 뒤 202와 현재 case 상태(ANALYZING)를 바로 반환한다.
         AnalysisCaseResponse response = org.mockito.Mockito.mock(AnalysisCaseResponse.class);
         when(response.getStatus()).thenReturn(AnalysisCaseStatus.ANALYZING);
         when(analysisCaseService.getCase(USER_ID, CASE_ID)).thenReturn(response);
@@ -57,12 +57,12 @@ class AnalysisControllerTest {
                 .with(authenticatedUser())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value("success"))
                 .andExpect(jsonPath("$.data.status").value("ANALYZING"));
 
-        verify(analysisService).runCustomizedAnalysis(USER_ID, CASE_ID);
+        verify(analysisRunDispatcher).dispatch(USER_ID, CASE_ID);
         verify(analysisCaseService).getCase(USER_ID, CASE_ID);
     }
 
@@ -76,6 +76,12 @@ class AnalysisControllerTest {
     void runPreservesRetrievalIntegrityCodeAndMessage() throws Exception {
         // retrieval 무결성 오류는 ANALYSIS_010으로 일반 서버 오류와 구분한다.
         assertRunFailure(ErrorCode.JSON05_RESULT_INTEGRITY_CONFLICT);
+    }
+
+    @Test
+    void runReportsQueueFullWhenTheAnalysisPoolCannotAcceptMoreWork() throws Exception {
+        // 분석 대기열이 가득 차 접수하지 못하면 503과 ANALYSIS_018로 다시 시도하도록 안내한다.
+        assertRunFailure(ErrorCode.ANALYSIS_QUEUE_FULL);
     }
 
     @Test
@@ -114,7 +120,7 @@ class AnalysisControllerTest {
 
     private void assertRunFailure(ErrorCode errorCode) throws Exception {
         // /run 예외가 HTTP status와 code/message로 손실 없이 변환되는지 검증한다.
-        doThrow(new CustomException(errorCode)).when(analysisService).runCustomizedAnalysis(USER_ID, CASE_ID);
+        doThrow(new CustomException(errorCode)).when(analysisRunDispatcher).dispatch(USER_ID, CASE_ID);
 
         mockMvc.perform(post("/analysis/cases/{caseId}/run", CASE_ID)
                         .with(authenticatedUser()).with(csrf()))

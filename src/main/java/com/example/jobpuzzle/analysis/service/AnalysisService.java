@@ -76,14 +76,34 @@ public class AnalysisService {
         candidateMaterialPartitionOrchestrator.execute(context, candidateSources);
     }
 
-    // JSON-01·02와 JSON-04 뒤에 snapshot 고정 retrieval을 준비한 다음 JSON-05를 실행한다.
+    // 실행 소유권을 얻고 바로 이어서 전체 분석을 실행한다 (같은 스레드에서 끝까지 실행).
     public void runCustomizedAnalysis(Long userId, Long analysisCaseId) {
+        if (startCustomizedAnalysis(userId, analysisCaseId)) {
+            continueCustomizedAnalysis(userId, analysisCaseId);
+        }
+    }
+
+    // [요청 스레드] 실행 소유권을 얻고, AI를 부르기 전에 확인할 수 있는 조건을 빠르게 검사한다.
+    // 여기서 실패하면 오류를 HTTP 응답으로 바로 돌려줄 수 있다. 소유권을 얻지 못하면(이미 분석 중) false.
+    public boolean startCustomizedAnalysis(Long userId, Long analysisCaseId) {
         // 상태 잠금으로 새 실행 소유권을 얻지 못한 동시 요청은 기존 실행을 그대로 둔다.
         if (!statusTransitionService.startOrRestart(userId, analysisCaseId)) {
-            return;
+            return false;
         }
         try {
             vectorIndexService.requireReady(userId, analysisCaseId);
+            guideContextService.requireAvailableGuide(userId, analysisCaseId);
+            return true;
+        } catch (RuntimeException exception) {
+            statusTransitionService.failIfAnalyzing(userId, analysisCaseId);
+            throw exception;
+        }
+    }
+
+    // [백그라운드] JSON-01·02와 JSON-04 뒤에 snapshot 고정 retrieval을 준비한 다음 JSON-05를 실행한다.
+    // startCustomizedAnalysis로 실행 소유권을 얻은 뒤에만 호출한다.
+    public void continueCustomizedAnalysis(Long userId, Long analysisCaseId) {
+        try {
             runInitialAnalysis(userId, analysisCaseId);
 
             Long snapshotId = analysisInputSnapshotRepository
