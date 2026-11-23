@@ -38,8 +38,8 @@ public class AsyncConfig {
         return executor;
     }
 
-    // 자료 분석(JSON-02)의 분할 호출을 동시에 실행하는 풀. 모든 분석이 함께 쓰므로 동시 Claude 호출 수의 상한이 된다.
-    // 풀이 바쁘면 거절하지 않고 호출한 스레드가 직접 실행해(CallerRunsPolicy) 분할 결과를 잃지 않는다.
+    // 자료 분석(JSON-02)의 분할 호출을 동시에 실행하는 풀. 모든 분석이 함께 쓰므로 분할 호출의 동시 실행 수 상한이 된다.
+    // 스레드와 대기열이 모두 차면 거절하지 않고 호출한 스레드가 직접 실행해(CallerRunsPolicy) 분할 결과를 잃지 않는다.
     @Bean(name = "json02PartitionExecutor")
     public ThreadPoolTaskExecutor json02PartitionExecutor(
             @Value("${app.ai.generation.json02-partition-concurrency:3}") int concurrency) {
