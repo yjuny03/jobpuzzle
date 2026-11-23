@@ -1,11 +1,13 @@
 package com.example.jobpuzzle.global.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 @EnableAsync
@@ -32,6 +34,21 @@ public class AsyncConfig {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("analysis-run-");
+        executor.initialize();
+        return executor;
+    }
+
+    // 자료 분석(JSON-02)의 분할 호출을 동시에 실행하는 풀. 모든 분석이 함께 쓰므로 동시 Claude 호출 수의 상한이 된다.
+    // 풀이 바쁘면 거절하지 않고 호출한 스레드가 직접 실행해(CallerRunsPolicy) 분할 결과를 잃지 않는다.
+    @Bean(name = "json02PartitionExecutor")
+    public ThreadPoolTaskExecutor json02PartitionExecutor(
+            @Value("${app.ai.generation.json02-partition-concurrency:3}") int concurrency) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(concurrency);
+        executor.setMaxPoolSize(concurrency);
+        executor.setQueueCapacity(50);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setThreadNamePrefix("json02-partition-");
         executor.initialize();
         return executor;
     }
