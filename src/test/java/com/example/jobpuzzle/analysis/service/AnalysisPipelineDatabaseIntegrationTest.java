@@ -213,8 +213,10 @@ class AnalysisPipelineDatabaseIntegrationTest {
     void retriesAfterJson05FailureAndReusesCompletedInitialStagesGuideAndRetrievals() throws IOException {
         Fixture fixture = fixture();
         AnalysisInputSnapshotResponse snapshot = analysisCaseService.confirmInput(fixture.user().getUserId(), fixture.analysisCase().getAnalysisCaseId());
-        doThrow(new AiProcessingException(com.example.jobpuzzle.ai.log.AiCallLogErrorType.RESPONSE_VALIDATION_FAILED, "forced JSON-05 failure"))
-                .doCallRealMethod().when(mockAiClient).generateCustomizedAnalysis(any());
+        // 재시도가 허용되는 일시적 실패(TIMEOUT)로 만든다. 응답 검증 실패는 같은 입력이면 결과가 같아 재시도를 막는다(retryBlocked).
+        doThrow(new AiProcessingException(com.example.jobpuzzle.ai.log.AiCallLogErrorType.TIMEOUT, "forced JSON-05 failure"))
+                // 실제 v1.10 프롬프트는 V18 경로(구조화된 출력)로 JSON-05를 호출한다.
+                .doCallRealMethod().when(mockAiClient).generateCustomizedAnalysisV18(any(), any());
 
         assertThatThrownBy(() -> analysisService.runCustomizedAnalysis(fixture.user().getUserId(), fixture.analysisCase().getAnalysisCaseId()))
                 .isInstanceOf(CustomException.class)
@@ -294,9 +296,11 @@ class AnalysisPipelineDatabaseIntegrationTest {
 
     // 배포 정본 프롬프트를 테스트 DB에도 그대로 넣어 renderer와 MockAiClient 태그 계약을 함께 검증한다.
     private void savePrompt(String code, String targetJson, String resourcePath) throws IOException {
+        // 실행기는 프롬프트 버전으로 처리 경로를 고르므로, 파일 이름의 실제 버전(v1.3·v1.6·v1.10)으로 저장한다.
+        String version = resourcePath.substring(resourcePath.lastIndexOf("-v") + 1, resourcePath.lastIndexOf(".txt"));
         String template = new ClassPathResource(resourcePath).getContentAsString(StandardCharsets.UTF_8);
         promptTemplateRepository.saveAndFlush(PromptTemplate.builder().promptCode(code).name(targetJson + " pipeline test")
-                .version("v1.0").targetJson(targetJson).templateText(template).forbiddenRules("JSON 이외의 응답 금지").isActive(true).build());
+                .version(version).targetJson(targetJson).templateText(template).forbiddenRules("JSON 이외의 응답 금지").isActive(true).build());
     }
 
     private record Fixture(User user, AnalysisCase analysisCase, JobGuideDocument guide) { }

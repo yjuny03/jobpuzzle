@@ -198,9 +198,11 @@ class AnalysisPipelineHttpIntegrationTest {
     }
 
     private void savePrompt(String code, String targetJson, String resourcePath) throws IOException {
+        // 실행기는 프롬프트 버전으로 처리 경로를 고르므로, 파일 이름의 실제 버전(v1.3·v1.6·v1.10)으로 저장한다.
+        String version = resourcePath.substring(resourcePath.lastIndexOf("-v") + 1, resourcePath.lastIndexOf(".txt"));
         String template = new ClassPathResource(resourcePath).getContentAsString(StandardCharsets.UTF_8);
         promptTemplateRepository.saveAndFlush(PromptTemplate.builder().promptCode(code).name(targetJson + " HTTP test")
-                .version("v1.0").targetJson(targetJson).templateText(template).forbiddenRules("JSON 이외의 응답 금지").isActive(true).build());
+                .version(version).targetJson(targetJson).templateText(template).forbiddenRules("JSON 이외의 응답 금지").isActive(true).build());
     }
 
     private RequestPostProcessor authenticated(User user) {
