@@ -74,6 +74,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("db-integration")
+// 로컬 MariaDB(localhost:3306)가 필요한 측정 테스트라 평소 테스트·CI에서는 실행하지 않는다. 실행: LOCAL_DB_MEASURE=true
+@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "LOCAL_DB_MEASURE", matches = "true")
 class AnalysisRunLatencyMeasurementTest {
 
     /** Mock AI 호출 1번당 넣는 지연. 실제 Claude는 단계별 수십 초 */

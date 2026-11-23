@@ -80,6 +80,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("db-integration")
+// 로컬 MariaDB(localhost:3306)가 필요한 측정 테스트라 평소 테스트·CI에서는 실행하지 않는다. 실행: LOCAL_DB_MEASURE=true
+@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "LOCAL_DB_MEASURE", matches = "true")
 class Json02PartitionConcurrencyMeasurementTest {
 
     static final long AI_DELAY_MS = 1_500;
