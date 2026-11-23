@@ -77,7 +77,7 @@ class RealUserFlowMeasurementTest {
 
         // 2) 분석 작업 생성(백엔드 개발·신입) → 자료 연결 → 입력 확정
         JsonNode created = data(mockMvc.perform(post("/analysis-cases").with(auth)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"jobCategoryId\":1}")).andReturn());
+                .contentType(MediaType.APPLICATION_JSON).content("{\"jobCategoryId\":" + jobCategoryId() + "}")).andReturn());
         long caseId = created.path("analysisCaseId").asLong();
         for (long extractionId : List.of(postingExtraction, resumeExtraction)) {
             mockMvc.perform(post("/analysis-cases/{id}/sources", caseId).with(auth)
@@ -176,5 +176,11 @@ class RealUserFlowMeasurementTest {
 
     private static long ms(long beginNanos) {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - beginNanos);
+    }
+
+    // 분석 기준 직무·경력 (기본 1 = IT·개발 > 백엔드 개발 > 신입). 활성 가이드가 있는 직무여야 분석이 시작된다.
+    private static long jobCategoryId() {
+        String value = System.getenv("REAL_JOB_CATEGORY_ID");
+        return value == null || value.isBlank() ? 1L : Long.parseLong(value);
     }
 }
